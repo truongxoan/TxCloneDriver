@@ -43,6 +43,8 @@ import Link from "next/link";
 const ALL_MODULES: { id: AppModuleId; label: string; icon: string; desc: string }[] = [
   { id: "overview", label: "Tổng quan", icon: "🏠", desc: "Xem trang thống kê trung tâm" },
   { id: "storage", label: "Google Drive", icon: "💾", desc: "Duyệt thư mục, xem phim & nghe nhạc" },
+  { id: "watch_together", label: "Xem & Nghe Chung", icon: "👥", desc: "Phòng nhạc YouTube & Drive đồng bộ, order bài" },
+  { id: "vault", label: "Két Sắt & 2FA", icon: "🔐", desc: "Quản lý mật khẩu, mã 2FA TOTP và bảo mật web" },
   { id: "notes", label: "Ghi chú & Link", icon: "📝", desc: "Quản lý ghi chú cá nhân và liên kết" },
   { id: "projects", label: "Dự án", icon: "📁", desc: "Quản lý dự án, tasks và tiến độ công việc" },
   { id: "events", label: "Lịch & Sự kiện", icon: "📅", desc: "Lịch âm dương, đếm ngược ngày lễ Tết" },

@@ -4,6 +4,8 @@ import { ThemeProvider } from "@/modules/theme-engine/themeContext";
 import { AuthProvider } from "@/modules/auth/authContext";
 import { DriveEndpointsProvider } from "@/modules/storage/driveEndpointsContext";
 import { TelegramProvider } from "@/modules/telegram/telegramContext";
+import { WatchPartyProvider } from "@/modules/watch-party/watchPartyContext";
+import { VaultProvider } from "@/modules/vault/vaultContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
@@ -23,9 +25,13 @@ export default function RootLayout({
         <AuthProvider>
           <DriveEndpointsProvider>
             <TelegramProvider>
-              <ThemeProvider>
-                <AppShell>{children}</AppShell>
-              </ThemeProvider>
+              <WatchPartyProvider>
+                <VaultProvider>
+                  <ThemeProvider>
+                    <AppShell>{children}</AppShell>
+                  </ThemeProvider>
+                </VaultProvider>
+              </WatchPartyProvider>
             </TelegramProvider>
           </DriveEndpointsProvider>
         </AuthProvider>

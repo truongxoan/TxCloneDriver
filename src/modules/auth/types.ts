@@ -9,7 +9,9 @@ export type AppModuleId =
   | "events"
   | "weather"
   | "settings"
-  | "telegram";
+  | "telegram"
+  | "watch_together"
+  | "vault";
 
 export interface AuthUser {
   id?: string;

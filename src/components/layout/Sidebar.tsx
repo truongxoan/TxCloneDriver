@@ -17,6 +17,8 @@ import {
   ChevronRight,
   X,
   Lock,
+  Users2,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -39,6 +41,8 @@ interface SidebarLinkItem {
 const SIDEBAR_LINKS: SidebarLinkItem[] = [
   { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
   { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
+  { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
+  { href: "/vault", label: "Két Sắt & 2FA", icon: KeyRound, module: "vault" },
   { href: "/notes", label: "Ghi chú & Link", icon: Link2, module: "notes" },
   { href: "/projects", label: "Dự án", icon: Folder, module: "projects" },
   { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays, module: "events" },

@@ -2,7 +2,19 @@
 
 import React from "react";
 import Link from "next/link";
-import { Lock, ShieldAlert, ArrowRight, HardDrive, Folder, Link2, Home, CalendarDays, CloudSun } from "lucide-react";
+import {
+  Lock,
+  ShieldAlert,
+  ArrowRight,
+  HardDrive,
+  Folder,
+  Link2,
+  Home,
+  CalendarDays,
+  CloudSun,
+  Users2,
+  KeyRound,
+} from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
 import { AppModuleId } from "@/modules/auth/types";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +28,8 @@ interface ModuleGuardProps {
 const MODULE_NAMES: Record<AppModuleId, { name: string; href: string; icon: React.ElementType }> = {
   overview: { name: "Tổng quan", href: "/overview", icon: Home },
   storage: { name: "Google Drive", href: "/storage", icon: HardDrive },
+  watch_together: { name: "Xem & Nghe Chung", href: "/watch-together", icon: Users2 },
+  vault: { name: "Két Sắt & 2FA", href: "/vault", icon: KeyRound },
   notes: { name: "Ghi chú & Link", href: "/notes", icon: Link2 },
   projects: { name: "Dự án", href: "/projects", icon: Folder },
   events: { name: "Lịch & Sự kiện", href: "/events", icon: CalendarDays },
