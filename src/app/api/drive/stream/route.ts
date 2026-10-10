@@ -18,14 +18,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    const mimeParam = searchParams.get("mime");
     const contentType1 = res1.headers.get("content-type") || "";
 
-    // If it's already an audio or binary stream (e.g. file < 100MB), stream it directly
+    // If it's already an audio/video or binary stream (e.g. file < 100MB), stream it directly
     if (!contentType1.includes("text/html") && res1.body) {
+      const finalType = mimeParam || (contentType1.includes("video") ? contentType1 : contentType1 || "audio/mpeg");
       return new NextResponse(res1.body as any, {
         status: 200,
         headers: {
-          "Content-Type": contentType1 || "audio/mpeg",
+          "Content-Type": finalType,
           "Accept-Ranges": "bytes",
           "Cache-Control": "public, max-age=3600",
         },
@@ -72,8 +74,10 @@ export async function GET(request: NextRequest) {
     const resContentLength = res2.headers.get("content-length");
     const resContentRange = res2.headers.get("content-range");
 
+    const finalContentType = mimeParam || (resContentType.includes("text/html") ? "audio/mpeg" : resContentType);
+
     const responseHeaders: Record<string, string> = {
-      "Content-Type": resContentType.includes("text/html") ? "audio/mpeg" : resContentType,
+      "Content-Type": finalContentType,
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=86400",
     };
