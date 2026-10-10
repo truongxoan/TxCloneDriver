@@ -3,200 +3,347 @@
 import React, { useState } from "react";
 import {
   Send,
-  ShieldAlert,
   Terminal,
   Users,
   Bell,
   CheckCircle2,
   AlertTriangle,
   Info,
-  ExternalLink,
   Key,
+  MessageSquare,
+  Sparkles,
+  Zap,
+  Check,
+  RotateCw,
+  Search,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useTelegram } from "@/modules/telegram/telegramContext";
+import { cn } from "@/lib/utils";
 
 const BOT_COMMANDS = [
   { command: "/start", desc: "Khởi động bot và xác thực danh tính người dùng" },
   { command: "/help", desc: "Xem danh sách các lệnh và cú pháp sử dụng" },
   { command: "/status", desc: "Kiểm tra tình trạng tài nguyên, CPU, RAM và sao lưu" },
   { command: "/search <từ khóa>", desc: "Tìm kiếm tài liệu và tệp tin trên Google Drive" },
-  { command: "/recent", desc: "Xem 5 tệp tin cập nhật gần đây nhất" },
+  { command: "/recent", desc: "Xem các tệp tin cập nhật gần đây nhất" },
   { command: "/backup", desc: "Kích hoạt phiên sao lưu snapshot thủ công khẩn cấp" },
   { command: "/cancel", desc: "Hủy bỏ tác vụ đang chờ xác nhận" },
 ];
 
 export default function TelegramPage() {
-  const [testStatus, setTestStatus] = useState<string | null>(null);
+  const {
+    botToken,
+    chatId,
+    botInfo,
+    isConnected,
+    saveConfig,
+    testConnection,
+    sendTestMessage,
+    autoDetectChatId,
+    disconnect,
+  } = useTelegram();
 
-  const handleTestConnection = () => {
-    setTestStatus("Đang kiểm tra kết nối Webhook...");
-    setTimeout(() => {
-      setTestStatus("Chưa thiết lập TELEGRAM_BOT_TOKEN trong biến môi trường. Vui lòng cấu hình ở Giai đoạn 6.");
-    }, 1200);
+  const [inputToken, setInputToken] = useState(botToken);
+  const [inputChatId, setInputChatId] = useState(chatId);
+  const [loadingTest, setLoadingTest] = useState(false);
+  const [loadingSend, setLoadingSend] = useState(false);
+  const [loadingDetect, setLoadingDetect] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveConfig(inputToken, inputChatId);
+    setStatusMessage({ type: "success", text: "Đã lưu cấu hình Bot Telegram thành công!" });
+  };
+
+  const handleTestBot = async () => {
+    setLoadingTest(true);
+    setStatusMessage(null);
+    const res = await testConnection(inputToken);
+    setLoadingTest(false);
+    if (res.success && res.bot) {
+      saveConfig(inputToken, inputChatId);
+      setStatusMessage({
+        type: "success",
+        text: `Kết nối thành công tới Bot: ${res.bot.name} (@${res.bot.username})!`,
+      });
+    } else {
+      setStatusMessage({
+        type: "error",
+        text: res.error || "Token Bot không chính xác. Vui lòng kiểm tra lại.",
+      });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    setLoadingSend(true);
+    setStatusMessage(null);
+    const res = await sendTestMessage();
+    setLoadingSend(false);
+    if (res.success) {
+      setStatusMessage({
+        type: "success",
+        text: "Đã gửi tin nhắn thử nghiệm thành công! Hãy kiểm tra ứng dụng Telegram trên điện thoại/máy tính của bạn.",
+      });
+    } else {
+      setStatusMessage({
+        type: "error",
+        text: res.error || "Không thể gửi tin nhắn. Hãy kiểm tra Chat ID hoặc chắc chắn bạn đã bấm 'Start' trong chat với Bot.",
+      });
+    }
+  };
+
+  const handleAutoDetect = async () => {
+    setLoadingDetect(true);
+    setStatusMessage(null);
+    const res = await autoDetectChatId();
+    setLoadingDetect(false);
+    if (res.success && res.chatId) {
+      setInputChatId(res.chatId);
+      setStatusMessage({
+        type: "success",
+        text: `Đã tự động tìm thấy Chat ID của bạn: ${res.chatId}!`,
+      });
+    } else {
+      setStatusMessage({
+        type: "error",
+        text: res.error || "Chưa tìm thấy tin nhắn nào. Hãy mở Telegram gửi 1 tin nhắn cho Bot rồi bấm lại nút này!",
+      });
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Notice Banner */}
-      <div className="rounded-2xl glass-panel p-4 border border-cyan-500/30 bg-cyan-500/10 flex items-start gap-3">
-        <Info className="h-5 w-5 text-cyan-400 shrink-0 mt-0.5" />
-        <div className="text-xs space-y-1">
-          <div className="font-semibold text-cyan-300">
-            Trạng thái Mô phỏng Giai đoạn 1 &mdash; Chưa kết nối Telegram Bot thật
-          </div>
-          <p className="text-muted-foreground">
-            Bot Telegram chưa được nạp Token hoặc Webhook Secret. Theo quy chuẩn bảo mật tại Section 12 & 15,
-            mọi thao tác tương tác Bot sẽ được xây dựng và mã hóa bảo mật toàn diện ở{" "}
-            <span className="text-primary font-medium">Giai đoạn 6</span>.
-          </p>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Send className="h-6 w-6 text-cyan-400" />
+            <Send className="h-6 w-6 text-sky-400" />
             Telegram Control Hub
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Trung tâm điều khiển và tiếp nhận cảnh báo tự động thông qua Telegram Bot API
+            Cấu hình Bot Telegram, kết nối thông báo thời gian thực và quản lý lệnh tương tác
           </p>
         </div>
 
-        <Badge variant="warning" size="md">
-          Chờ tích hợp (Giai đoạn 6)
+        <Badge
+          variant={isConnected ? "success" : "outline"}
+          size="md"
+          className="flex items-center gap-1.5"
+        >
+          <span
+            className={cn(
+              "h-2 w-2 rounded-full",
+              isConnected ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+            )}
+          />
+          <span>{isConnected ? `Đã kết nối: @${botInfo?.username}` : "Chưa kết nối Bot"}</span>
         </Badge>
       </div>
 
-      {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-5">
-          <span className="text-xs text-muted-foreground">Trạng thái Webhook</span>
-          <div className="text-lg font-bold text-amber-400 mt-1 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Chưa đăng ký Webhook
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Yêu cầu HTTPS công khai và Secret Token xác thực
-          </p>
-        </Card>
+      {/* Live Status Message */}
+      {statusMessage && (
+        <div
+          className={cn(
+            "p-4 rounded-2xl border text-xs flex items-center gap-3 animate-in fade-in",
+            statusMessage.type === "success"
+              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : "bg-rose-500/15 border-rose-500/30 text-rose-300"
+          )}
+        >
+          {statusMessage.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+          )}
+          <span>{statusMessage.text}</span>
+        </div>
+      )}
 
-        <Card className="p-5">
-          <span className="text-xs text-muted-foreground">Người dùng được cấp phép (Whitelist)</span>
-          <div className="text-lg font-bold text-foreground mt-1 flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            0 Tài khoản liên kết
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Chống truy cập trái phép & kiểm tra phân quyền backend
-          </p>
-        </Card>
-
-        <Card className="p-5">
-          <span className="text-xs text-muted-foreground">Kênh nhận thông báo</span>
-          <div className="text-lg font-bold text-foreground mt-1 flex items-center gap-2">
-            <Bell className="h-4 w-4 text-accent" />
-            Sẵn sàng cấu hình
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Cảnh báo thời tiết xấu, backup lỗi và nhắc việc
-          </p>
-        </Card>
-      </div>
-
-      {/* Webhook Configuration Preview & Command Reference */}
+      {/* Main Bot Setup Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Command Reference (7 cols) */}
-        <div className="lg:col-span-7">
-          <Card className="p-5">
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-primary" />
-                Đặc tả Bộ lệnh Tương tác Bot
-              </CardTitle>
-              <CardDescription>
-                Các câu lệnh người dùng được hỗ trợ khi chat trực tiếp với bot
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="space-y-2">
-                {BOT_COMMANDS.map((cmd, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border flex items-start justify-between gap-4"
-                  >
-                    <div>
-                      <span className="font-mono text-xs font-bold text-primary">
-                        {cmd.command}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {cmd.desc}
-                      </p>
-                    </div>
-                    <Badge variant="outline" size="sm" className="shrink-0 text-[10px]">
-                      Kiểm tra quyền
-                    </Badge>
-                  </div>
-                ))}
+        {/* Left: Configuration Form (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          <Card className="p-6 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400">
+                  <Key className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Cấu hình Bot Telegram</h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Nhập Bot Token từ @BotFather và Chat ID của bạn
+                  </p>
+                </div>
               </div>
+
+              {isConnected && (
+                <button
+                  onClick={disconnect}
+                  className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                >
+                  Ngắt kết nối
+                </button>
+              )}
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-4">
+              {/* Token Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-200 block">
+                  1. Telegram Bot Token
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="VD: 7123456789:AAFlkBq7_Z9Y1xAbCdEf..."
+                    value={inputToken}
+                    onChange={(e) => setInputToken(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl glass-input text-xs text-white font-mono"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTestBot}
+                    disabled={loadingTest || !inputToken.trim()}
+                    className="gap-1.5 text-xs shrink-0"
+                  >
+                    <Zap className="h-3.5 w-3.5 text-amber-400" />
+                    <span>{loadingTest ? "Đang kiểm tra..." : "Kiểm tra Token"}</span>
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Lấy miễn phí bằng cách chat với <strong className="text-sky-300">@BotFather</strong> trên Telegram và gõ lệnh <code>/newbot</code>.
+                </p>
+              </div>
+
+              {/* Chat ID Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-200 block">
+                  2. Telegram Chat ID (Nơi nhận tin nhắn)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="VD: 123456789 (Dãy số ID tài khoản hoặc nhóm)"
+                    value={inputChatId}
+                    onChange={(e) => setInputChatId(e.target.value)}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl glass-input text-xs text-white font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleAutoDetect}
+                    disabled={loadingDetect || !inputToken.trim()}
+                    className="gap-1.5 text-xs shrink-0"
+                    title="Tự động tìm Chat ID từ tin nhắn gần nhất bạn gửi cho bot"
+                  >
+                    <Search className="h-3.5 w-3.5 text-sky-400" />
+                    <span>{loadingDetect ? "Đang quét..." : "Tự tìm ID"}</span>
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Gửi 1 tin nhắn bất kỳ cho bot của bạn trên Telegram, sau đó bấm <strong>&ldquo;Tự tìm ID&rdquo;</strong> để hệ thống tự điền ID! Hoặc chat với <code>@userinfobot</code> để lấy số ID.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/10">
+                <Button type="submit" variant="secondary" size="sm" className="text-xs">
+                  Lưu cấu hình
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSendMessage}
+                  disabled={loadingSend || !inputToken || !inputChatId}
+                  className="gap-1.5 text-xs"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  <span>{loadingSend ? "Đang gửi..." : "Gửi tin nhắn thử nghiệm"}</span>
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          {/* Bot Commands Reference */}
+          <Card className="p-5">
+            <CardHeader className="p-0 pb-3">
+              <CardTitle className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <Terminal className="h-4 w-4 text-sky-400" />
+                Các Lệnh Tương Tác Hỗ Trợ
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 space-y-2">
+              {BOT_COMMANDS.map((cmd, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-mono font-bold text-sky-300">{cmd.command}</span>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{cmd.desc}</p>
+                  </div>
+                  <Badge variant="outline" size="sm" className="text-[9px]">
+                    Hoạt động
+                  </Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>
 
-        {/* Setup Guide & Test Trigger (5 cols) */}
+        {/* Right: Bot Info Card & Features (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
           <Card className="p-5 space-y-4">
-            <CardHeader className="p-0 pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Key className="h-4 w-4 text-accent" />
-                Cấu hình Giai đoạn 6
-              </CardTitle>
-              <CardDescription>
-                Các bước chuẩn bị để kích hoạt Bot an toàn
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="p-0 space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-surface-elevated/60 border border-surface-border space-y-1.5">
-                <span className="font-semibold text-foreground">Bước 1: Tạo bot qua @BotFather</span>
-                <p className="text-muted-foreground text-[11px]">
-                  Lấy chuỗi token dạng: <code className="text-primary font-mono">123456:ABC-DEF...</code>
+            <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+              <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+                <Send className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-sm">
+                  {botInfo?.name || "DataVault Cloud Bot"}
+                </h3>
+                <p className="text-xs text-sky-400 font-mono">
+                  {botInfo?.username ? `@${botInfo.username}` : "@Chưa kết nối"}
                 </p>
               </div>
+            </div>
 
-              <div className="p-3 rounded-xl bg-surface-elevated/60 border border-surface-border space-y-1.5">
-                <span className="font-semibold text-foreground">Bước 2: Cài đặt biến môi trường</span>
-                <p className="text-muted-foreground text-[11px]">
-                  Cấu hình <code className="text-primary font-mono">TELEGRAM_BOT_TOKEN</code> và{" "}
-                  <code className="text-primary font-mono">TELEGRAM_WEBHOOK_SECRET</code> trong file .env.
-                </p>
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-slate-300">Trạng thái kết nối</span>
+                <span className="font-bold text-emerald-400">
+                  {isConnected ? "Hoạt động (Online)" : "Chưa cấu hình"}
+                </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-surface-elevated/60 border border-surface-border space-y-1.5">
-                <span className="font-semibold text-foreground">Bước 3: Whitelist User ID</span>
-                <p className="text-muted-foreground text-[11px]">
-                  Chỉ cho phép Telegram ID của quản trị viên thực thi lệnh backup và tìm kiếm tệp.
-                </p>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-slate-300">Chat ID đích</span>
+                <span className="font-mono text-white">{chatId || "Chưa có"}</span>
               </div>
 
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full mt-2"
-                onClick={handleTestConnection}
-              >
-                Kiểm tra kết nối Bot (Thử nghiệm)
-              </Button>
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/10">
+                <span className="text-slate-300">Giao thức API</span>
+                <span className="text-slate-300">Telegram Bot API (HTTPS)</span>
+              </div>
+            </div>
 
-              {testStatus && (
-                <div className="p-2.5 rounded-xl bg-surface-elevated border border-primary/30 text-[11px] text-foreground">
-                  {testStatus}
-                </div>
-              )}
-            </CardContent>
+            <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-400/20 text-[11px] text-sky-300 space-y-1">
+              <p className="font-bold">✨ Tự động hóa kết nối:</p>
+              <p className="text-slate-300">
+                Khi cấu hình xong, hệ thống DataVault sẽ tự động gửi thông báo khi hoàn thành sao lưu hoặc cảnh báo thời tiết bất thường trực tiếp vào điện thoại của bạn!
+              </p>
+            </div>
           </Card>
         </div>
       </div>

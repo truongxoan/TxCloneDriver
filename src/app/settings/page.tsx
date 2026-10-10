@@ -16,9 +16,16 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useTheme } from "@/modules/theme-engine/themeContext";
+import { useAuth } from "@/modules/auth/authContext";
+import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
+import { useTelegram } from "@/modules/telegram/telegramContext";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const { effectsEnabled, setEffectsEnabled, intensity, setIntensity } = useTheme();
+  const { isAdmin } = useAuth();
+  const { endpoints, activeEndpoint } = useDriveEndpoints();
+  const { botToken, chatId, botInfo, isConnected: tgConnected } = useTelegram();
 
   const [activeTab, setActiveTab] = useState<"general" | "appearance" | "api" | "security">("general");
   const [hubName, setHubName] = useState("DataVault Cloud Hub Pro");
@@ -186,58 +193,107 @@ export default function SettingsPage() {
       )}
 
       {activeTab === "api" && (
-        <Card className="p-6 max-w-2xl space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-foreground text-sm">
-              Cấu hình Secret Môi trường (.env)
-            </h3>
-            <Badge variant="warning" size="sm">
-              Bảo mật Server-side
-            </Badge>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            Theo Section 15, không lưu API key hoặc token trực tiếp trên Frontend. Các giá trị dưới đây được ánh xạ từ file môi trường máy chủ.
-          </p>
-
-          <div className="space-y-3 text-xs">
-            <div>
-              <label className="text-muted-foreground block mb-1">
-                GOOGLE_DRIVE_CLIENT_ID (Giai đoạn 3)
-              </label>
-              <input
-                type="text"
-                disabled
-                placeholder="apps.googleusercontent.com (Chưa cấu hình)"
-                className="w-full px-3 py-2 rounded-xl glass-input opacity-60 cursor-not-allowed"
-              />
+        <div className="space-y-4 max-w-2xl">
+          {/* Section 1: Google Drive Apps Script Hub */}
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                  <span className="text-base">📁</span>
+                  Cổng Đồng bộ Google Drive (Apps Script Web App)
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Giải pháp tích hợp thư mục Google Drive trực tiếp, không yêu cầu thẻ thanh toán Google Cloud
+                </p>
+              </div>
+              <Badge variant={activeEndpoint ? "success" : "warning"} size="sm">
+                {activeEndpoint ? "Đang kết nối" : "Chưa cấu hình"}
+              </Badge>
             </div>
 
-            <div>
-              <label className="text-muted-foreground block mb-1">
-                TELEGRAM_BOT_TOKEN (Giai đoạn 6)
-              </label>
-              <input
-                type="password"
-                disabled
-                placeholder="••••••••••••••••••••••••••••••••"
-                className="w-full px-3 py-2 rounded-xl glass-input opacity-60 cursor-not-allowed"
-              />
+            <div className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Thư mục hoạt động:</span>
+                <span className="font-semibold text-foreground">{activeEndpoint?.name || "Chưa chọn"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">URL Web App:</span>
+                <span className="font-mono text-[10px] text-primary truncate max-w-xs" title={activeEndpoint?.url}>
+                  {activeEndpoint?.url ? `${activeEndpoint.url.slice(0, 45)}...` : "Chưa có"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Các điểm dự phòng:</span>
+                <span className="text-foreground">{endpoints.length} endpoint(s)</span>
+              </div>
             </div>
 
-            <div>
-              <label className="text-muted-foreground block mb-1">
-                DATABASE_URL (PostgreSQL - Giai đoạn 2)
-              </label>
-              <input
-                type="password"
-                disabled
-                placeholder="postgresql://user:pass@localhost:5432/datavault"
-                className="w-full px-3 py-2 rounded-xl glass-input opacity-60 cursor-not-allowed"
-              />
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Link href="/storage">
+                <Button variant="primary" size="sm" className="text-xs">
+                  Quản lý & Chuyển đổi nguồn Drive &rarr;
+                </Button>
+              </Link>
             </div>
-          </div>
-        </Card>
+          </Card>
+
+          {/* Section 2: Telegram Bot Integration */}
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                  <span className="text-base">✈️</span>
+                  Tích hợp Telegram Bot Thông báo
+                </h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Gửi thông báo thời tiết, sự kiện và tình trạng sao lưu qua Telegram Bot
+                </p>
+              </div>
+              <Badge variant={tgConnected ? "success" : "default"} size="sm">
+                {tgConnected ? "Đã kết nối" : "Chưa cấu hình"}
+              </Badge>
+            </div>
+
+            <div className="p-3 rounded-xl bg-surface-elevated/40 border border-surface-border space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Bot Name:</span>
+                <span className="font-semibold text-foreground">
+                  {botInfo?.username ? `@${botInfo.username}` : "Chưa xác minh"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Chat ID đích:</span>
+                <span className="font-mono text-[10px] text-foreground">
+                  {chatId || "Chưa cấu hình"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Link href="/telegram">
+                <Button variant="primary" size="sm" className="text-xs">
+                  Cấu hình & Kiểm tra Telegram &rarr;
+                </Button>
+              </Link>
+            </div>
+          </Card>
+
+          {/* Section 3: Server Environment Secrets */}
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-foreground text-sm">
+                Bảo mật Server-side (.env)
+              </h3>
+              <Badge variant="warning" size="sm">
+                Môi trường Máy chủ
+              </Badge>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Các khóa API máy chủ được mã hóa và chỉ đọc từ biến môi trường máy chủ Next.js khi cần bảo vệ toàn diện.
+            </p>
+          </Card>
+        </div>
       )}
 
       {activeTab === "security" && (

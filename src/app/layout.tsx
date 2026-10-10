@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/modules/theme-engine/themeContext";
 import { AuthProvider } from "@/modules/auth/authContext";
+import { DriveEndpointsProvider } from "@/modules/storage/driveEndpointsContext";
+import { TelegramProvider } from "@/modules/telegram/telegramContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
@@ -19,9 +21,13 @@ export default function RootLayout({
     <html lang="vi" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased selection:bg-primary/30 selection:text-white">
         <AuthProvider>
-          <ThemeProvider>
-            <AppShell>{children}</AppShell>
-          </ThemeProvider>
+          <DriveEndpointsProvider>
+            <TelegramProvider>
+              <ThemeProvider>
+                <AppShell>{children}</AppShell>
+              </ThemeProvider>
+            </TelegramProvider>
+          </DriveEndpointsProvider>
         </AuthProvider>
       </body>
     </html>

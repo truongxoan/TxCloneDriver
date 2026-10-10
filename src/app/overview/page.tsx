@@ -30,12 +30,16 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { useAuth } from "@/modules/auth/authContext";
+import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
+import { useTelegram } from "@/modules/telegram/telegramContext";
 import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar/lunarConverter";
 import { getWeather } from "@/modules/weather/weatherMockService";
 
 export default function OverviewPage() {
   const { currentTheme } = useTheme();
   const { user, isAdmin } = useAuth();
+  const { endpoints, activeEndpoint, files } = useDriveEndpoints();
+  const { isConnected: tgConnected, botInfo } = useTelegram();
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date(2025, 3, 26)); // Tháng 4 2025
   const [searchVal, setSearchVal] = useState("");
 
@@ -95,7 +99,10 @@ export default function OverviewPage() {
         {/* 4 Quick Service Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
           {/* Card 1: Google Drive */}
-          <div className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3">
+          <Link
+            href="/storage"
+            className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3 hover:border-blue-400/40 transition-all cursor-pointer"
+          >
             <div className="h-10 w-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 shadow-sm">
               <svg className="h-5 w-5" viewBox="0 0 87.3 78" fill="none">
                 <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
@@ -108,22 +115,33 @@ export default function OverviewPage() {
             </div>
             <div className="min-w-0">
               <h3 className="text-xs font-bold text-white truncate">Google Drive</h3>
-              <p className="text-[11px] text-emerald-400 font-semibold">Đã kết nối</p>
-              <p className="text-[10px] text-slate-400">12.5 GB / 15 GB</p>
+              <p className={cn("text-[11px] font-semibold", activeEndpoint ? "text-emerald-400" : "text-amber-400")}>
+                {activeEndpoint ? "Đã kết nối" : "Chưa kết nối"}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {activeEndpoint ? `${files.length} tệp · ${endpoints.length} nguồn` : "Nhấp cấu hình"}
+              </p>
             </div>
-          </div>
+          </Link>
 
           {/* Card 2: Telegram */}
-          <div className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3">
+          <Link
+            href="/telegram"
+            className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3 hover:border-sky-400/40 transition-all cursor-pointer"
+          >
             <div className="h-10 w-10 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0 shadow-sm">
               <Send className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <h3 className="text-xs font-bold text-white truncate">Telegram</h3>
-              <p className="text-[11px] text-emerald-400 font-semibold">Đã kết nối</p>
-              <p className="text-[10px] text-slate-400 truncate">Nhận thông báo</p>
+              <p className={cn("text-[11px] font-semibold", tgConnected ? "text-emerald-400" : "text-amber-400")}>
+                {tgConnected ? "Đã kết nối" : "Chưa cấu hình"}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {botInfo?.username ? `@${botInfo.username}` : "Cấu hình ngay"}
+              </p>
             </div>
-          </div>
+          </Link>
 
           {/* Card 3: Sao lưu tự động */}
           <div className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3">
@@ -275,8 +293,12 @@ export default function OverviewPage() {
                 <Send className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold text-white truncate">Đã kết nối tài khoản</p>
-                <p className="text-[10px] text-slate-400 truncate">@your_username</p>
+                <p className="text-[11px] font-bold text-white truncate">
+                  {tgConnected ? "Đã kết nối Telegram Bot" : "Chưa kết nối Bot"}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {botInfo?.username ? `@${botInfo.username}` : "Cần cấu hình Bot Token"}
+                </p>
               </div>
             </div>
 
@@ -337,9 +359,12 @@ export default function OverviewPage() {
               </div>
             </div>
 
-            <button className="mt-3 w-full py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 text-xs font-semibold transition-all">
-              Cài đặt chi tiết
-            </button>
+            <Link
+              href="/telegram"
+              className="mt-3 block text-center w-full py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 text-xs font-semibold transition-all"
+            >
+              Cài đặt & Gửi tin nhắn &rarr;
+            </Link>
           </div>
         </div>
 
