@@ -4,16 +4,26 @@
   Chạy 1 dòng duy nhất trên bất kỳ máy tính Windows nào để biến máy đó thành Máy chủ Server trực tuyến toàn cầu!
 #>
 
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$ErrorActionPreference = "Continue"
+
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "   🚀 TXCLONEDRIVER — KÍCH HOẠT MÁY CHỦ TỪ XA 24/7   " -ForegroundColor Yellow
 Write-Host "======================================================" -ForegroundColor Cyan
 
 # 1. Kiểm tra Node.js
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] Máy tính này chưa cài đặt Node.js." -ForegroundColor Red
-    Write-Host "[*] Đang tự động cài đặt Node.js qua winget..." -ForegroundColor Yellow
-    winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    if (Test-Path "C:\Program Files\nodejs\node.exe") {
+        $env:Path = "C:\Program Files\nodejs;" + $env:Path
+    } else {
+        Write-Host "[!] Máy tính này chưa cài đặt Node.js." -ForegroundColor Red
+        Write-Host "[*] Đang tự động cài đặt Node.js qua winget..." -ForegroundColor Yellow
+        winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        if (Test-Path "C:\Program Files\nodejs\node.exe") {
+            $env:Path = "C:\Program Files\nodejs;" + $env:Path
+        }
+    }
 }
 
 # 2. Thư mục cài đặt máy chủ
@@ -21,11 +31,23 @@ $HostDir = "C:\TxCloneDriver-Host"
 if (-not (Test-Path $HostDir)) {
     New-Item -ItemType Directory -Path $HostDir -Force | Out-Null
     Write-Host "[*] Đang tải mã nguồn dự án mới nhất từ GitHub..." -ForegroundColor Cyan
-    git clone https://github.com/truongxoan/TxCloneDriver.git $HostDir
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        git clone https://github.com/truongxoan/TxCloneDriver.git $HostDir
+    } else {
+        Write-Host "[*] Đang tải bản nén ZIP từ GitHub (không cần cài Git)..." -ForegroundColor Yellow
+        $zipPath = "$env:TEMP\TxCloneDriver-main.zip"
+        Invoke-WebRequest -Uri "https://github.com/truongxoan/TxCloneDriver/archive/refs/heads/main.zip" -OutFile $zipPath
+        Expand-Archive -Path $zipPath -DestinationPath "$env:TEMP\TxCloneDriver-extract" -Force
+        Copy-Item -Path "$env:TEMP\TxCloneDriver-extract\TxCloneDriver-main\*" -Destination $HostDir -Recurse -Force
+        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+        Remove-Item "$env:TEMP\TxCloneDriver-extract" -Recurse -Force -ErrorAction SilentlyContinue
+    }
 } else {
-    Write-Host "[*] Đang đồng bộ mã nguồn mới nhất từ GitHub..." -ForegroundColor Cyan
+    Write-Host "[*] Đang kiểm tra mã nguồn tại $HostDir..." -ForegroundColor Cyan
     Set-Location $HostDir
-    git pull origin main
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        git pull origin main 2>$null
+    }
 }
 
 Set-Location $HostDir
