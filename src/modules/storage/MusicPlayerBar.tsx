@@ -62,13 +62,15 @@ export function MusicPlayerBar({
       (currentTrack.url.includes("drive.google.com") || currentTrack.id.length > 20)
   );
 
+  const [isLoading, setIsLoading] = useState(false);
+
   // When track changes, load and reset
   useEffect(() => {
     if (currentTrack) {
       setAudioError(null);
       setCurrentTime(0);
+      setIsLoading(true);
 
-      // If it's a Drive file, try HTML5 first; if error occurs, prompt Drive Preview Player
       if (audioRef.current && !useDriveEmbed) {
         audioRef.current.src = currentTrack.url;
         audioRef.current.load();
@@ -76,16 +78,13 @@ export function MusicPlayerBar({
           .play()
           .then(() => {
             setIsPlaying(true);
+            setIsLoading(false);
             setAudioError(null);
           })
           .catch((err) => {
-            console.warn("Direct stream restricted by Google Drive", err);
+            console.warn("Audio play wait for user gesture or loading chunk", err);
             setIsPlaying(false);
-            if (isDriveTrack) {
-              setAudioError(
-                "Tệp Google Drive đang ở chế độ Riêng tư hoặc trên 100MB nên Google chặn phát trực tiếp ẩn danh."
-              );
-            }
+            setIsLoading(false);
           });
       }
     }
@@ -187,6 +186,16 @@ export function MusicPlayerBar({
           ref={audioRef}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleTimeUpdate}
+          onCanPlay={() => {
+            setIsLoading(false);
+            setAudioError(null);
+          }}
+          onWaiting={() => setIsLoading(true)}
+          onPlaying={() => {
+            setIsLoading(false);
+            setIsPlaying(true);
+            setAudioError(null);
+          }}
           onEnded={() => {
             if (isLoop) {
               audioRef.current?.play();
@@ -196,9 +205,10 @@ export function MusicPlayerBar({
           }}
           onError={() => {
             setIsPlaying(false);
+            setIsLoading(false);
             if (isDriveTrack) {
               setAudioError(
-                "Google Drive từ chối phát luồng do tệp đang để Riêng tư hoặc dung lượng quá lớn."
+                "Đang kết nối luồng tệp lớn từ Google Drive. Bạn có thể bấm 'Bật Trình phát Drive Preview' để nghe ngay qua tài khoản Google của bạn."
               );
             } else {
               setAudioError("Không thể tải nguồn âm thanh này.");

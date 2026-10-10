@@ -120,7 +120,9 @@ export default function StoragePage() {
         id: f.id,
         title: f.name.replace(/\.(mp3|m4a|wav|ogg|flac)$/i, ""),
         artist: "Google Drive Audio",
-        url: f.downloadUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        url: f.id.startsWith("audio-demo")
+          ? f.downloadUrl || ""
+          : `/api/drive/stream?id=${f.id}`,
       }));
   }, [allDisplayFiles]);
 
@@ -188,11 +190,15 @@ export default function StoragePage() {
   };
 
   const playFileAudio = (item: DriveFileItem) => {
+    const streamUrl = item.id.startsWith("audio-demo")
+      ? item.downloadUrl || ""
+      : `/api/drive/stream?id=${item.id}`;
+
     const track: AudioTrack = {
       id: item.id,
       title: item.name.replace(/\.(mp3|m4a|wav|ogg|flac)$/i, ""),
       artist: activeEndpoint?.name || "Google Drive Audio",
-      url: item.downloadUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+      url: streamUrl,
     };
     setCurrentTrack(track);
     triggerAction(`Đang phát: "${track.title}"`);
