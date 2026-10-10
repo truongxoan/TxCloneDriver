@@ -6,7 +6,7 @@
 
 ## 🌐 HƯỚNG DẪN ĐƯA WEBSITE LÊN MẠNG & GẮN TÊN MIỀN RIÊNG
 
-Dự án đã được đẩy lên GitHub tại: `https://github.com/3122380192/TxCloneDriver`
+Dự án đã được đẩy lên GitHub tại: `https://github.com/truongxoan/TxCloneDriver`
 
 Bạn có **2 CÁCH** để biến dự án này thành một website trực tuyến cho tất cả mọi người truy cập:
 
@@ -14,18 +14,18 @@ Bạn có **2 CÁCH** để biến dự án này thành một website trực tuy
 
 ### CÁCH 1: TRIỂN KHAI LÊN VERCEL (KHUYÊN DÙNG — MIỄN PHÍ 100%, 24/7, KHÔNG CẦN SERVER)
 
-> **Ưu điểm vượt trội**: Không tốn tiền thuê server, không cần bật máy tính ở nhà, website online vĩnh viễn 24/24 trên toàn cầu, tự động cấp HTTPS miễn phí và gắn tên miền bạn đã mua chỉ trong 1 phút.
+> **Ưu điểm vượt trội**: Không tốn tiền thuê server, không cần bật máy tính ở nhà, website online vĩnh viễn 24/24 trên toàn cầu, tự động cấp HTTPS miễn phí và gắn tên miền **`txlab.io.vn`** chỉ trong 1 phút.
 
-1. **Bước 1**: Truy cập **[https://vercel.com](https://vercel.com)** &rarr; Đăng nhập bằng tài khoản GitHub `3122380192`.
+1. **Bước 1**: Truy cập **[https://vercel.com](https://vercel.com)** &rarr; Đăng nhập bằng tài khoản GitHub `truongxoan`.
 2. **Bước 2**: Bấm nút **"Add New..."** &rarr; Chọn **"Project"**.
 3. **Bước 3**: Tìm kho lưu trữ **`TxCloneDriver`** và bấm nút **"Import"** &rarr; Bấm **"Deploy"**.
-4. **Bước 4 (Gắn tên miền của bạn)**:
+4. **Bước 4 (Gắn tên miền `txlab.io.vn` của bạn trên TenTen)**:
    - Sau khi Vercel build xong (khoảng 1 phút), vào mục **Settings** &rarr; **Domains**.
-   - Nhập tên miền bạn đã thuê (Ví dụ: `yourdomain.com`).
-   - Vercel sẽ hiển thị 2 bản ghi DNS:
-     - **A Record**: `76.76.21.21`
-     - **CNAME Record**: `cname.vercel-dns.com`
-   - Vào trang quản lý nơi bạn mua tên miền, thêm 2 bản ghi trên là website của bạn sẽ chính thức online toàn cầu!
+   - Nhập tên miền: `txlab.io.vn` (và `www.txlab.io.vn`).
+   - Vercel sẽ hiển thị 2 bản ghi DNS cần trỏ:
+     - **A Record**: Host `@` trỏ tới IP `76.76.21.21`
+     - **CNAME Record**: Host `www` trỏ tới `cname.vercel-dns.com`
+   - Đăng nhập vào trang quản trị tên miền TenTen (`id.tenten.vn`), vào mục **Quản lý tên miền** &rarr; **Cấu hình DNS** của `txlab.io.vn` và thêm 2 bản ghi trên là website chính thức hoạt động 24/7!
 
 ---
 
@@ -37,7 +37,7 @@ Bạn có **2 CÁCH** để biến dự án này thành một website trực tuy
 Mở PowerShell (Run as Administrator) và chạy đúng 1 dòng lệnh sau:
 
 ```powershell
-irm https://raw.githubusercontent.com/3122380192/TxCloneDriver/main/start-online.ps1 | iex
+irm https://raw.githubusercontent.com/truongxoan/TxCloneDriver/main/start-online.ps1 | iex
 ```
 
 #### Hoặc chạy file kịch bản tại chỗ:

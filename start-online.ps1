@@ -21,7 +21,7 @@ $HostDir = "C:\TxCloneDriver-Host"
 if (-not (Test-Path $HostDir)) {
     New-Item -ItemType Directory -Path $HostDir -Force | Out-Null
     Write-Host "[*] Đang tải mã nguồn dự án mới nhất từ GitHub..." -ForegroundColor Cyan
-    git clone https://github.com/3122380192/TxCloneDriver.git $HostDir
+    git clone https://github.com/truongxoan/TxCloneDriver.git $HostDir
 } else {
     Write-Host "[*] Đang đồng bộ mã nguồn mới nhất từ GitHub..." -ForegroundColor Cyan
     Set-Location $HostDir
