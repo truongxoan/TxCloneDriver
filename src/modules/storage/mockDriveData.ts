@@ -1,0 +1,92 @@
+import { StorageItem, StorageQuota } from "./types";
+
+export const MOCK_STORAGE_QUOTA: StorageQuota = {
+  totalBytes: 15 * 1024 * 1024 * 1024, // 15 GB
+  usedBytes: 4.8 * 1024 * 1024 * 1024, // 4.8 GB
+  breakdown: {
+    documentsBytes: 1.2 * 1024 * 1024 * 1024,
+    imagesBytes: 1.8 * 1024 * 1024 * 1024,
+    backupsBytes: 1.5 * 1024 * 1024 * 1024,
+    othersBytes: 0.3 * 1024 * 1024 * 1024,
+  },
+};
+
+export const MOCK_STORAGE_ITEMS: StorageItem[] = [
+  {
+    id: "item-1",
+    name: "Tài liệu Dự án DataVault 2026.pdf",
+    category: "document",
+    sizeBytes: 14.5 * 1024 * 1024,
+    mimeType: "application/pdf",
+    updatedAt: "Hôm nay, 14:30",
+    starred: true,
+    driveSyncStatus: "demo_only",
+    owner: "Quản trị viên",
+  },
+  {
+    id: "item-2",
+    name: "Sao_luu_He_thong_Full_20261009.tar.gz",
+    category: "backup",
+    sizeBytes: 850 * 1024 * 1024,
+    mimeType: "application/gzip",
+    updatedAt: "Hôm qua, 23:00",
+    starred: true,
+    driveSyncStatus: "demo_only",
+    owner: "Hệ thống Tự động",
+  },
+  {
+    id: "item-3",
+    name: "Kế hoạch Tài chính Q4-2026.xlsx",
+    category: "document",
+    sizeBytes: 2.8 * 1024 * 1024,
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    updatedAt: "08/10/2026",
+    starred: false,
+    driveSyncStatus: "demo_only",
+    owner: "Quản trị viên",
+  },
+  {
+    id: "item-4",
+    name: "Banner_Xuan_Anh_Dao_4K.png",
+    category: "image",
+    sizeBytes: 18.2 * 1024 * 1024,
+    mimeType: "image/png",
+    updatedAt: "07/10/2026",
+    starred: true,
+    driveSyncStatus: "demo_only",
+    owner: "Design Hub",
+  },
+  {
+    id: "item-5",
+    name: "Hợp đồng Dịch vụ Cloud v2.docx",
+    category: "document",
+    sizeBytes: 5.1 * 1024 * 1024,
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    updatedAt: "05/10/2026",
+    starred: false,
+    driveSyncStatus: "demo_only",
+    owner: "Pháp chế",
+  },
+  {
+    id: "item-6",
+    name: "Snapshot_Database_PostgreSQL.sql",
+    category: "backup",
+    sizeBytes: 420 * 1024 * 1024,
+    mimeType: "application/sql",
+    updatedAt: "03/10/2026",
+    starred: false,
+    driveSyncStatus: "demo_only",
+    owner: "Database Bot",
+  },
+  {
+    id: "item-7",
+    name: "Thư mục: Lưu trữ Ảnh Gia đình",
+    category: "folder",
+    sizeBytes: 1.2 * 1024 * 1024 * 1024,
+    mimeType: "folder",
+    updatedAt: "01/10/2026",
+    starred: true,
+    driveSyncStatus: "demo_only",
+    owner: "Quản trị viên",
+  },
+];
