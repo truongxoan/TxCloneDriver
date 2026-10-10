@@ -6,20 +6,16 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  FolderOpen,
   HardDrive,
-  Send,
+  Link2,
+  Folder,
   CalendarDays,
   CloudSun,
-  Moon,
-  Compass,
-  Bell,
   Settings,
   Cloud,
   ChevronLeft,
   ChevronRight,
   X,
-  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,15 +27,12 @@ interface SidebarProps {
 }
 
 const SIDEBAR_LINKS = [
-  { href: "/overview", label: "Trang chủ", icon: Home },
-  { href: "/storage", label: "Tệp của tôi", icon: FolderOpen },
+  { href: "/overview", label: "Tổng quan", icon: Home },
   { href: "/storage", label: "Google Drive", icon: HardDrive },
-  { href: "/telegram", label: "Telegram", icon: Send },
+  { href: "/notes", label: "Ghi chú & Link", icon: Link2 },
+  { href: "/projects", label: "Dự án", icon: Folder },
   { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays },
   { href: "/weather", label: "Thời tiết", icon: CloudSun },
-  { href: "/calendar", label: "Lịch âm dương", icon: Moon },
-  { href: "/traditional-calendar", label: "Giờ hoàng đạo", icon: Compass },
-  { href: "/activity", label: "Thông báo", icon: Bell },
   { href: "/settings", label: "Cài đặt", icon: Settings },
 ];
 
@@ -150,32 +143,15 @@ export function Sidebar({
           </nav>
         </div>
 
-        {/* Bottom Mascot Card matching user's reference mockup */}
+        {/* Bottom Brand Quote matching user's reference image */}
         {!collapsed && (
-          <div className="relative mt-auto pt-3">
-            <div className="rounded-3xl glass-card p-3 border border-white/15 text-center flex flex-col items-center relative overflow-hidden bg-gradient-to-b from-white/5 to-white/10">
-              {/* Cute Cat Mascot Avatar */}
-              <div className="relative w-16 h-16 rounded-2xl overflow-hidden mb-2 border border-white/20 shadow-md">
-                <Image
-                  src="/images/cat-mascot.jpg"
-                  alt="DataVault Mascot"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-
-              <div className="space-y-0.5 text-[11px] text-slate-300 font-medium">
-                <p>Lưu trữ an toàn</p>
-                <p>Kết nối mọi lúc</p>
-                <p className="text-[10px] text-muted-foreground">
-                  Khám phá không giới hạn
-                </p>
-              </div>
-
-              <button className="mt-2.5 w-full py-1.5 px-3 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 border border-blue-400/40 text-blue-200 text-xs font-bold transition-all shadow-sm">
-                DataVault 💙
-              </button>
-            </div>
+          <div className="relative mt-auto pt-4 px-2 pb-2 border-t border-white/10">
+            <p className="text-xs italic text-slate-300 font-serif leading-relaxed opacity-90">
+              &ldquo;Dữ liệu của bạn là tài sản quý giá nhất&rdquo;
+            </p>
+            <p className="text-[10px] text-sky-400 font-medium mt-1">
+              — DataVault Cloud Hub
+            </p>
           </div>
         )}
       </aside>

@@ -90,7 +90,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   const tetHoliday = holidayList.find((h) => h.id === "tet-nguyen-dan") || holidayList[0];
 
   return (
-    <header className="sticky top-0 z-30 flex h-auto min-h-[64px] w-full items-center justify-between px-3 sm:px-5 py-2.5 gap-2 overflow-x-auto no-scrollbar">
+    <header className="sticky top-0 z-30 flex h-auto min-h-[64px] w-full items-center justify-between md:justify-end px-3 sm:px-6 py-2.5 gap-4">
       {/* Mobile Hamburger Menu */}
       <button
         onClick={onOpenMobileMenu}
@@ -99,74 +99,28 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Main Multi-Pill Bar */}
-      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-        {/* Pill 1: Clock & Solar Date */}
-        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl glass-pill shrink-0">
-          <div className="flex flex-col">
-            <span className="text-sm font-extrabold text-foreground tracking-tight font-mono leading-none">
-              {hoursStr}:{minStr}:{secStr}
-            </span>
-            <span className="text-[11px] text-muted-foreground mt-0.5 whitespace-nowrap">
-              {weekday}, {solarDateStr}
-            </span>
+      {/* Header Info & Controls (aligned right, matching reference) */}
+      <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar">
+        {/* Clock & Solar Date */}
+        <div className="text-right shrink-0">
+          <div className="text-sm font-extrabold text-white tracking-tight font-mono leading-tight">
+            {hoursStr}:{minStr}:{secStr}
+          </div>
+          <div className="text-[11px] text-slate-300 font-medium">
+            {weekday}, {solarDateStr}
           </div>
         </div>
 
-        {/* Pill 2: Âm lịch & Can Chi */}
-        <div className="hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl glass-pill shrink-0">
-          <span className="text-lg">🐎</span>
+        {/* Weather Pill */}
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0 text-xs">
+          <span className="text-base">🌤️</span>
           <div className="flex flex-col text-left">
-            <span className="text-xs font-bold text-foreground leading-none">
-              Âm lịch: {lunar.day}/{lunar.month}/{lunar.year}
+            <span className="text-xs font-bold text-white leading-tight">
+              {weather.temperature}°C
             </span>
-            <span className="text-[10px] text-amber-300 font-medium mt-0.5 whitespace-nowrap">
-              (Ngày {lunar.canChiDay} &bull; Tháng {lunar.canChiMonth})
+            <span className="text-[10px] text-slate-300 truncate max-w-[110px]">
+              {weather.condition} - {weather.city}
             </span>
-          </div>
-        </div>
-
-        {/* Pill 3: Tết Nguyên Đán Countdown */}
-        <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0">
-          <div className="h-6 w-6 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
-            <Gift className="h-3.5 w-3.5" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[11px] font-bold text-foreground leading-none">
-              Tết Nguyên Đán
-            </span>
-            <span className="text-[10px] text-rose-400 font-semibold mt-0.5">
-              Còn {tetHoliday.daysRemaining} ngày
-            </span>
-          </div>
-        </div>
-
-        {/* Pill 4: Giờ hoàng đạo */}
-        <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0">
-          <div className="h-6 w-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0">
-            <Compass className="h-3.5 w-3.5" />
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="text-[11px] font-medium text-muted-foreground leading-none">
-              Giờ hoàng đạo
-            </span>
-            <span className="text-[11px] font-bold text-foreground mt-0.5 whitespace-nowrap">
-              {currentAuspicious.timeRange} ({currentAuspicious.chi.replace("Giờ ", "")})
-            </span>
-          </div>
-        </div>
-
-        {/* Pill 5: Thời tiết */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0 text-xs">
-          <CloudSun className="h-4 w-4 text-amber-300 shrink-0" />
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-foreground">{weather.city}</span>
-            <span className="font-extrabold text-foreground">{weather.temperature}°C</span>
-            <span className="text-muted-foreground text-[11px]">{weather.condition}</span>
-            <span className="text-muted-foreground/50 mx-0.5">|</span>
-            <span className="text-muted-foreground text-[10px]">Độ ẩm {weather.humidity}%</span>
-            <span className="text-muted-foreground/50 mx-0.5">|</span>
-            <span className="text-muted-foreground text-[10px]">Gió {weather.windSpeedKmH} km/h</span>
           </div>
         </div>
       </div>

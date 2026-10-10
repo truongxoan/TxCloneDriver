@@ -5,495 +5,113 @@ import Link from "next/link";
 import {
   Search,
   HardDrive,
-  Send,
-  RotateCw,
-  MoreVertical,
-  FileText,
-  Image as ImageIcon,
-  FileCode,
-  Archive,
-  ChevronRight,
   Folder,
-  CloudSun,
+  Cloud,
+  ChevronRight,
+  MoreVertical,
+  Laptop,
+  Smartphone,
+  Server,
+  Bookmark,
+  Upload,
+  Link2,
+  CheckCircle2,
   ChevronLeft,
-  Gift,
-  Landmark,
-  Star,
-  Cake,
-  Compass,
-  ScrollText,
-  Calendar,
-  Sparkles,
-  Check,
-  ShieldCheck,
+  X,
+  FileText,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/modules/theme-engine/themeContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
-import { useTelegram } from "@/modules/telegram/telegramContext";
-import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar/lunarConverter";
-import { getWeather } from "@/modules/weather/weatherMockService";
 
 export default function OverviewPage() {
-  const { currentTheme } = useTheme();
-  const { user, isAdmin } = useAuth();
-  const { endpoints, activeEndpoint, files } = useDriveEndpoints();
-  const { isConnected: tgConnected, botInfo } = useTelegram();
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date(2025, 3, 26)); // Tháng 4 2025
+  const { user } = useAuth();
+  const { activeEndpoint, files } = useDriveEndpoints();
   const [searchVal, setSearchVal] = useState("");
-
-  // Telegram switches state
-  const [tgReminders, setTgReminders] = useState(true);
-  const [tgWeather, setTgWeather] = useState(true);
-  const [tgSystem, setTgSystem] = useState(true);
-
-  const weather = getWeather("hanoi");
-  const lunar = convertSolar2Lunar(26, 4, 2025);
-  const auspiciousHours = getAuspiciousHours(26, 4, 2025, 12);
+  const [selectedMonth, setSelectedMonth] = useState("Tháng 4 2025");
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 animate-in fade-in duration-300">
+    <div className="space-y-4 max-w-7xl mx-auto animate-in fade-in duration-300 pb-10">
       {/* ============================================================== */}
-      {/* LEFT & CENTER MAIN WORKSPACE (8 COLS on XL) */}
+      {/* 1. TOP ROW: GREETING & SEARCH (LEFT) + COMPACT CALENDAR (RIGHT) */}
       {/* ============================================================== */}
-      <div className="xl:col-span-8 space-y-4">
-        {/* Hero Greeting & Search Banner */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1 pb-2">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm flex items-center gap-2.5">
-              Xin chào, {user?.name || "Người dùng"}
-              {isAdmin && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30 uppercase tracking-wider">
-                  Admin
-                </span>
-              )}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* Left: Greeting & Search Bar */}
+        <div className="lg:col-span-8 flex flex-col justify-between h-full pt-1">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm flex items-center gap-2">
+              <span>👋</span>
+              <span>Xin chào, {user?.name || "Trường"}!</span>
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium">
-              Mọi dữ liệu quan trọng của bạn đều được lưu trữ an toàn tại đây.
+            <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
+              Chào mừng bạn trở lại với DataVault Cloud Hub.
             </p>
           </div>
 
-          <div className="text-right hidden md:block">
-            <p className="text-xs italic text-slate-300 font-serif opacity-90 max-w-xs">
-              &ldquo;Hôm nay là một ngày tuyệt vời để bắt đầu những điều tốt đẹp!&rdquo;
-            </p>
-          </div>
-        </div>
-
-        {/* Global Search Pill Bar */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchVal}
-            onChange={(e) => setSearchVal(e.target.value)}
-            placeholder="Tìm kiếm tệp, thư mục, ..."
-            className="w-full pl-10 pr-20 py-2.5 rounded-2xl glass-input text-xs placeholder:text-slate-400 shadow-sm"
-          />
-          <kbd className="absolute right-3.5 top-2.5 rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 font-mono">
-            Ctrl + K
-          </kbd>
-        </div>
-
-        {/* 4 Quick Service Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-          {/* Card 1: Google Drive */}
-          <Link
-            href="/storage"
-            className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3 hover:border-blue-400/40 transition-all cursor-pointer"
-          >
-            <div className="h-10 w-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 shadow-sm">
-              <svg className="h-5 w-5" viewBox="0 0 87.3 78" fill="none">
-                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
-                <path d="M43.65 25 29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44C.4 50 0 51.55 0 53.1h27.5z" fill="#00AC47"/>
-                <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.3c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 10.15z" fill="#EA4335"/>
-                <path d="M43.65 25 57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.4-4.5 1.2z" fill="#00832D"/>
-                <path d="M59.8 53.1H87.3c0-1.55-.4-3.1-1.2-4.5l-25.4-44c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25z" fill="#2684FC"/>
-                <path d="M73.55 76.8H27.5L13.75 53h46.05z" fill="#FFBA00"/>
-              </svg>
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-xs font-bold text-white truncate">Google Drive</h3>
-              <p className={cn("text-[11px] font-semibold", activeEndpoint ? "text-emerald-400" : "text-amber-400")}>
-                {activeEndpoint ? "Đã kết nối" : "Chưa kết nối"}
-              </p>
-              <p className="text-[10px] text-slate-400 truncate">
-                {activeEndpoint ? `${files.length} tệp · ${endpoints.length} nguồn` : "Nhấp cấu hình"}
-              </p>
-            </div>
-          </Link>
-
-          {/* Card 2: Telegram */}
-          <Link
-            href="/telegram"
-            className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3 hover:border-sky-400/40 transition-all cursor-pointer"
-          >
-            <div className="h-10 w-10 rounded-2xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0 shadow-sm">
-              <Send className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-xs font-bold text-white truncate">Telegram</h3>
-              <p className={cn("text-[11px] font-semibold", tgConnected ? "text-emerald-400" : "text-amber-400")}>
-                {tgConnected ? "Đã kết nối" : "Chưa cấu hình"}
-              </p>
-              <p className="text-[10px] text-slate-400 truncate">
-                {botInfo?.username ? `@${botInfo.username}` : "Cấu hình ngay"}
-              </p>
-            </div>
-          </Link>
-
-          {/* Card 3: Sao lưu tự động */}
-          <div className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
-              <RotateCw className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-xs font-bold text-white truncate">Sao lưu tự động</h3>
-              <p className="text-[11px] text-emerald-400 font-semibold">Đang hoạt động</p>
-              <p className="text-[10px] text-slate-400 truncate">Lần gần nhất: 15:30</p>
-            </div>
-          </div>
-
-          {/* Card 4: Theme hiện tại */}
-          <div className="rounded-2xl glass-card p-3.5 border border-white/10 flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-pink-500/20 border border-pink-400/30 flex items-center justify-center text-pink-400 shrink-0 shadow-sm text-lg">
-              🌸
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-xs font-bold text-white truncate">Theme hiện tại</h3>
-              <p className="text-[11px] text-pink-300 font-semibold truncate">
-                {currentTheme.name}
-              </p>
-              <p className="text-[10px] text-slate-400 truncate">{currentTheme.nameVi}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Middle 3 Cards Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          {/* Card 1: Dung lượng lưu trữ (Circular Donut Chart) */}
-          <div className="rounded-3xl glass-card p-4 border border-white/10 flex flex-col justify-between">
-            <h3 className="text-xs font-bold text-white mb-2">Dung lượng lưu trữ</h3>
-
-            <div className="flex items-center gap-4 my-auto">
-              {/* Circular Gauge */}
-              <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke="rgba(255, 255, 255, 0.1)"
-                    strokeWidth="10"
-                    fill="transparent"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    stroke="#3b82f6"
-                    strokeWidth="10"
-                    strokeDasharray="251.2"
-                    strokeDashoffset="80.3"
-                    strokeLinecap="round"
-                    fill="transparent"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center">
-                  <span className="text-lg font-black text-white font-mono">68%</span>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-[11px] text-slate-400">Đã sử dụng</p>
-                <p className="text-sm font-black text-white">68.5 GB / 100 GB</p>
-              </div>
-            </div>
-
-            {/* Legend Breakdown */}
-            <div className="mt-3 pt-2.5 border-t border-white/10 space-y-1.5 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-300">
-                  <span className="h-2 w-2 rounded-full bg-blue-500" />
-                  Google Drive
-                </span>
-                <span className="font-mono text-slate-400">42.3 GB</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-300">
-                  <span className="h-2 w-2 rounded-full bg-cyan-400" />
-                  Telegram
-                </span>
-                <span className="font-mono text-slate-400">12.7 GB</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-slate-300">
-                  <span className="h-2 w-2 rounded-full bg-purple-400" />
-                  Khác
-                </span>
-                <span className="font-mono text-slate-400">13.5 GB</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Tệp gần đây */}
-          <div className="rounded-3xl glass-card p-4 border border-white/10 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-bold text-white">Tệp gần đây</h3>
-              <button className="text-slate-400 hover:text-white">
-                <MoreVertical className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 my-1">
-              {[
-                { name: "Báo cáo_Tháng_04.pdf", size: "2.4 MB · 2 giờ trước", color: "bg-rose-500/20 text-rose-400" },
-                { name: "Hình ảnh đẹp.jpg", size: "4.8 MB · 5 giờ trước", color: "bg-emerald-500/20 text-emerald-400" },
-                { name: "Tài liệu quan trọng.docx", size: "1.2 MB · 8 giờ trước", color: "bg-blue-500/20 text-blue-400" },
-                { name: "Bản sao lưu.zip", size: "256 MB · 1 ngày trước", color: "bg-amber-500/20 text-amber-400" },
-              ].map((file, idx) => (
-                <div key={idx} className="flex items-center gap-2.5 group cursor-pointer">
-                  <div className={cn("p-1.5 rounded-xl shrink-0", file.color)}>
-                    <FileText className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold text-slate-200 group-hover:text-blue-400 truncate transition-colors">
-                      {file.name}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      {file.size}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-2 pt-2 border-t border-white/10 text-right">
-              <Link
-                href="/storage"
-                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold inline-flex items-center gap-1"
-              >
-                Xem tất cả &rarr;
-              </Link>
-            </div>
-          </div>
-
-          {/* Card 3: Nhận thông báo Telegram */}
-          <div className="rounded-3xl glass-card p-4 border border-white/10 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-bold text-white">Nhận thông báo Telegram</h3>
-              <div className="h-7 w-7 rounded-full bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-400">
-                <Send className="h-3.5 w-3.5" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 p-2 rounded-2xl bg-white/5 border border-white/10 mb-2">
-              <div className="h-7 w-7 rounded-full bg-sky-500 flex items-center justify-center text-white shrink-0">
-                <Send className="h-3.5 w-3.5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold text-white truncate">
-                  {tgConnected ? "Đã kết nối Telegram Bot" : "Chưa kết nối Bot"}
-                </p>
-                <p className="text-[10px] text-slate-400 truncate">
-                  {botInfo?.username ? `@${botInfo.username}` : "Cần cấu hình Bot Token"}
-                </p>
-              </div>
-            </div>
-
-            {/* Toggle Switches */}
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-300">Nhắc sự kiện</span>
+          {/* Global Search Bar */}
+          <div className="relative mt-5 max-w-2xl">
+            <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              placeholder="Tìm kiếm tệp, thư mục, ghi chú, liên kết..."
+              className="w-full pl-11 pr-24 py-3 rounded-2xl glass-input text-xs sm:text-sm placeholder:text-slate-400 shadow-sm border border-white/10"
+            />
+            <div className="absolute right-3.5 top-2.5 flex items-center gap-1.5">
+              {searchVal && (
                 <button
-                  onClick={() => setTgReminders(!tgReminders)}
-                  className={cn(
-                    "w-8 h-4 rounded-full transition-colors relative",
-                    tgReminders ? "bg-blue-600" : "bg-slate-700"
-                  )}
+                  onClick={() => setSearchVal("")}
+                  className="p-1 rounded-md text-slate-400 hover:text-white"
                 >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition-transform",
-                      tgReminders ? "translate-x-4" : "translate-x-0"
-                    )}
-                  />
+                  <X className="h-3.5 w-3.5" />
                 </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-300">Cảnh báo thời tiết</span>
-                <button
-                  onClick={() => setTgWeather(!tgWeather)}
-                  className={cn(
-                    "w-8 h-4 rounded-full transition-colors relative",
-                    tgWeather ? "bg-blue-600" : "bg-slate-700"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition-transform",
-                      tgWeather ? "translate-x-4" : "translate-x-0"
-                    )}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-300">Thông báo hệ thống</span>
-                <button
-                  onClick={() => setTgSystem(!tgSystem)}
-                  className={cn(
-                    "w-8 h-4 rounded-full transition-colors relative",
-                    tgSystem ? "bg-blue-600" : "bg-slate-700"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white transition-transform",
-                      tgSystem ? "translate-x-4" : "translate-x-0"
-                    )}
-                  />
-                </button>
-              </div>
+              )}
+              <kbd className="hidden sm:inline-block rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 font-mono">
+                Ctrl + K
+              </kbd>
             </div>
-
-            <Link
-              href="/telegram"
-              className="mt-3 block text-center w-full py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-slate-200 text-xs font-semibold transition-all"
-            >
-              Cài đặt & Gửi tin nhắn &rarr;
-            </Link>
           </div>
         </div>
 
-        {/* Bottom Section 1: Thư mục của tôi (8 folders) */}
-        <div className="rounded-3xl glass-card p-4 border border-white/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white">Thư mục của tôi</h3>
-            <Link
-              href="/storage"
-              className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold"
-            >
-              Xem tất cả &rarr;
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {[
-              { name: "Công việc", count: "12 thư mục · 256 tệp", color: "text-amber-400" },
-              { name: "Học tập", count: "8 thư mục · 132 tệp", color: "text-cyan-400" },
-              { name: "Cá nhân", count: "6 thư mục · 98 tệp", color: "text-amber-500" },
-              { name: "Ảnh & Video", count: "24 thư mục · 524 tệp", color: "text-teal-400" },
-              { name: "Tài liệu quan trọng", count: "5 thư mục · 86 tệp", color: "text-orange-400" },
-              { name: "Dự án", count: "9 thư mục · 174 tệp", color: "text-yellow-400" },
-              { name: "Tải xuống", count: "28 tệp", color: "text-blue-400" },
-              { name: "Thùng rác", count: "12 tệp", color: "text-slate-400" },
-            ].map((folder, idx) => (
-              <div
-                key={idx}
-                className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-between transition-all group cursor-pointer"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Folder className={cn("h-5 w-5 shrink-0 fill-current", folder.color)} />
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-200 group-hover:text-white truncate">
-                      {folder.name}
-                    </p>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {folder.count}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-white shrink-0 ml-1" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Bottom Section 2: Dự báo thời tiết Ribbon Card */}
-        <div className="rounded-3xl glass-card p-4 border border-white/10">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            {/* Left: City & Current */}
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="text-3xl">🌤️</div>
-              <div>
-                <span className="text-[11px] text-slate-400 block">Dự báo thời tiết</span>
-                <span className="text-sm font-bold text-white">Hà Nội</span>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-lg font-black text-white font-mono">28°C</span>
-                  <span className="text-xs text-slate-300">Có mây</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Middle: Hourly */}
-            <div className="flex items-center gap-3 overflow-x-auto pb-1 lg:pb-0 text-center text-xs">
-              {[
-                { time: "17:00", temp: "28°", icon: "🌤️" },
-                { time: "20:00", temp: "26°", icon: "⛅" },
-                { time: "23:00", temp: "24°", icon: "🌙" },
-                { time: "02:00", temp: "23°", icon: "🌙" },
-                { time: "05:00", temp: "22°", icon: "🌧️" },
-              ].map((h, idx) => (
-                <div key={idx} className="p-2 rounded-xl bg-white/5 border border-white/10 min-w-[54px]">
-                  <span className="text-[10px] text-slate-400 font-mono">{h.time}</span>
-                  <div className="my-0.5 text-sm">{h.icon}</div>
-                  <span className="font-bold text-white text-xs">{h.temp}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Right: Daily */}
-            <div className="flex items-center gap-2.5 overflow-x-auto text-xs text-center border-t lg:border-t-0 lg:border-l border-white/10 pt-2 lg:pt-0 lg:pl-4">
-              {[
-                { day: "Hôm nay", range: "28°/21°" },
-                { day: "CN", range: "29°/22°" },
-                { day: "Th 2", range: "31°/23°" },
-                { day: "Th 3", range: "32°/24°" },
-                { day: "Th 4", range: "30°/22°" },
-              ].map((d, idx) => (
-                <div key={idx} className="min-w-[48px]">
-                  <span className="text-[10px] text-slate-400 block">{d.day}</span>
-                  <span className="text-xs font-bold text-slate-200 mt-1 block">{d.range}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================================== */}
-      {/* RIGHT SIDEBAR PANEL (4 COLS on XL) */}
-      {/* ============================================================== */}
-      <div className="xl:col-span-4 space-y-4">
-        {/* Card 1: Interactive Mini Calendar Tháng 4 2025 */}
-        <div className="rounded-3xl glass-card p-4 border border-white/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white">Tháng 4 2025</h3>
+        {/* Right: Sleek Month Calendar Widget */}
+        <div className="lg:col-span-4 rounded-3xl glass-card p-4 border border-white/10 shadow-glass">
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="text-xs font-bold text-white tracking-wide">
+              {selectedMonth}
+            </h3>
             <div className="flex items-center gap-1 text-slate-400">
-              <button className="p-1 hover:text-white"><ChevronLeft className="h-3.5 w-3.5" /></button>
-              <button className="p-1 hover:text-white"><ChevronRight className="h-3.5 w-3.5" /></button>
+              <button className="p-1 hover:text-white rounded-lg transition-colors">
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button className="p-1 hover:text-white rounded-lg transition-colors">
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
           {/* Weekday Row */}
-          <div className="grid grid-cols-7 gap-1 text-center font-bold text-[11px] text-slate-400">
-            <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span>
+          <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 mb-1">
+            <span>T2</span>
+            <span>T3</span>
+            <span>T4</span>
+            <span>T5</span>
+            <span>T6</span>
+            <span>T7</span>
             <span className="text-rose-400">CN</span>
           </div>
 
-          {/* Calendar Days Grid */}
+          {/* Days Grid */}
           <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium">
             {/* Trailing days of March */}
             <span className="py-1 text-slate-600">31</span>
-            <span className="py-1 text-slate-600">1</span>
-            <span className="py-1 text-slate-600">2</span>
-            <span className="py-1 text-slate-600">3</span>
-            <span className="py-1 text-slate-600">4</span>
-            <span className="py-1 text-slate-600">5</span>
-            <span className="py-1 text-rose-800">6</span>
+            <span className="py-1 text-slate-400">1</span>
+            <span className="py-1 text-slate-400">2</span>
+            <span className="py-1 text-slate-400">3</span>
+            <span className="py-1 text-slate-400">4</span>
+            <span className="py-1 text-slate-400">5</span>
+            <span className="py-1 text-rose-500/60">6</span>
 
             {/* Week 2 */}
             <span className="py-1 text-slate-300">7</span>
@@ -513,13 +131,12 @@ export default function OverviewPage() {
             <span className="py-1 text-slate-300">19</span>
             <span className="py-1 text-rose-400">20</span>
 
-            {/* Week 4 */}
+            {/* Week 4 (with 26 highlighted) */}
             <span className="py-1 text-slate-300">21</span>
             <span className="py-1 text-slate-300">22</span>
             <span className="py-1 text-slate-300">23</span>
             <span className="py-1 text-slate-300">24</span>
             <span className="py-1 text-slate-300">25</span>
-            {/* Today: 26 highlighted with blue circle */}
             <span className="py-1 flex items-center justify-center">
               <span className="h-6 w-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shadow-lg shadow-blue-500/50">
                 26
@@ -534,148 +151,405 @@ export default function OverviewPage() {
             <span className="py-1 text-slate-600">1</span>
             <span className="py-1 text-slate-600">2</span>
             <span className="py-1 text-slate-600">3</span>
-            <span className="py-1 text-rose-800">4</span>
+            <span className="py-1 text-rose-500/60">4</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* 2. ROW OF 4 OVERVIEW CARDS                                     */}
+      {/* ============================================================== */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+        {/* Card 1: Dung lượng Drive */}
+        <Link
+          href="/storage"
+          className="rounded-3xl glass-card p-4 border border-white/10 hover:border-blue-400/40 transition-all flex flex-col justify-between group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-10 w-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
+              <svg className="h-5 w-5" viewBox="0 0 87.3 78" fill="none">
+                <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                <path d="M43.65 25 29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44C.4 50 0 51.55 0 53.1h27.5z" fill="#00AC47"/>
+                <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.3c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 10.15z" fill="#EA4335"/>
+                <path d="M43.65 25 57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.4-4.5 1.2z" fill="#00832D"/>
+                <path d="M59.8 53.1H87.3c0-1.55-.4-3.1-1.2-4.5l-25.4-44c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25z" fill="#2684FC"/>
+                <path d="M73.55 76.8H27.5L13.75 53h46.05z" fill="#FFBA00"/>
+              </svg>
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
           </div>
 
-          {/* Today Pill at bottom of calendar */}
-          <div className="p-2 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2 text-xs">
-            <span className="text-sm">🌸</span>
-            <div>
-              <span className="text-[10px] text-pink-300 font-semibold block leading-none">
-                Ngày hôm nay
+          <div className="mt-3">
+            <span className="text-[11px] text-slate-400 block font-medium">Dung lượng Drive</span>
+            <span className="text-sm font-extrabold text-white mt-0.5 block">42.6 GB / 100 GB</span>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-2">
+              <div className="bg-blue-500 h-full rounded-full" style={{ width: "43%" }} />
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] mt-2 font-medium">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                {activeEndpoint ? "Đã kết nối" : "Sẵn sàng"}
               </span>
-              <span className="text-xs font-bold text-white">
-                26/04/2025 &bull; Âm lịch: 29/03/2025
-              </span>
+              <span className="text-slate-400 font-mono">43%</span>
+            </div>
+          </div>
+        </Link>
+
+        {/* Card 2: Ghi chú */}
+        <Link
+          href="/notes"
+          className="rounded-3xl glass-card p-4 border border-white/10 hover:border-purple-400/40 transition-all flex flex-col justify-between group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-10 w-10 rounded-2xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 shrink-0">
+              <Bookmark className="h-5 w-5" />
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
+          </div>
+
+          <div className="mt-3">
+            <span className="text-[11px] text-slate-400 block font-medium">Ghi chú</span>
+            <span className="text-2xl font-black text-white mt-0.5 block">18</span>
+            <p className="text-[11px] text-purple-300 font-medium mt-1">
+              +3 hôm nay
+            </p>
+          </div>
+        </Link>
+
+        {/* Card 3: Dự án đang làm */}
+        <Link
+          href="/projects"
+          className="rounded-3xl glass-card p-4 border border-white/10 hover:border-emerald-400/40 transition-all flex flex-col justify-between group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0">
+              <Folder className="h-5 w-5" />
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
+          </div>
+
+          <div className="mt-3">
+            <span className="text-[11px] text-slate-400 block font-medium">Dự án đang làm</span>
+            <span className="text-2xl font-black text-white mt-0.5 block">3</span>
+            <p className="text-[11px] text-emerald-300 font-medium mt-1">
+              1 sắp hoàn thành
+            </p>
+          </div>
+        </Link>
+
+        {/* Card 4: Sao lưu */}
+        <div className="rounded-3xl glass-card p-4 border border-white/10 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <div className="h-10 w-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300 shrink-0">
+              <Cloud className="h-5 w-5" />
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-500" />
+          </div>
+
+          <div className="mt-3">
+            <span className="text-[11px] text-slate-400 block font-medium">Sao lưu</span>
+            <span className="text-xs font-bold text-white mt-1 block">
+              Lần gần nhất: 2 ngày trước
+            </span>
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium mt-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Hoạt động
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Card 2: Sự kiện sắp tới */}
-        <div className="rounded-3xl glass-card p-4 border border-white/10 space-y-3">
+      {/* ============================================================== */}
+      {/* 3. MIDDLE ROW: DỰ ÁN ĐANG LÀM (LEFT) & GHI CHÚ NHANH (RIGHT)   */}
+      {/* ============================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Column 1: Dự án đang làm */}
+        <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-blue-400" />
-              Sự kiện sắp tới
-            </h3>
-            <Link href="/events" className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold">
-              Xem tất cả
-            </Link>
-          </div>
-
-          <div className="space-y-2.5">
-            {/* Tết Nguyên Đán */}
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-400 shrink-0">
-                  <Gift className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">Tết Nguyên Đán</p>
-                  <p className="text-[10px] text-rose-400 font-semibold">Còn 281 ngày</p>
-                  <p className="text-[10px] text-slate-400">10/02/2026 (Âm lịch: 23/12/2025)</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Giỗ Tổ Hùng Vương */}
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
-                  <Landmark className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">Giỗ Tổ Hùng Vương</p>
-                  <p className="text-[10px] text-amber-400 font-semibold">Còn 351 ngày</p>
-                  <p className="text-[10px] text-slate-400">07/04/2026 (Âm lịch: 10/03/2026)</p>
-                </div>
-              </div>
-            </div>
-
-            {/* 30/4 - Giải phóng miền Nam */}
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-                  <Star className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">30/4 - Giải phóng miền Nam</p>
-                  <p className="text-[10px] text-red-400 font-semibold">Còn 375 ngày</p>
-                  <p className="text-[10px] text-slate-400">30/04/2026 (Âm lịch: 14/03/2026)</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Sinh nhật của bạn */}
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-xl bg-amber-400/20 border border-amber-300/30 flex items-center justify-center text-amber-300 shrink-0">
-                  <Cake className="h-4 w-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">Sinh nhật của bạn</p>
-                  <p className="text-[10px] text-amber-300 font-semibold">Còn 32 ngày</p>
-                  <p className="text-[10px] text-slate-400">28/05/2025 (Âm lịch: 01/05/2025)</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Giờ hoàng đạo hôm nay */}
-        <div className="rounded-3xl glass-card p-4 border border-white/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Compass className="h-4 w-4 text-amber-400" />
-              Giờ hoàng đạo hôm nay
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Folder className="h-4 w-4 text-blue-400" />
+              Dự án đang làm
             </h3>
             <Link
-              href="/traditional-calendar"
-              className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold"
+              href="/projects"
+              className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
             >
-              Xem chi tiết
+              Xem tất cả &rarr;
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="font-bold text-amber-300 text-xs block">Dần</span>
-              <span className="text-[10px] text-slate-400 font-mono">03:00 - 05:00</span>
+          {/* Project 1: Website DataVault */}
+          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+              <Laptop className="h-5 w-5" />
             </div>
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="font-bold text-amber-300 text-xs block">Thìn</span>
-              <span className="text-[10px] text-slate-400 font-mono">07:00 - 09:00</span>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white truncate">Website DataVault</span>
+                <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-semibold">
+                  Đang làm
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 truncate">
+                Phát triển giao diện và tích hợp API
+              </p>
+              <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-blue-500 h-full rounded-full" style={{ width: "75%" }} />
+              </div>
             </div>
-            <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10">
-              <span className="font-bold text-amber-300 text-xs block">Tỵ</span>
-              <span className="text-[10px] text-slate-400 font-mono">09:00 - 11:00</span>
+            <button className="text-slate-400 hover:text-white p-1">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Project 2: Ứng dụng di động */}
+          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+              <Smartphone className="h-5 w-5" />
             </div>
-            {/* Ngọ (Active Highlighted Blue Pill) */}
-            <div className="p-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 border border-blue-400/50 text-white shadow-lg shadow-blue-500/30">
-              <span className="font-bold text-white text-xs block">Ngọ (Hiện tại)</span>
-              <span className="text-[10px] text-blue-100 font-mono">11:00 - 13:00</span>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white truncate">Ứng dụng di động</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 text-[10px] font-semibold">
+                  Chờ xử lý
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 truncate">
+                Thiết kế UI/UX và phát triển tính năng
+              </p>
+              <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-purple-500 h-full rounded-full" style={{ width: "40%" }} />
+              </div>
             </div>
+            <button className="text-slate-400 hover:text-white p-1">
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Project 3: Backup hệ thống */}
+          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Server className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-white truncate">Backup hệ thống</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-semibold">
+                  Sắp hoàn thành
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 truncate">
+                Tự động sao lưu dữ liệu quan trọng
+              </p>
+              <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-emerald-500 h-full rounded-full" style={{ width: "90%" }} />
+              </div>
+            </div>
+            <button className="text-slate-400 hover:text-white p-1">
+              <MoreVertical className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
-        {/* Card 4: Lịch truyền thống */}
-        <div className="rounded-3xl glass-card p-4 border border-white/10 space-y-1.5">
+        {/* Column 2: Ghi chú & Link nhanh */}
+        <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <ScrollText className="h-4 w-4 text-amber-400" />
-              Lịch truyền thống
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Bookmark className="h-4 w-4 text-purple-400" />
+              Ghi chú & Link nhanh
             </h3>
-            <span className="text-lg">🏮</span>
+            <Link
+              href="/notes?action=new"
+              className="px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1 transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              Thêm mới
+            </Link>
           </div>
 
-          <div className="pt-1">
-            <p className="text-sm font-extrabold text-white">
-              Ngày trực: <span className="text-amber-300">Thành</span>
-            </p>
-            <p className="text-[10px] text-slate-400 mt-1">
-              (Thông tin mang tính chất tham khảo văn hóa dân gian)
-            </p>
+          {/* Link 1: Notion */}
+          <a
+            href="https://www.notion.so"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-xl bg-black border border-white/20 flex items-center justify-center text-white font-serif font-black text-lg shrink-0">
+                N
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
+                  Notion &bull; Kế hoạch công việc
+                </p>
+                <p className="text-[11px] text-slate-400 truncate">
+                  www.notion.so
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
+              <button
+                onClick={(e) => e.preventDefault()}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </div>
+          </a>
+
+          {/* Link 2: Google Drive */}
+          <Link
+            href="/storage"
+            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
+                <svg className="h-5 w-5" viewBox="0 0 87.3 78" fill="none">
+                  <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066DA"/>
+                  <path d="M43.65 25 29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44C.4 50 0 51.55 0 53.1h27.5z" fill="#00AC47"/>
+                  <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.3c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 10.15z" fill="#EA4335"/>
+                  <path d="M43.65 25 57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.4-4.5 1.2z" fill="#00832D"/>
+                  <path d="M59.8 53.1H87.3c0-1.55-.4-3.1-1.2-4.5l-25.4-44c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25z" fill="#2684FC"/>
+                  <path d="M73.55 76.8H27.5L13.75 53h46.05z" fill="#FFBA00"/>
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
+                  Google Drive &bull; Tài liệu quan trọng
+                </p>
+                <p className="text-[11px] text-slate-400 truncate">
+                  drive.google.com
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
+              <button
+                onClick={(e) => e.preventDefault()}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </div>
+          </Link>
+
+          {/* Link 3: GitHub */}
+          <a
+            href="https://github.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-xl bg-slate-900 border border-white/20 flex items-center justify-center text-white shrink-0">
+                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors truncate">
+                  GitHub &bull; Repository
+                </p>
+                <p className="text-[11px] text-slate-400 truncate">
+                  github.com
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
+              <button
+                onClick={(e) => e.preventDefault()}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      {/* ============================================================== */}
+      {/* 4. BOTTOM ROW: HOẠT ĐỘNG GẦN ĐÂY (FULL WIDTH)                 */}
+      {/* ============================================================== */}
+      <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass space-y-3.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <span className="text-amber-400">⚡</span>
+            Hoạt động gần đây
+          </h3>
+          <Link
+            href="/activity"
+            className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
+          >
+            Xem tất cả &rarr;
+          </Link>
+        </div>
+
+        {/* Item 1 */}
+        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0">
+              <Upload className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">
+                Đã tải lên 3 tệp vào Google Drive
+              </p>
+              <p className="text-[11px] text-slate-300 truncate">
+                Hình ảnh dự án / concept-0914.zip
+              </p>
+            </div>
           </div>
+          <span className="text-[11px] text-emerald-400 font-medium shrink-0 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            2 giờ trước
+          </span>
+        </div>
+
+        {/* Item 2 */}
+        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-purple-500/20 border border-purple-400/30 flex items-center justify-center text-purple-300 shrink-0">
+              <Link2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">
+                Đã thêm liên kết mới
+              </p>
+              <p className="text-[11px] text-slate-300 truncate">
+                Tài liệu tham khảo &bull; Figma
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] text-emerald-400 font-medium shrink-0 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            5 giờ trước
+          </span>
+        </div>
+
+        {/* Item 3 */}
+        <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-300 shrink-0">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">
+                Cập nhật dự án
+              </p>
+              <p className="text-[11px] text-slate-300 truncate">
+                Website DataVault &bull; hoàn thành 2 task
+              </p>
+            </div>
+          </div>
+          <span className="text-[11px] text-emerald-400 font-medium shrink-0 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            1 ngày trước
+          </span>
         </div>
       </div>
     </div>
