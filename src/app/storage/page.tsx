@@ -409,6 +409,21 @@ export default function StoragePage() {
         </div>
       </Card>
 
+      {/* Helpful Audio Streaming Tip Banner when viewing music */}
+      {selectedCategory === "audio" && (
+        <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-400/25 flex items-start gap-3 text-xs text-slate-300 animate-in fade-in">
+          <span className="text-lg">🎵</span>
+          <div className="space-y-1">
+            <span className="font-bold text-white block">
+              Mẹo phát nhạc từ Google Drive:
+            </span>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Các bản nhạc Google Drive lớn (&gt; 100MB) hoặc đang để chế độ Riêng tư sẽ được tự động hỗ trợ phát qua <strong>Trình phát Google Drive Preview</strong> bằng tài khoản Google của bạn. Để phát trực tiếp qua mọi thiết bị, bạn chỉ cần mở Google Drive &rarr; Chia sẻ thư mục &rarr; chọn <em>&ldquo;Bất kỳ ai có đường liên kết&rdquo;</em>.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Error Notice if any */}
       {error && (
         <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-3">

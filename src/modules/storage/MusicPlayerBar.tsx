@@ -13,6 +13,10 @@ import {
   Music,
   Disc3,
   ExternalLink,
+  Radio,
+  AlertCircle,
+  HelpCircle,
+  Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,22 +50,46 @@ export function MusicPlayerBar({
   const [isLoop, setIsLoop] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
 
-  // When track changes, load and play
+  // Playback Mode: "direct" (HTML5 Audio) or "drive_embed" (Google Drive Preview Player)
+  const [useDriveEmbed, setUseDriveEmbed] = useState(false);
+  const [showHelpGuide, setShowHelpGuide] = useState(false);
+
+  // Determine if track is from Google Drive
+  const isDriveTrack = Boolean(
+    currentTrack &&
+      currentTrack.id &&
+      !currentTrack.id.startsWith("audio-demo") &&
+      (currentTrack.url.includes("drive.google.com") || currentTrack.id.length > 20)
+  );
+
+  // When track changes, load and reset
   useEffect(() => {
-    if (currentTrack && audioRef.current) {
+    if (currentTrack) {
       setAudioError(null);
       setCurrentTime(0);
-      audioRef.current.src = currentTrack.url;
-      audioRef.current.load();
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
-          console.warn("Audio autoplay blocked or invalid URL", err);
-          setIsPlaying(false);
-        });
+
+      // If it's a Drive file, try HTML5 first; if error occurs, prompt Drive Preview Player
+      if (audioRef.current && !useDriveEmbed) {
+        audioRef.current.src = currentTrack.url;
+        audioRef.current.load();
+        audioRef.current
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            setAudioError(null);
+          })
+          .catch((err) => {
+            console.warn("Direct stream restricted by Google Drive", err);
+            setIsPlaying(false);
+            if (isDriveTrack) {
+              setAudioError(
+                "Tệp Google Drive đang ở chế độ Riêng tư hoặc trên 100MB nên Google chặn phát trực tiếp ẩn danh."
+              );
+            }
+          });
+      }
     }
-  }, [currentTrack]);
+  }, [currentTrack, useDriveEmbed, isDriveTrack]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -71,10 +99,15 @@ export function MusicPlayerBar({
     } else {
       audioRef.current
         .play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          setAudioError(null);
+        })
         .catch(() => {
-          setAudioError("Không thể phát trực tiếp tệp này. Bạn có thể tải tệp về máy.");
           setIsPlaying(false);
+          setAudioError(
+            "Không thể phát ẩn danh. Vui lòng chuyển sang 'Trình phát Google Drive' bên dưới."
+          );
         });
     }
   };
@@ -143,26 +176,38 @@ export function MusicPlayerBar({
 
   if (!currentTrack) return null;
 
-  return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-[500px] z-50 animate-in slide-in-from-bottom-5 duration-300">
-      <audio
-        ref={audioRef}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleTimeUpdate}
-        onEnded={() => {
-          if (isLoop) {
-            audioRef.current?.play();
-          } else {
-            handleNext();
-          }
-        }}
-        onError={() => {
-          setAudioError("Tệp âm thanh Google Drive đang chuẩn bị hoặc cần cấp quyền tải trực tiếp.");
-          setIsPlaying(false);
-        }}
-      />
+  const drivePreviewUrl = `https://drive.google.com/file/d/${currentTrack.id}/preview`;
+  const driveViewUrl = `https://drive.google.com/file/d/${currentTrack.id}/view`;
 
-      <div className="rounded-3xl glass-card p-4 border border-white/20 shadow-2xl backdrop-blur-xl bg-slate-950/85 text-white space-y-3">
+  return (
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-[540px] z-50 animate-in slide-in-from-bottom-5 duration-300">
+      {/* Hidden standard audio player when direct mode is active */}
+      {!useDriveEmbed && (
+        <audio
+          ref={audioRef}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleTimeUpdate}
+          onEnded={() => {
+            if (isLoop) {
+              audioRef.current?.play();
+            } else {
+              handleNext();
+            }
+          }}
+          onError={() => {
+            setIsPlaying(false);
+            if (isDriveTrack) {
+              setAudioError(
+                "Google Drive từ chối phát luồng do tệp đang để Riêng tư hoặc dung lượng quá lớn."
+              );
+            } else {
+              setAudioError("Không thể tải nguồn âm thanh này.");
+            }
+          }}
+        />
+      )}
+
+      <div className="rounded-3xl glass-card p-4 border border-white/20 shadow-2xl backdrop-blur-2xl bg-slate-950/90 text-white space-y-3">
         {/* Top Info Bar */}
         <div className="flex items-center justify-between gap-3">
           {/* Animated Vinyl / Artwork */}
@@ -171,7 +216,7 @@ export function MusicPlayerBar({
               <Disc3
                 className={cn(
                   "h-7 w-7 text-pink-400 transition-all",
-                  isPlaying ? "animate-spin text-sky-400 duration-3000" : ""
+                  isPlaying || useDriveEmbed ? "animate-spin text-sky-400 duration-3000" : ""
                 )}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
@@ -180,9 +225,9 @@ export function MusicPlayerBar({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                  Drive Audio
+                  {useDriveEmbed ? "Drive Iframe Player" : "Direct Audio"}
                 </span>
-                {isPlaying && (
+                {(isPlaying || useDriveEmbed) && (
                   <span className="flex items-center gap-0.5 text-xs text-emerald-400 font-mono">
                     <span className="h-2 w-0.5 bg-emerald-400 animate-pulse" />
                     <span className="h-3 w-0.5 bg-emerald-400 animate-pulse delay-75" />
@@ -190,7 +235,7 @@ export function MusicPlayerBar({
                   </span>
                 )}
               </div>
-              <h4 className="text-xs font-bold text-white truncate max-w-[240px] mt-0.5">
+              <h4 className="text-xs font-bold text-white truncate max-w-[260px] mt-0.5" title={currentTrack.title}>
                 {currentTrack.title}
               </h4>
               <p className="text-[10px] text-slate-400 truncate">
@@ -199,110 +244,201 @@ export function MusicPlayerBar({
             </div>
           </div>
 
-          {/* Close Player Button */}
-          <button
-            onClick={() => {
-              if (audioRef.current) audioRef.current.pause();
-              onClose();
-            }}
-            className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-            title="Đóng trình phát"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Seekbar & Time */}
-        <div className="space-y-1">
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            value={currentTime}
-            onChange={handleSeek}
-            className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-blue-500"
-          />
-          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-            <span>{formatSeconds(currentTime)}</span>
-            <span>{formatSeconds(duration)}</span>
+          {/* Right Header Buttons */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowHelpGuide(!showHelpGuide)}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              title="Hướng dẫn phát nhạc Google Drive"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => {
+                if (audioRef.current) audioRef.current.pause();
+                onClose();
+              }}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              title="Đóng trình phát"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
-        {/* Player Controls */}
-        <div className="flex items-center justify-between pt-0.5">
-          {/* Loop toggle */}
-          <button
-            onClick={() => setIsLoop(!isLoop)}
-            className={cn(
-              "p-2 rounded-xl transition-colors text-xs",
-              isLoop ? "text-blue-400 bg-blue-500/20" : "text-slate-400 hover:text-white"
+        {/* MODE 1: Google Drive Preview Player (Iframe Embed) */}
+        {useDriveEmbed && isDriveTrack ? (
+          <div className="space-y-2 pt-1 animate-in fade-in">
+            <div className="rounded-2xl overflow-hidden border border-white/20 bg-black/60 shadow-inner">
+              <iframe
+                src={drivePreviewUrl}
+                className="w-full h-28 border-0"
+                allow="autoplay"
+                title={currentTrack.title}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-slate-300 px-1">
+              <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Phát qua session Google của bạn
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={driveViewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 font-medium inline-flex items-center gap-1 text-[10px]"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Mở trên Drive
+                </a>
+                <button
+                  onClick={() => setUseDriveEmbed(false)}
+                  className="text-slate-400 hover:text-white underline text-[10px]"
+                >
+                  Thử phát trực tiếp
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* MODE 2: Direct HTML5 Audio Player */
+          <div className="space-y-3">
+            {/* Seekbar & Time */}
+            <div className="space-y-1">
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                value={currentTime}
+                onChange={handleSeek}
+                className="w-full h-1.5 bg-white/15 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+              <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>{formatSeconds(currentTime)}</span>
+                <span>{formatSeconds(duration)}</span>
+              </div>
+            </div>
+
+            {/* Player Controls */}
+            <div className="flex items-center justify-between pt-0.5">
+              {/* Loop toggle */}
+              <button
+                onClick={() => setIsLoop(!isLoop)}
+                className={cn(
+                  "p-2 rounded-xl transition-colors text-xs",
+                  isLoop ? "text-blue-400 bg-blue-500/20" : "text-slate-400 hover:text-white"
+                )}
+                title={isLoop ? "Đang bật lặp lại" : "Tắt lặp lại"}
+              >
+                <Repeat className="h-4 w-4" />
+              </button>
+
+              {/* Main Controls: Prev, Play/Pause, Next */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handlePrev}
+                  className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Bài trước"
+                >
+                  <SkipBack className="h-4 w-4" />
+                </button>
+
+                <button
+                  onClick={togglePlay}
+                  className="h-10 w-10 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 transition-transform active:scale-95"
+                  title={isPlaying ? "Tạm dừng" : "Phát"}
+                >
+                  {isPlaying ? (
+                    <Pause className="h-5 w-5 fill-current" />
+                  ) : (
+                    <Play className="h-5 w-5 fill-current ml-0.5" />
+                  )}
+                </button>
+
+                <button
+                  onClick={handleNext}
+                  className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Bài tiếp"
+                >
+                  <SkipForward className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Volume Control */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleMute}
+                  className="p-2 rounded-xl text-slate-400 hover:text-white transition-colors"
+                  title={isMuted ? "Bật âm lượng" : "Tắt tiếng"}
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="h-4 w-4" />
+                  ) : (
+                    <Volume2 className="h-4 w-4" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="w-16 h-1 bg-white/15 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Warning & Fallback Switcher when Direct Stream encounters an error */}
+        {audioError && !useDriveEmbed && (
+          <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-xs space-y-2">
+            <div className="flex items-start gap-2 text-amber-300 font-semibold text-[11px]">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+              <span>{audioError}</span>
+            </div>
+
+            {isDriveTrack && (
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => setUseDriveEmbed(true)}
+                  className="flex-1 py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/30 transition-all"
+                >
+                  <Radio className="h-3.5 w-3.5" />
+                  <span>Bật Trình phát Drive Preview (Khuyên dùng)</span>
+                </button>
+                <a
+                  href={driveViewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-1.5 px-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 text-xs transition-colors"
+                  title="Mở file trên tab Google Drive"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
             )}
-            title={isLoop ? "Đang bật lặp lại" : "Tắt lặp lại"}
-          >
-            <Repeat className="h-4 w-4" />
-          </button>
-
-          {/* Main Controls: Prev, Play/Pause, Next */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrev}
-              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-              title="Bài trước"
-            >
-              <SkipBack className="h-4 w-4" />
-            </button>
-
-            <button
-              onClick={togglePlay}
-              className="h-10 w-10 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 transition-transform active:scale-95"
-              title={isPlaying ? "Tạm dừng" : "Phát"}
-            >
-              {isPlaying ? (
-                <Pause className="h-5 w-5 fill-current" />
-              ) : (
-                <Play className="h-5 w-5 fill-current ml-0.5" />
-              )}
-            </button>
-
-            <button
-              onClick={handleNext}
-              className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-              title="Bài tiếp"
-            >
-              <SkipForward className="h-4 w-4" />
-            </button>
           </div>
+        )}
 
-          {/* Volume Control */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleMute}
-              className="p-2 rounded-xl text-slate-400 hover:text-white transition-colors"
-              title={isMuted ? "Bật âm lượng" : "Tắt tiếng"}
-            >
-              {isMuted || volume === 0 ? (
-                <VolumeX className="h-4 w-4" />
-              ) : (
-                <Volume2 className="h-4 w-4" />
-              )}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              className="w-16 h-1 bg-white/15 rounded-lg appearance-none cursor-pointer accent-blue-500"
-            />
+        {/* Expandable Help & Sharing Guide */}
+        {showHelpGuide && (
+          <div className="p-3 rounded-2xl bg-white/5 border border-white/10 text-[11px] text-slate-300 space-y-2 animate-in fade-in">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <Share2 className="h-3.5 w-3.5 text-blue-400" />
+              Tại sao tệp Google Drive không phát trực tiếp được?
+            </p>
+            <p className="text-slate-300 leading-relaxed">
+              <strong>1. Quyền riêng tư:</strong> Nếu tệp đang để <em>&ldquo;Bị hạn chế&rdquo;</em>, Google bắt buộc đăng nhập và chặn luồng phát audio ẩn danh.
+              <br />
+              <strong>2. Tệp quá lớn (&gt; 100MB):</strong> Các bản Nonstop từ 200MB - 500MB bị Google chặn quét virus tự động.
+            </p>
+            <p className="text-emerald-400 font-semibold">
+              👉 Cách khắc phục: Trên Google Drive, chuột phải vào thư mục nhạc &rarr; chọn <strong>Chia sẻ (Share)</strong> &rarr; đổi quyền thành <strong>&ldquo;Bất kỳ ai có đường liên kết&rdquo; (Anyone with the link)</strong>.
+            </p>
           </div>
-        </div>
-
-        {/* Error / Notice message if any */}
-        {audioError && (
-          <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-xl text-center">
-            {audioError}
-          </p>
         )}
       </div>
     </div>
