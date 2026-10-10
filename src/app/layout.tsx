@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/modules/theme-engine/themeContext";
+import { AuthProvider } from "@/modules/auth/authContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
@@ -17,9 +18,11 @@ export default function RootLayout({
   return (
     <html lang="vi" suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased selection:bg-primary/30 selection:text-white">
-        <ThemeProvider>
-          <AppShell>{children}</AppShell>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <AppShell>{children}</AppShell>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

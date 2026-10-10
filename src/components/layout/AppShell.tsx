@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
@@ -9,10 +10,16 @@ import { useTheme } from "@/modules/theme-engine/themeContext";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { currentTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // If on login page, render standalone view without sidebar and header
+  if (pathname === "/login") {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
 
   return (
     <div className="relative min-h-screen text-foreground flex overflow-hidden">

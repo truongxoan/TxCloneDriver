@@ -21,6 +21,8 @@ import {
   Share2,
   Info,
   CheckCircle2,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -28,8 +30,10 @@ import { Badge } from "@/components/ui/Badge";
 import { formatBytes, cn } from "@/lib/utils";
 import { MOCK_STORAGE_ITEMS, MOCK_STORAGE_QUOTA } from "@/modules/storage/mockDriveData";
 import { StorageItem, FileCategory } from "@/modules/storage/types";
+import { useAuth } from "@/modules/auth/authContext";
 
 export default function StoragePage() {
+  const { user, isAdmin } = useAuth();
   const [items, setItems] = useState<StorageItem[]>(MOCK_STORAGE_ITEMS);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -72,18 +76,38 @@ export default function StoragePage() {
         </div>
       )}
 
-      {/* Notice Banner */}
-      <div className="rounded-2xl glass-panel p-4 border border-amber-500/30 bg-amber-500/10 flex items-start gap-3">
-        <Info className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
-        <div className="text-xs space-y-1">
-          <div className="font-semibold text-amber-300">
-            Trạng thái Mô phỏng Giai đoạn 1 &mdash; Chưa kết nối Google Drive thật
+      {/* Permission & Role Banner */}
+      <div
+        className={cn(
+          "rounded-2xl glass-panel p-4 border flex items-start justify-between gap-3",
+          isAdmin
+            ? "border-emerald-500/30 bg-emerald-500/10"
+            : "border-blue-500/30 bg-blue-500/10"
+        )}
+      >
+        <div className="flex items-start gap-3">
+          {isAdmin ? (
+            <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+          ) : (
+            <ShieldAlert className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+          )}
+          <div className="text-xs space-y-1">
+            <div className="font-semibold text-white flex items-center gap-2">
+              <span>Vai trò hiện tại: {user?.name || "Người dùng"}</span>
+              <Badge
+                variant={isAdmin ? "success" : "primary"}
+                size="sm"
+                className="uppercase tracking-wider"
+              >
+                {isAdmin ? "Toàn quyền Admin" : "User Chỉ đọc & Tải xuống"}
+              </Badge>
+            </div>
+            <p className="text-muted-foreground">
+              {isAdmin
+                ? "Tài khoản của bạn có toàn quyền quản lý: Thêm mới, chỉnh sửa, tải lên và xóa tệp tin trên hệ thống."
+                : "Tài khoản Tiêu chuẩn: Bạn được xem toàn bộ danh mục tài liệu và tải xuống. Tính năng thêm tệp hoặc tạo thư mục đã được khóa theo chính sách phân quyền."}
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Các tệp và thư mục hiển thị dưới đây là dữ liệu mẫu để định hình cấu trúc giao diện và trải nghiệm người dùng.
-            Kết nối OAuth 2.0 và Google Drive API v3 chính thức sẽ được kích hoạt tại{" "}
-            <span className="text-primary font-medium">Giai đoạn 3</span>.
-          </p>
         </div>
       </div>
 
@@ -99,24 +123,27 @@ export default function StoragePage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => triggerAction("Tạo thư mục: Tính năng sẽ kích hoạt ở Giai đoạn 3")}
-          >
-            <FolderPlus className="h-4 w-4" />
-            <span>Thư mục mới</span>
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => triggerAction("Tải lên: Sẽ đồng bộ Google Drive API v3 ở Giai đoạn 3")}
-          >
-            <Upload className="h-4 w-4" />
-            <span>Tải tệp lên</span>
-          </Button>
-        </div>
+        {/* Action Buttons: Only visible to ADMIN */}
+        {isAdmin && (
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => triggerAction("Tạo thư mục: Tính năng dành cho Quản trị viên")}
+            >
+              <FolderPlus className="h-4 w-4" />
+              <span>Thư mục mới</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => triggerAction("Tải tệp lên: Đã xác thực quyền Quản trị viên")}
+            >
+              <Upload className="h-4 w-4" />
+              <span>Tải tệp lên</span>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Storage Breakdown Widget */}
@@ -261,27 +288,34 @@ export default function StoragePage() {
                     <td className="py-3 px-4 text-muted-foreground">{item.updatedAt}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {/* Download is allowed for EVERYONE (both Admin and User) */}
                         <button
-                          onClick={() => triggerAction(`Tải xuống "${item.name}" (Demo)`)}
-                          className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
-                          title="Tải xuống"
+                          onClick={() => triggerAction(`Đang tải xuống "${item.name}"...`)}
+                          className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                          title="Tải xuống tệp tin"
                         >
-                          <Download className="h-3.5 w-3.5" />
+                          <Download className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => triggerAction(`Chia sẻ "${item.name}" (Demo)`)}
-                          className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-elevated"
-                          title="Chia sẻ"
-                        >
-                          <Share2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => triggerAction(`Xóa "${item.name}" (Demo)`)}
-                          className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20"
-                          title="Xóa"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+
+                        {/* Share and Delete are ONLY allowed for ADMIN */}
+                        {isAdmin && (
+                          <>
+                            <button
+                              onClick={() => triggerAction(`Chia sẻ "${item.name}" (Admin)`)}
+                              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-elevated transition-colors"
+                              title="Chia sẻ liên kết"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => triggerAction(`Xóa "${item.name}" (Admin)`)}
+                              className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-colors"
+                              title="Xóa tệp tin"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -302,9 +336,24 @@ export default function StoragePage() {
                   <div className="p-2 rounded-xl bg-surface-elevated border border-surface-border">
                     {getFileIcon(item.category)}
                   </div>
-                  <Badge variant="outline" size="sm" className="text-[10px]">
-                    {item.category}
-                  </Badge>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => triggerAction(`Đang tải xuống "${item.name}"...`)}
+                      className="p-1 rounded-lg text-emerald-400 hover:bg-emerald-500/20"
+                      title="Tải xuống"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => triggerAction(`Xóa "${item.name}" (Admin)`)}
+                        className="p-1 rounded-lg text-rose-400 hover:bg-rose-500/20"
+                        title="Xóa"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <h4 className="font-semibold text-foreground text-xs line-clamp-2">
                   {item.name}

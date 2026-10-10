@@ -15,12 +15,16 @@ import {
   Gift,
   Compass,
   User,
+  LogOut,
+  Shield,
+  ShieldAlert,
 } from "lucide-react";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { THEMES } from "@/modules/theme-engine/themesData";
 import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar/lunarConverter";
 import { getUpcomingHolidayCountdowns } from "@/modules/holiday-countdown/holidaysData";
 import { getWeather } from "@/modules/weather/weatherMockService";
+import { useAuth } from "@/modules/auth/authContext";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
@@ -49,9 +53,12 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
     setIsAutoSeason,
   } = useTheme();
 
+  const { user, isAdmin, logout } = useAuth();
+
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
   const weather = getWeather("hanoi");
 
@@ -107,7 +114,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
         </div>
 
         {/* Pill 2: Âm lịch & Can Chi */}
-        <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-2xl glass-pill shrink-0">
+        <div className="hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl glass-pill shrink-0">
           <span className="text-lg">🐎</span>
           <div className="flex flex-col text-left">
             <span className="text-xs font-bold text-foreground leading-none">
@@ -164,7 +171,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right Controls: Theme Selector, Notification Bell, User Avatar */}
+      {/* Right Controls: Theme Selector, Notification Bell, User Avatar & Logout */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Theme Selector Pill */}
         <div className="relative">
@@ -253,9 +260,86 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-slate-950" />
         </button>
 
-        {/* User Profile Avatar Pill */}
-        <div className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-foreground cursor-pointer">
-          <User className="h-4 w-4" />
+        {/* User Profile Avatar Pill with Role & Logout */}
+        <div className="relative">
+          <button
+            onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+            className="flex items-center gap-2 h-9 px-2.5 rounded-2xl glass-pill hover:bg-white/10 text-foreground transition-all cursor-pointer"
+          >
+            <div
+              className={cn(
+                "h-6 w-6 rounded-xl flex items-center justify-center text-[10px] font-black text-white shadow-sm",
+                isAdmin
+                  ? "bg-gradient-to-tr from-rose-600 to-amber-500 shadow-rose-500/30"
+                  : "bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-blue-500/30"
+              )}
+            >
+              {user?.avatarInitials || "AD"}
+            </div>
+            <span className="hidden sm:inline text-xs font-semibold text-slate-200">
+              {user?.username || "admin"}
+            </span>
+            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+          </button>
+
+          {profileDropdownOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setProfileDropdownOpen(false)}
+              />
+              <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl glass-panel p-3 shadow-glass border border-white/15 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                  <div
+                    className={cn(
+                      "h-10 w-10 rounded-2xl flex items-center justify-center text-xs font-black text-white shrink-0 shadow-md",
+                      isAdmin
+                        ? "bg-gradient-to-tr from-rose-600 to-amber-500"
+                        : "bg-gradient-to-tr from-blue-600 to-indigo-500"
+                    )}
+                  >
+                    {user?.avatarInitials || "AD"}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-white truncate">
+                      {user?.name || "Quản trị viên"}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span
+                        className={cn(
+                          "text-[10px] font-bold px-1.5 py-0.2 rounded-md uppercase tracking-wider",
+                          isAdmin
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            : "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                        )}
+                      >
+                        {isAdmin ? "Toàn quyền Admin" : "User tiêu chuẩn"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="py-2 space-y-1 text-xs">
+                  <div className="px-2 py-1.5 text-[11px] text-slate-400">
+                    {isAdmin
+                      ? "Bạn có toàn quyền thêm, sửa, xóa và cấu hình hệ thống."
+                      : "Bạn có quyền xem và tải xuống tài liệu (Không được thêm/xóa)."}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setProfileDropdownOpen(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/15 font-semibold transition-colors mt-2 text-xs"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Đăng xuất khỏi hệ thống</span>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

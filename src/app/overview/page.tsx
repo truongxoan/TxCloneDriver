@@ -25,14 +25,17 @@ import {
   Calendar,
   Sparkles,
   Check,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/modules/theme-engine/themeContext";
+import { useAuth } from "@/modules/auth/authContext";
 import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar/lunarConverter";
 import { getWeather } from "@/modules/weather/weatherMockService";
 
 export default function OverviewPage() {
   const { currentTheme } = useTheme();
+  const { user, isAdmin } = useAuth();
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date(2025, 3, 26)); // Tháng 4 2025
   const [searchVal, setSearchVal] = useState("");
 
@@ -54,8 +57,13 @@ export default function OverviewPage() {
         {/* Hero Greeting & Search Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-1 pb-2">
           <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
-              Xin chào, Người dùng
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm flex items-center gap-2.5">
+              Xin chào, {user?.name || "Người dùng"}
+              {isAdmin && (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30 uppercase tracking-wider">
+                  Admin
+                </span>
+              )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 font-medium">
               Mọi dữ liệu quan trọng của bạn đều được lưu trữ an toàn tại đây.
