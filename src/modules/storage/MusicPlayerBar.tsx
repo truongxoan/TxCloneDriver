@@ -249,7 +249,7 @@ export function MusicPlayerBar({
                 {currentTrack.title}
               </h4>
               <p className="text-[10px] text-slate-400 truncate">
-                {currentTrack.artist || "Google Drive • DataVault Cloud"}
+                {currentTrack.artist || "Google Drive • TxCloneDriver Cloud"}
               </p>
             </div>
           </div>

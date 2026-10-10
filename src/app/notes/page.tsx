@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { NoteItem, NoteCategory } from "@/types/notesAndProjects";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 const DEFAULT_NOTES: NoteItem[] = [
   {
@@ -35,7 +36,7 @@ const DEFAULT_NOTES: NoteItem[] = [
     title: "Notion • Kế hoạch & Roadmap công việc",
     category: "website",
     url: "https://www.notion.so",
-    content: "Trang tài liệu quản lý tiến độ, roadmap quý 2 và sprint backlog dự án DataVault.",
+    content: "Trang tài liệu quản lý tiến độ, roadmap quý 2 và sprint backlog dự án TxCloneDriver.",
     tags: ["Workspace", "Kế hoạch", "Productivity"],
     isPinned: true,
     updatedAt: "26/04/2025",
@@ -52,7 +53,7 @@ const DEFAULT_NOTES: NoteItem[] = [
   },
   {
     id: "note-3",
-    title: "GitHub • DataVault Cloud Hub Repository",
+    title: "GitHub • TxCloneDriver Cloud Hub Repository",
     category: "github",
     url: "https://github.com",
     content: "Mã nguồn chính Next.js App Router, CI/CD pipeline và quản lý các pull request.",
@@ -285,7 +286,8 @@ export default function NotesPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <ModuleGuard moduleId="notes" moduleName="Ghi chú & Link">
+      <div className="space-y-6 pb-20">
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed bottom-6 right-6 z-50 rounded-2xl glass-panel p-4 shadow-glass border border-primary/50 text-xs text-foreground flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
@@ -764,6 +766,7 @@ export default function NotesPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }

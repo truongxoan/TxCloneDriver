@@ -7,9 +7,9 @@ import { TelegramProvider } from "@/modules/telegram/telegramContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "DataVault Cloud Hub — Premium Data Management Platform",
+  title: "TxCloneDriver — Hệ thống Quản trị & Đồng bộ Đám mây",
   description:
-    "Nền tảng quản lý dữ liệu cá nhân cao cấp tích hợp Google Drive, Telegram, Lịch âm dương Việt Nam và giao diện 3D theo mùa.",
+    "Nền tảng quản lý dữ liệu cá nhân cao cấp TxCloneDriver tích hợp Google Drive, Telegram, Lịch âm dương Việt Nam và kiểm soát phân quyền thành viên.",
 };
 
 export default function RootLayout({

@@ -16,8 +16,11 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/modules/auth/authContext";
+import { AppModuleId } from "@/modules/auth/types";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -26,14 +29,21 @@ interface SidebarProps {
   onCloseMobile: () => void;
 }
 
-const SIDEBAR_LINKS = [
-  { href: "/overview", label: "Tổng quan", icon: Home },
-  { href: "/storage", label: "Google Drive", icon: HardDrive },
-  { href: "/notes", label: "Ghi chú & Link", icon: Link2 },
-  { href: "/projects", label: "Dự án", icon: Folder },
-  { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays },
-  { href: "/weather", label: "Thời tiết", icon: CloudSun },
-  { href: "/settings", label: "Cài đặt", icon: Settings },
+interface SidebarLinkItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  module: AppModuleId;
+}
+
+const SIDEBAR_LINKS: SidebarLinkItem[] = [
+  { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
+  { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
+  { href: "/notes", label: "Ghi chú & Link", icon: Link2, module: "notes" },
+  { href: "/projects", label: "Dự án", icon: Folder, module: "projects" },
+  { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays, module: "events" },
+  { href: "/weather", label: "Thời tiết", icon: CloudSun, module: "weather" },
+  { href: "/settings", label: "Cài đặt", icon: Settings, module: "settings" },
 ];
 
 export function Sidebar({
@@ -43,6 +53,7 @@ export function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { hasModuleAccess, isAdmin } = useAuth();
 
   return (
     <>
@@ -70,13 +81,13 @@ export function Sidebar({
               href="/overview"
               className="flex items-center gap-3 overflow-hidden group"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 text-white shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform">
                 <Cloud className="h-5 w-5 fill-white/20" />
               </div>
               {!collapsed && (
                 <div className="flex flex-col truncate">
                   <span className="text-base font-black tracking-tight text-white leading-none">
-                    DataVault
+                    TxCloneDriver
                   </span>
                   <span className="text-[11px] font-semibold text-sky-400/90 tracking-wide mt-0.5">
                     Cloud Hub
@@ -111,6 +122,8 @@ export function Sidebar({
           <nav className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-290px)] pr-1">
             {SIDEBAR_LINKS.map((item, idx) => {
               const Icon = item.icon;
+              const isAllowed = isAdmin || hasModuleAccess(item.module);
+
               // Check active status
               const isActive =
                 item.href === "/overview"
@@ -123,20 +136,43 @@ export function Sidebar({
                   href={item.href}
                   onClick={onCloseMobile}
                   className={cn(
-                    "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all group",
+                    "flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all group",
                     isActive
                       ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 font-bold"
-                      : "text-slate-300 hover:text-white hover:bg-white/10"
+                      : isAllowed
+                      ? "text-slate-300 hover:text-white hover:bg-white/10"
+                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5 opacity-75"
                   )}
-                  title={collapsed ? item.label : undefined}
+                  title={
+                    collapsed
+                      ? isAllowed
+                        ? item.label
+                        : `${item.label} (Chưa được cấp quyền)`
+                      : undefined
+                  }
                 >
-                  <Icon
-                    className={cn(
-                      "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
-                      isActive ? "text-white" : "text-slate-400 group-hover:text-white"
-                    )}
-                  />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  <div className="flex items-center gap-3 truncate">
+                    <Icon
+                      className={cn(
+                        "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
+                        isActive
+                          ? "text-white"
+                          : isAllowed
+                          ? "text-slate-400 group-hover:text-white"
+                          : "text-slate-500"
+                      )}
+                    />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </div>
+
+                  {!collapsed && !isAllowed && (
+                    <span
+                      title="Quyền truy cập bị khóa"
+                      className="ml-auto flex items-center justify-center h-4 w-4 rounded-full bg-slate-800 text-amber-400/80 border border-amber-400/20"
+                    >
+                      <Lock className="h-2.5 w-2.5" />
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -150,7 +186,7 @@ export function Sidebar({
               &ldquo;Dữ liệu của bạn là tài sản quý giá nhất&rdquo;
             </p>
             <p className="text-[10px] text-sky-400 font-medium mt-1">
-              — DataVault Cloud Hub
+              — TxCloneDriver Cloud Hub
             </p>
           </div>
         )}

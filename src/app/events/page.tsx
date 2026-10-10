@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { getUpcomingHolidayCountdowns } from "@/modules/holiday-countdown/holidaysData";
 import { CountdownItem } from "@/modules/holiday-countdown/types";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<CountdownItem[]>(getUpcomingHolidayCountdowns());
@@ -60,7 +61,8 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <ModuleGuard moduleId="events" moduleName="Lịch & Sự kiện">
+      <div className="space-y-6">
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 rounded-2xl glass-panel p-4 shadow-glass border border-primary/50 text-xs text-foreground flex items-center gap-3 animate-in fade-in">
@@ -202,6 +204,7 @@ export default function EventsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }

@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
 import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 export default function OverviewPage() {
   const { user } = useAuth();
@@ -32,22 +33,23 @@ export default function OverviewPage() {
   const [selectedMonth, setSelectedMonth] = useState("Tháng 4 2025");
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto animate-in fade-in duration-300 pb-10">
-      {/* ============================================================== */}
-      {/* 1. TOP ROW: GREETING & SEARCH (LEFT) + COMPACT CALENDAR (RIGHT) */}
-      {/* ============================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        {/* Left: Greeting & Search Bar */}
-        <div className="lg:col-span-8 flex flex-col justify-between h-full pt-1">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm flex items-center gap-2">
-              <span>👋</span>
-              <span>Xin chào, {user?.name || "Trường"}!</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
-              Chào mừng bạn trở lại với DataVault Cloud Hub.
-            </p>
-          </div>
+    <ModuleGuard moduleId="overview" moduleName="Tổng quan">
+      <div className="space-y-4 max-w-7xl mx-auto animate-in fade-in duration-300 pb-10">
+        {/* ============================================================== */}
+        {/* 1. TOP ROW: GREETING & SEARCH (LEFT) + COMPACT CALENDAR (RIGHT) */}
+        {/* ============================================================== */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          {/* Left: Greeting & Search Bar */}
+          <div className="lg:col-span-8 flex flex-col justify-between h-full pt-1">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm flex items-center gap-2">
+                <span>👋</span>
+                <span>Xin chào, {user?.name || "Trường"}!</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
+                Chào mừng bạn trở lại với TxCloneDriver Cloud Hub.
+              </p>
+            </div>
 
           {/* Global Search Bar */}
           <div className="relative mt-5 max-w-2xl">
@@ -281,14 +283,14 @@ export default function OverviewPage() {
             </Link>
           </div>
 
-          {/* Project 1: Website DataVault */}
+          {/* Project 1: Website TxCloneDriver */}
           <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
               <Laptop className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white truncate">Website DataVault</span>
+                <span className="text-xs font-bold text-white truncate">Website TxCloneDriver</span>
                 <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-semibold">
                   Đang làm
                 </span>
@@ -542,7 +544,7 @@ export default function OverviewPage() {
                 Cập nhật dự án
               </p>
               <p className="text-[11px] text-slate-300 truncate">
-                Website DataVault &bull; hoàn thành 2 task
+                Website TxCloneDriver &bull; hoàn thành 2 task
               </p>
             </div>
           </div>
@@ -553,5 +555,6 @@ export default function OverviewPage() {
         </div>
       </div>
     </div>
+    </ModuleGuard>
   );
 }

@@ -175,7 +175,7 @@ export default function CinemaVideoModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  DataVault Cinema
+                  TxCloneDriver Cinema
                 </span>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white">
                   {currentVideo.resolution || "1080p FHD"}

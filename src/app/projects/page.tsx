@@ -25,18 +25,19 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { ProjectItem, ProjectStatus } from "@/types/notesAndProjects";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 const DEFAULT_PROJECTS: ProjectItem[] = [
   {
     id: "proj-1",
-    title: "Website DataVault Cloud Hub",
+    title: "Website TxCloneDriver Cloud Hub",
     description: "Phát triển giao diện web SaaS quản lý dữ liệu cá nhân cao cấp, tích hợp Google Drive và Telegram Bot.",
     status: "in_progress",
     progressPercent: 75,
     priority: "high",
     dueDate: "30/05/2025",
     updatedAt: "26/04/2025",
-    githubUrl: "https://github.com/datavault/hub",
+    githubUrl: "https://github.com/txclonedriver/hub",
     branch: "main",
     tasks: [
       { id: "t1", title: "Thiết kế Glassmorphism SaaS 3D", completed: true },
@@ -47,14 +48,14 @@ const DEFAULT_PROJECTS: ProjectItem[] = [
   },
   {
     id: "proj-2",
-    title: "Ứng dụng Di động DataVault Mobile",
+    title: "Ứng dụng Di động TxCloneDriver Mobile",
     description: "Phiên bản di động React Native hỗ trợ đồng bộ tệp ngoại tuyến và xác thực vân tay/FaceID.",
     status: "not_started",
     progressPercent: 40,
     priority: "medium",
     dueDate: "15/07/2025",
     updatedAt: "20/04/2025",
-    githubUrl: "https://github.com/datavault/mobile",
+    githubUrl: "https://github.com/txclonedriver/mobile",
     branch: "dev",
     tasks: [
       { id: "t5", title: "Phác thảo Wireframe & UX", completed: true },
@@ -71,7 +72,7 @@ const DEFAULT_PROJECTS: ProjectItem[] = [
     priority: "high",
     dueDate: "10/05/2025",
     updatedAt: "24/04/2025",
-    githubUrl: "https://github.com/datavault/backup-engine",
+    githubUrl: "https://github.com/txclonedriver/backup-engine",
     branch: "feature/failover",
     tasks: [
       { id: "t8", title: "Thiết kế Route Handler Proxy", completed: true },
@@ -230,7 +231,8 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <ModuleGuard moduleId="projects" moduleName="Dự án">
+      <div className="space-y-6 pb-20">
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed bottom-6 right-6 z-50 rounded-2xl glass-panel p-4 shadow-glass border border-primary/50 text-xs text-foreground flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
@@ -635,6 +637,7 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }

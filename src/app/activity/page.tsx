@@ -34,7 +34,7 @@ const ACTIVITIES: ActivityItem[] = [
     id: "act-1",
     category: "system",
     title: "Khởi tạo thành công Giai đoạn 1",
-    description: "DataVault Cloud Hub thiết lập xong cấu trúc giao diện, Smart Header và Theme engine.",
+    description: "TxCloneDriver Cloud Hub thiết lập xong cấu trúc giao diện, Smart Header và Theme engine.",
     actor: "Admin (Tx)",
     ip: "127.0.0.1",
     timestamp: "10/10/2026 16:50:12",

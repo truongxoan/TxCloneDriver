@@ -2,24 +2,74 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AuthUser, AuthContextType } from "./types";
+import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId } from "./types";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const COOKIE_NAME = "datavault_session";
+const COOKIE_NAME = "txclonedriver_session";
+const STORAGE_USERS_KEY = "txclonedriver_managed_users";
+
+// Default initial users
+const INITIAL_USERS: ManagedUser[] = [
+  {
+    id: "u-admin",
+    username: "admin",
+    password: "kdkctrkn@123",
+    name: "Quản trị viên Tối cao",
+    role: "admin",
+    status: "approved",
+    allowedModules: ["overview", "storage", "notes", "projects", "events", "weather", "settings", "telegram"],
+    createdAt: "10/10/2026",
+  },
+  {
+    id: "u-member-a",
+    username: "11",
+    password: "21",
+    name: "Thành viên A (Chỉ Google Drive)",
+    role: "user",
+    status: "approved",
+    allowedModules: ["storage"], // Đúng như yêu cầu: Thành viên A chỉ được mở mục Google Driver
+    createdAt: "10/10/2026",
+  },
+  {
+    id: "u-member-b",
+    username: "userb",
+    password: "21",
+    name: "Thành viên B (Google Drive & Dự án)",
+    role: "user",
+    status: "approved",
+    allowedModules: ["storage", "projects"], // Đúng như yêu cầu: Thành viên B chỉ được mở Google Driver và Dự án
+    createdAt: "10/10/2026",
+  },
+  {
+    id: "u-member-pending",
+    username: "hocvien_moi",
+    password: "21",
+    name: "Học viên Đăng ký mới (Chờ duyệt)",
+    role: "user",
+    status: "pending",
+    allowedModules: [],
+    createdAt: "10/10/2026",
+  },
+];
 
 function setSessionCookie(user: AuthUser) {
   const serialized = encodeURIComponent(JSON.stringify(user));
   document.cookie = `${COOKIE_NAME}=${serialized}; path=/; max-age=604800; SameSite=Lax`;
+  // Also sync to legacy cookie for middleware compatibility
+  document.cookie = `datavault_session=${serialized}; path=/; max-age=604800; SameSite=Lax`;
 }
 
 function clearSessionCookie() {
   document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  document.cookie = `datavault_session=; path=/; max-age=0; SameSite=Lax`;
 }
 
 function getSessionCookie(): AuthUser | null {
   if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)"));
+  const match =
+    document.cookie.match(new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)")) ||
+    document.cookie.match(new RegExp("(^| )datavault_session=([^;]+)"));
   if (match) {
     try {
       return JSON.parse(decodeURIComponent(match[2])) as AuthUser;
@@ -33,51 +83,131 @@ function getSessionCookie(): AuthUser | null {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(INITIAL_USERS);
   const [initialized, setInitialized] = useState(false);
 
+  // Load managed users and session
   useEffect(() => {
-    // Check existing session
-    const existing = getSessionCookie();
-    if (existing) {
-      setUser(existing);
+    try {
+      const savedUsers = localStorage.getItem(STORAGE_USERS_KEY);
+      if (savedUsers) {
+        setManagedUsers(JSON.parse(savedUsers));
+      } else {
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
+      }
+    } catch {
+      // ignore
+    }
+
+    const existingSession = getSessionCookie();
+    if (existingSession) {
+      setUser(existingSession);
     }
     setInitialized(true);
   }, []);
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Trim inputs
+  const saveUsersList = (updated: ManagedUser[]) => {
+    setManagedUsers(updated);
+    try {
+      localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const login = async (
+    username: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> => {
     const u = username.trim();
     const p = password.trim();
 
-    // Verify credentials strictly according to specifications
-    if (u === "admin" && p === "kdkctrkn@123") {
-      const adminUser: AuthUser = {
-        username: "admin",
-        role: "admin",
-        name: "Quản trị viên Tối cao",
-        avatarInitials: "AD",
+    // Check in managedUsers list
+    const foundUser = managedUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
+
+    if (!foundUser || foundUser.password !== p) {
+      return {
+        success: false,
+        error: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
       };
-      setUser(adminUser);
-      setSessionCookie(adminUser);
-      return { success: true };
     }
 
-    if (u === "11" && p === "21") {
-      const standardUser: AuthUser = {
-        username: "11",
-        role: "user",
-        name: "Người dùng",
-        avatarInitials: "US",
+    // Check approval status
+    if (foundUser.status === "pending") {
+      return {
+        success: false,
+        error:
+          "Tài khoản của bạn đang CHỜ PHÊ DUYỆT từ Quản trị viên (Admin). Vui lòng liên hệ Admin để được cấp quyền trước khi đăng nhập.",
       };
-      setUser(standardUser);
-      setSessionCookie(standardUser);
-      return { success: true };
     }
 
-    return {
-      success: false,
-      error: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
+    if (foundUser.status === "rejected") {
+      return {
+        success: false,
+        error: "Tài khoản của bạn đã bị từ chối hoặc khóa quyền truy cập.",
+      };
+    }
+
+    // Approved user
+    const initials = foundUser.name
+      .split(" ")
+      .map((s) => s[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "US";
+
+    const authUser: AuthUser = {
+      id: foundUser.id,
+      username: foundUser.username,
+      role: foundUser.role,
+      name: foundUser.name,
+      avatarInitials: initials,
+      status: foundUser.status,
+      allowedModules: foundUser.allowedModules,
     };
+
+    setUser(authUser);
+    setSessionCookie(authUser);
+    return { success: true };
+  };
+
+  const register = async (
+    username: string,
+    password: string,
+    name: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    const u = username.trim();
+    const p = password.trim();
+    const n = name.trim();
+
+    if (!u || !p || !n) {
+      return { success: false, error: "Vui lòng nhập đầy đủ thông tin đăng ký." };
+    }
+
+    if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
+      return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
+    }
+
+    const now = new Date();
+    const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}/${now.getFullYear()}`;
+
+    const newUser: ManagedUser = {
+      id: `u-${Date.now()}`,
+      username: u,
+      password: p,
+      name: n,
+      role: "user",
+      status: "pending", // Mặc định chờ admin phê duyệt
+      allowedModules: [], // Chưa được cấp quyền module nào
+      createdAt: dateStr,
+    };
+
+    const updated = [...managedUsers, newUser];
+    saveUsersList(updated);
+
+    return { success: true };
   };
 
   const logout = () => {
@@ -86,14 +216,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push("/login");
   };
 
+  // Admin action: update permissions and status
+  const updateUserPermissions = (userId: string, allowedModules: string[], status: UserStatus) => {
+    const updated = managedUsers.map((item) =>
+      item.id === userId ? { ...item, allowedModules, status } : item
+    );
+    saveUsersList(updated);
+
+    // If current logged in user was modified, update their active session
+    if (user && user.id === userId) {
+      const updatedUser: AuthUser = {
+        ...user,
+        allowedModules,
+        status,
+      };
+      setUser(updatedUser);
+      setSessionCookie(updatedUser);
+    }
+  };
+
+  const approveUser = (userId: string, allowedModules: string[]) => {
+    updateUserPermissions(userId, allowedModules.length > 0 ? allowedModules : ["storage"], "approved");
+  };
+
+  const rejectUser = (userId: string) => {
+    const updated = managedUsers.map((item) =>
+      item.id === userId ? { ...item, status: "rejected" as UserStatus } : item
+    );
+    saveUsersList(updated);
+  };
+
+  const deleteUser = (userId: string) => {
+    const updated = managedUsers.filter((item) => item.id !== userId);
+    saveUsersList(updated);
+  };
+
+  // Check if current user has permission for a specific module
+  const hasModuleAccess = (moduleKey: AppModuleId): boolean => {
+    if (!user) return false;
+    if (user.role === "admin") return true;
+    return user.allowedModules?.includes(moduleKey) || false;
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated: !!user,
         isAdmin: user?.role === "admin",
+        managedUsers,
         login,
+        register,
         logout,
+        updateUserPermissions,
+        approveUser,
+        rejectUser,
+        deleteUser,
+        hasModuleAccess,
       }}
     >
       {initialized ? children : null}

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const sessionCookie = request.cookies.get("datavault_session")?.value;
+  const sessionCookie =
+    request.cookies.get("txclonedriver_session")?.value ||
+    request.cookies.get("datavault_session")?.value;
   const { pathname } = request.nextUrl;
 
   // Static assets & internal requests
@@ -21,11 +23,27 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Already logged in -> redirect away from /login to /overview
+  // Already logged in -> redirect away from /login to allowed landing page
   if (sessionCookie && (pathname === "/login" || pathname === "/")) {
-    const overviewUrl = request.nextUrl.clone();
-    overviewUrl.pathname = "/overview";
-    return NextResponse.redirect(overviewUrl);
+    let targetPath = "/overview";
+    try {
+      const user = JSON.parse(decodeURIComponent(sessionCookie));
+      if (
+        user &&
+        user.role !== "admin" &&
+        Array.isArray(user.allowedModules) &&
+        !user.allowedModules.includes("overview")
+      ) {
+        const firstModule = user.allowedModules[0] || "storage";
+        targetPath = `/${firstModule}`;
+      }
+    } catch {
+      targetPath = "/overview";
+    }
+
+    const targetUrl = request.nextUrl.clone();
+    targetUrl.pathname = targetPath;
+    return NextResponse.redirect(targetUrl);
   }
 
   return NextResponse.next();

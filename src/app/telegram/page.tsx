@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useTelegram } from "@/modules/telegram/telegramContext";
 import { cn } from "@/lib/utils";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 const BOT_COMMANDS = [
   { command: "/start", desc: "Khởi động bot và xác thực danh tính người dùng" },
@@ -116,7 +117,8 @@ export default function TelegramPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <ModuleGuard moduleId="telegram" moduleName="Telegram Bot">
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -311,7 +313,7 @@ export default function TelegramPage() {
               </div>
               <div>
                 <h3 className="font-bold text-white text-sm">
-                  {botInfo?.name || "DataVault Cloud Bot"}
+                  {botInfo?.name || "TxCloneDriver Cloud Bot"}
                 </h3>
                 <p className="text-xs text-sky-400 font-mono">
                   {botInfo?.username ? `@${botInfo.username}` : "@Chưa kết nối"}
@@ -341,12 +343,13 @@ export default function TelegramPage() {
             <div className="p-3 rounded-2xl bg-sky-500/10 border border-sky-400/20 text-[11px] text-sky-300 space-y-1">
               <p className="font-bold">✨ Tự động hóa kết nối:</p>
               <p className="text-slate-300">
-                Khi cấu hình xong, hệ thống DataVault sẽ tự động gửi thông báo khi hoàn thành sao lưu hoặc cảnh báo thời tiết bất thường trực tiếp vào điện thoại của bạn!
+                Khi cấu hình xong, hệ thống TxCloneDriver sẽ tự động gửi thông báo khi hoàn thành sao lưu hoặc cảnh báo thời tiết bất thường trực tiếp vào điện thoại của bạn!
               </p>
             </div>
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }

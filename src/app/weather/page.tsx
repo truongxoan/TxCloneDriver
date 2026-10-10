@@ -17,13 +17,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { getWeather, MOCK_CITIES_WEATHER } from "@/modules/weather/weatherMockService";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 export default function WeatherPage() {
   const [selectedCityKey, setSelectedCityKey] = useState<string>("hanoi");
   const weather = getWeather(selectedCityKey);
 
   return (
-    <div className="space-y-6">
+    <ModuleGuard moduleId="weather" moduleName="Thời tiết">
+      <div className="space-y-6">
       {/* Notice Banner */}
       <div className="rounded-2xl glass-panel p-4 border border-cyan-500/30 bg-cyan-500/10 flex items-start gap-3">
         <Info className="h-5 w-5 text-cyan-400 shrink-0 mt-0.5" />
@@ -190,6 +192,7 @@ export default function WeatherPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }

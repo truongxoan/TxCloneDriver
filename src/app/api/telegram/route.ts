@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId.trim(),
-          text: text || "🔔 [DataVault Cloud Hub] Thông báo thử nghiệm kết nối thành công!",
+          text: text || "🔔 [TxCloneDriver Cloud Hub] Thông báo thử nghiệm kết nối thành công!",
           parse_mode: "HTML",
         }),
       });

@@ -48,12 +48,13 @@ import { useDriveEndpoints, DriveFileItem } from "@/modules/storage/driveEndpoin
 import { MusicPlayerBar, AudioTrack } from "@/modules/storage/MusicPlayerBar";
 import CinemaVideoModal, { VideoItem } from "@/modules/storage/CinemaVideoModal";
 import { detectDuplicates } from "@/modules/storage/duplicateDetector";
+import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 // Default soothing audio tracks in Drive for testing & immediate experience
 const DEFAULT_DRIVE_AUDIO_TRACKS: DriveFileItem[] = [
   {
     id: "audio-demo-1",
-    name: "Lofi Chill Sunset (DataVault Drive).mp3",
+    name: "Lofi Chill Sunset (TxCloneDriver).mp3",
     mimeType: "audio/mp3",
     sizeBytes: 5242880,
     updatedAt: "26/04/2025",
@@ -81,7 +82,7 @@ const DEFAULT_DRIVE_AUDIO_TRACKS: DriveFileItem[] = [
 const DEFAULT_DRIVE_VIDEO_ITEMS: DriveFileItem[] = [
   {
     id: "video-demo-1",
-    name: "DataVault Sci-Fi Cinematic Trailer 4K.mp4",
+    name: "TxCloneDriver Sci-Fi Cinematic Trailer 4K.mp4",
     mimeType: "video/mp4",
     sizeBytes: 157286400,
     updatedAt: "26/04/2025",
@@ -350,7 +351,8 @@ export default function StoragePage() {
   };
 
   return (
-    <div className="space-y-6 pb-28">
+    <ModuleGuard moduleId="storage" moduleName="Google Drive">
+      <div className="space-y-6 pb-28">
       {/* Toast Notification */}
       {showToast && (
         <div className="fixed bottom-6 right-6 z-50 rounded-2xl glass-panel p-4 shadow-glass border border-primary/50 text-xs text-foreground flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
@@ -736,7 +738,7 @@ export default function StoragePage() {
               Mẹo phát nhạc từ Google Drive:
             </span>
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              Các bản nhạc Nonstop lớn (trên 200MB - 500MB) được tự động xử lý qua máy chủ với hỗ trợ tua thời gian (Range Streaming). Bạn có thể bấm nút <strong>&ldquo;Phát&rdquo;</strong> để nghe ngay lập tức trên Music Player DataVault hoặc chuyển sang <strong>&ldquo;Trình phát Drive Preview&rdquo;</strong>.
+              Các bản nhạc Nonstop lớn (trên 200MB - 500MB) được tự động xử lý qua máy chủ với hỗ trợ tua thời gian (Range Streaming). Bạn có thể bấm nút <strong>&ldquo;Phát&rdquo;</strong> để nghe ngay lập tức trên Music Player TxCloneDriver hoặc chuyển sang <strong>&ldquo;Trình phát Drive Preview&rdquo;</strong>.
             </p>
           </div>
         </div>
@@ -748,7 +750,7 @@ export default function StoragePage() {
           <span className="text-lg">🎬</span>
           <div className="space-y-1">
             <span className="font-bold text-white block">
-              Rạp chiếu phim DataVault Cinema:
+              Rạp chiếu phim TxCloneDriver Cinema:
             </span>
             <p className="text-[11px] text-slate-300 leading-relaxed">
               Thưởng thức video và phim độ phân giải cao với hiệu ứng Ambilight rạp chiếu, chế độ tắt đèn phòng, điều chỉnh tỉ lệ màn hình chuẩn 16:9 và 21:9 điện ảnh. Bấm <strong>&ldquo;Xem phim 🎬&rdquo;</strong> ở bất kỳ tệp video nào để mở rạp!
@@ -1101,6 +1103,7 @@ export default function StoragePage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ModuleGuard>
   );
 }
