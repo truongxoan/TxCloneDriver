@@ -11,16 +11,16 @@ import {
   Bell,
   Menu,
   Check,
-  CheckCircle2,
   ChevronDown,
-  Volume2,
-  VolumeX,
+  Gift,
+  Compass,
+  User,
 } from "lucide-react";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { THEMES } from "@/modules/theme-engine/themesData";
-import { convertSolar2Lunar } from "@/modules/lunar-calendar/lunarConverter";
+import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar/lunarConverter";
+import { getUpcomingHolidayCountdowns } from "@/modules/holiday-countdown/holidaysData";
 import { getWeather } from "@/modules/weather/weatherMockService";
-import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
@@ -64,108 +64,115 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
     return () => clearInterval(timer);
   }, []);
 
-  // Format Time & Dates
   const now = currentTime || new Date();
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
+  const hoursStr = String(now.getHours()).padStart(2, "0");
+  const minStr = String(now.getMinutes()).padStart(2, "0");
+  const secStr = String(now.getSeconds()).padStart(2, "0");
   const weekday = WEEKDAYS_VI[now.getDay()];
   const solarDateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
     now.getMonth() + 1
   ).padStart(2, "0")}/${now.getFullYear()}`;
 
-  // Lunar conversion for today
-  const lunar = convertSolar2Lunar(
-    now.getDate(),
-    now.getMonth() + 1,
-    now.getFullYear()
-  );
+  // Accurate lunar calculations
+  const lunar = convertSolar2Lunar(now.getDate(), now.getMonth() + 1, now.getFullYear());
+  const auspiciousHours = getAuspiciousHours(now.getDate(), now.getMonth() + 1, now.getFullYear(), now.getHours());
+  const currentAuspicious = auspiciousHours.find((h) => h.isCurrent) || auspiciousHours[0];
+
+  // Tết Nguyên Đán countdown
+  const holidayList = getUpcomingHolidayCountdowns(now);
+  const tetHoliday = holidayList.find((h) => h.id === "tet-nguyen-dan") || holidayList[0];
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-surface-border glass-panel px-4 lg:px-6">
-      {/* Left: Mobile Menu + Smart Time Capsule */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onOpenMobileMenu}
-          className="md:hidden flex h-9 w-9 items-center justify-center rounded-xl bg-surface-elevated text-muted-foreground hover:text-foreground"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+    <header className="sticky top-0 z-30 flex h-auto min-h-[64px] w-full items-center justify-between px-3 sm:px-5 py-2.5 gap-2 overflow-x-auto no-scrollbar">
+      {/* Mobile Hamburger Menu */}
+      <button
+        onClick={onOpenMobileMenu}
+        className="md:hidden flex h-9 w-9 shrink-0 items-center justify-center rounded-xl glass-pill text-muted-foreground hover:text-foreground"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
-        {/* Live Clock & Vietnamese Lunar Capsule */}
-        <div className="flex items-center gap-2.5 rounded-xl bg-surface-elevated/70 border border-surface-border px-3 py-1.5 shadow-sm">
-          <Clock className="h-4 w-4 text-primary animate-pulse" />
-          <div className="flex items-baseline gap-1.5 font-mono">
-            <span className="text-sm font-bold text-foreground">
-              {hours}:{minutes}
+      {/* Main Multi-Pill Bar */}
+      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        {/* Pill 1: Clock & Solar Date */}
+        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl glass-pill shrink-0">
+          <div className="flex flex-col">
+            <span className="text-sm font-extrabold text-foreground tracking-tight font-mono leading-none">
+              {hoursStr}:{minStr}:{secStr}
             </span>
-            <span className="text-xs text-muted-foreground">:{seconds}</span>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-2 border-l border-surface-border/70 pl-2.5">
-            <span className="text-xs font-medium text-foreground">
+            <span className="text-[11px] text-muted-foreground mt-0.5 whitespace-nowrap">
               {weekday}, {solarDateStr}
-            </span>
-            <span className="text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
-              Âm: {lunar.day}/{lunar.month} {lunar.canChiYear}
             </span>
           </div>
         </div>
 
-        {/* Quick Weather Capsule */}
-        <div className="hidden lg:flex items-center gap-2 rounded-xl bg-surface-elevated/60 border border-surface-border px-3 py-1.5 text-xs">
-          <CloudSun className="h-4 w-4 text-accent" />
-          <span className="text-foreground font-medium">Hà Nội, {weather.temperature}°C</span>
-          <span className="text-muted-foreground text-[11px]">({weather.condition})</span>
-          <Badge variant="outline" size="sm" className="text-[9px] py-0 px-1">
-            Demo
-          </Badge>
+        {/* Pill 2: Âm lịch & Can Chi */}
+        <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-2xl glass-pill shrink-0">
+          <span className="text-lg">🐎</span>
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-bold text-foreground leading-none">
+              Âm lịch: {lunar.day}/{lunar.month}/{lunar.year}
+            </span>
+            <span className="text-[10px] text-amber-300 font-medium mt-0.5 whitespace-nowrap">
+              (Ngày {lunar.canChiDay} &bull; Tháng {lunar.canChiMonth})
+            </span>
+          </div>
+        </div>
+
+        {/* Pill 3: Tết Nguyên Đán Countdown */}
+        <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0">
+          <div className="h-6 w-6 rounded-lg bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+            <Gift className="h-3.5 w-3.5" />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[11px] font-bold text-foreground leading-none">
+              Tết Nguyên Đán
+            </span>
+            <span className="text-[10px] text-rose-400 font-semibold mt-0.5">
+              Còn {tetHoliday.daysRemaining} ngày
+            </span>
+          </div>
+        </div>
+
+        {/* Pill 4: Giờ hoàng đạo */}
+        <div className="hidden 2xl:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0">
+          <div className="h-6 w-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shrink-0">
+            <Compass className="h-3.5 w-3.5" />
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[11px] font-medium text-muted-foreground leading-none">
+              Giờ hoàng đạo
+            </span>
+            <span className="text-[11px] font-bold text-foreground mt-0.5 whitespace-nowrap">
+              {currentAuspicious.timeRange} ({currentAuspicious.chi.replace("Giờ ", "")})
+            </span>
+          </div>
+        </div>
+
+        {/* Pill 5: Thời tiết */}
+        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-2xl glass-pill shrink-0 text-xs">
+          <CloudSun className="h-4 w-4 text-amber-300 shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-foreground">{weather.city}</span>
+            <span className="font-extrabold text-foreground">{weather.temperature}°C</span>
+            <span className="text-muted-foreground text-[11px]">{weather.condition}</span>
+            <span className="text-muted-foreground/50 mx-0.5">|</span>
+            <span className="text-muted-foreground text-[10px]">Độ ẩm {weather.humidity}%</span>
+            <span className="text-muted-foreground/50 mx-0.5">|</span>
+            <span className="text-muted-foreground text-[10px]">Gió {weather.windSpeedKmH} km/h</span>
+          </div>
         </div>
       </div>
 
-      {/* Right Controls: Search, Theme Picker, Seasonal Effect Toggle, Notifications, Avatar */}
-      <div className="flex items-center gap-2">
-        {/* Quick Search Button */}
-        <button
-          onClick={onOpenSearch}
-          className="hidden sm:flex items-center gap-2 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-surface-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-all"
-        >
-          <Search className="h-3.5 w-3.5 text-primary" />
-          <span>Tìm kiếm...</span>
-          <kbd className="hidden md:inline-flex items-center gap-0.5 rounded border border-surface-border bg-surface px-1.5 py-0.2 text-[10px] text-muted-foreground">
-            Ctrl K
-          </kbd>
-        </button>
-
-        {/* Seasonal Effects Toggle Button */}
-        <button
-          onClick={() => setEffectsEnabled(!effectsEnabled)}
-          className={cn(
-            "flex items-center gap-1.5 h-9 px-2.5 rounded-xl border text-xs font-medium transition-all",
-            effectsEnabled
-              ? "bg-accent/15 text-accent border-accent/40 shadow-glow-accent"
-              : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
-          )}
-          title={effectsEnabled ? "Tắt hiệu ứng mùa" : "Bật hiệu ứng mùa"}
-        >
-          <Sparkles
-            className={cn(
-              "h-4 w-4 transition-transform",
-              effectsEnabled ? "rotate-12 scale-110" : "opacity-60"
-            )}
-          />
-          <span className="hidden xl:inline">
-            {effectsEnabled ? "Hiệu ứng: Bật" : "Hiệu ứng: Tắt"}
-          </span>
-        </button>
-
-        {/* Theme Engine Dropdown */}
+      {/* Right Controls: Theme Selector, Notification Bell, User Avatar */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Theme Selector Pill */}
         <div className="relative">
           <button
             onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
-            className="flex items-center gap-2 h-9 px-3 rounded-xl bg-surface-elevated hover:bg-surface-elevated/80 border border-surface-border text-xs font-medium text-foreground transition-all"
+            className="flex items-center gap-2 h-9 px-3 rounded-2xl glass-pill hover:bg-white/10 text-xs font-semibold text-foreground transition-all"
           >
-            <Palette className="h-4 w-4 text-primary" />
+            <span className="text-sm">🌸</span>
             <span className="hidden sm:inline">{currentTheme.nameVi}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
@@ -177,9 +184,9 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                 className="fixed inset-0 z-40"
                 onClick={() => setThemeDropdownOpen(false)}
               />
-              <div className="absolute right-0 mt-2 z-50 w-72 rounded-2xl glass-panel p-2 shadow-glass border border-surface-border">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-surface-border/60">
-                  <span className="text-xs font-semibold text-foreground">
+              <div className="absolute right-0 mt-2 z-50 w-72 rounded-2xl glass-panel p-2 shadow-glass border border-white/15">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+                  <span className="text-xs font-bold text-foreground">
                     Bộ Sưu Tập Giao Diện
                   </span>
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
@@ -187,7 +194,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                       type="checkbox"
                       checked={isAutoSeason}
                       onChange={(e) => setIsAutoSeason(e.target.checked)}
-                      className="rounded border-surface-border"
+                      className="rounded border-white/20"
                     />
                     <span>Tự động theo mùa</span>
                   </label>
@@ -206,13 +213,13 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                         className={cn(
                           "w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors group",
                           isSelected
-                            ? "bg-primary/20 text-foreground font-semibold border border-primary/30"
-                            : "hover:bg-surface-elevated/70 text-muted-foreground hover:text-foreground"
+                            ? "bg-primary/25 text-foreground font-semibold border border-primary/40"
+                            : "hover:bg-white/10 text-muted-foreground hover:text-foreground"
                         )}
                       >
                         <div className="flex items-center gap-2.5">
                           <span
-                            className="h-3 w-3 rounded-full border border-white/20 shadow-sm"
+                            className="h-3 w-3 rounded-full border border-white/20 shadow-sm shrink-0"
                             style={{ backgroundColor: theme.primaryColor }}
                           />
                           <div>
@@ -226,7 +233,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                         </div>
 
                         {isSelected && (
-                          <Check className="h-4 w-4 text-primary" />
+                          <Check className="h-4 w-4 text-primary shrink-0" />
                         )}
                       </button>
                     );
@@ -237,61 +244,18 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           )}
         </div>
 
-        {/* Notifications Popover */}
-        <div className="relative">
-          <button
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-elevated hover:bg-surface-elevated/80 border border-surface-border text-muted-foreground hover:text-foreground transition-all relative"
-            title="Thông báo hệ thống"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary animate-ping" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-          </button>
-
-          {notificationsOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setNotificationsOpen(false)}
-              />
-              <div className="absolute right-0 mt-2 z-50 w-80 rounded-2xl glass-panel p-3 shadow-glass border border-surface-border">
-                <div className="flex items-center justify-between pb-2 border-b border-surface-border/60">
-                  <span className="text-xs font-semibold text-foreground">
-                    Thông báo DataVault
-                  </span>
-                  <Badge variant="primary" size="sm">
-                    Giai đoạn 1
-                  </Badge>
-                </div>
-                <div className="py-2 space-y-2 text-xs">
-                  <div className="rounded-xl p-2.5 bg-surface-elevated/70 border border-surface-border">
-                    <p className="font-medium text-foreground">
-                      🎉 Hoàn thành Nền tảng Giai đoạn 1
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Design System, Theme Engine 8 mùa & Lịch âm dương đã sẵn sàng.
-                    </p>
-                  </div>
-                  <div className="rounded-xl p-2.5 bg-surface-elevated/70 border border-surface-border">
-                    <p className="font-medium text-foreground">
-                      ☁️ Google Drive & Telegram
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Đang ở trạng thái chờ cấu hình (chuẩn bị cho Giai đoạn 3 và 6).
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        {/* Notifications Button */}
+        <button
+          onClick={() => setNotificationsOpen(!notificationsOpen)}
+          className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all relative"
+        >
+          <Bell className="h-4 w-4" />
+          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-slate-950" />
+        </button>
 
         {/* User Profile Avatar Pill */}
-        <div className="flex items-center gap-2 pl-1.5 border-l border-surface-border/60">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-primary to-accent p-0.5 flex items-center justify-center text-xs font-bold text-white shadow-glow-sm">
-            AD
-          </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-foreground cursor-pointer">
+          <User className="h-4 w-4" />
         </div>
       </div>
     </header>

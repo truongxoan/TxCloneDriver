@@ -28,5 +28,6 @@ export interface ThemeDefinition {
   primaryColor: string;
   badge: string;
   previewGradient: string;
+  bgImage?: string;
   cssVars: Record<string, string>;
 }
