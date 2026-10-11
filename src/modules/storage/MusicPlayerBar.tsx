@@ -20,37 +20,37 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface AudioTrack {
-  id: string;
-  title: string;
-  artist?: string;
-  url: string;
-  duration?: string;
-}
+import { useMusicPlayer, AudioTrack } from "@/modules/audio/musicPlayerContext";
+export type { AudioTrack };
 
 interface MusicPlayerBarProps {
-  currentTrack: AudioTrack | null;
-  playlist: AudioTrack[];
-  onClose: () => void;
+  currentTrack?: AudioTrack | null;
+  playlist?: AudioTrack[];
+  onClose?: () => void;
   onTrackChange?: (track: AudioTrack) => void;
 }
 
 export function MusicPlayerBar({
-  currentTrack,
-  playlist,
+  currentTrack: propTrack,
+  playlist: propPlaylist,
   onClose,
   onTrackChange,
 }: MusicPlayerBarProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLoop, setIsLoop] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
+  const global = useMusicPlayer();
 
-  // Playback Mode: "direct" (HTML5 Audio) or "drive_embed" (Google Drive Preview Player)
+  const currentTrack = propTrack !== undefined ? propTrack : global.currentTrack;
+  const playlist = propPlaylist && propPlaylist.length > 0 ? propPlaylist : global.playlist;
+
+  const isPlaying = global.isPlaying;
+  const currentTime = global.currentTime;
+  const duration = global.duration;
+  const volume = global.volume;
+  const isMuted = global.isMuted;
+  const isLoop = global.isLoop;
+  const isLoading = global.isLoading;
+  const audioError = global.audioError;
+
+  // Playback Mode: "direct" (HTML5 Audio via Global Player) or "drive_embed" (Google Drive Preview Player)
   const [useDriveEmbed, setUseDriveEmbed] = useState(false);
   const [showHelpGuide, setShowHelpGuide] = useState(false);
 
@@ -62,107 +62,46 @@ export function MusicPlayerBar({
       (currentTrack.url.includes("drive.google.com") || currentTrack.id.length > 20)
   );
 
-  const [isLoading, setIsLoading] = useState(false);
-
-  // When track changes, load and reset
-  useEffect(() => {
-    if (currentTrack) {
-      setAudioError(null);
-      setCurrentTime(0);
-      setIsLoading(true);
-
-      if (audioRef.current && !useDriveEmbed) {
-        audioRef.current.src = currentTrack.url;
-        audioRef.current.load();
-        audioRef.current
-          .play()
-          .then(() => {
-            setIsPlaying(true);
-            setIsLoading(false);
-            setAudioError(null);
-          })
-          .catch((err) => {
-            console.warn("Audio play wait for user gesture or loading chunk", err);
-            setIsPlaying(false);
-            setIsLoading(false);
-          });
-      }
-    }
-  }, [currentTrack, useDriveEmbed, isDriveTrack]);
-
   const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current
-        .play()
-        .then(() => {
-          setIsPlaying(true);
-          setAudioError(null);
-        })
-        .catch(() => {
-          setIsPlaying(false);
-          setAudioError(
-            "Không thể phát ẩn danh. Vui lòng chuyển sang 'Trình phát Google Drive' bên dưới."
-          );
-        });
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
-        setDuration(audioRef.current.duration);
-      }
-    }
+    global.togglePlay();
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
-    setCurrentTime(val);
-    if (audioRef.current) {
-      audioRef.current.currentTime = val;
-    }
+    global.seek(val);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
-    setVolume(val);
-    setIsMuted(val === 0);
-    if (audioRef.current) {
-      audioRef.current.volume = val;
-    }
+    global.setVolume(val);
   };
 
   const toggleMute = () => {
-    if (!audioRef.current) return;
-    if (isMuted) {
-      audioRef.current.volume = volume || 0.8;
-      setIsMuted(false);
-    } else {
-      audioRef.current.volume = 0;
-      setIsMuted(true);
-    }
+    global.toggleMute();
+  };
+
+  const toggleLoop = () => {
+    global.toggleLoop();
   };
 
   const handleNext = () => {
-    if (!currentTrack || playlist.length === 0) return;
-    const currentIndex = playlist.findIndex((t) => t.id === currentTrack.id);
-    const nextIndex = (currentIndex + 1) % playlist.length;
-    if (onTrackChange) {
-      onTrackChange(playlist[nextIndex]);
+    global.nextTrack();
+    if (onTrackChange && global.currentTrack) {
+      onTrackChange(global.currentTrack);
     }
   };
 
   const handlePrev = () => {
-    if (!currentTrack || playlist.length === 0) return;
-    const currentIndex = playlist.findIndex((t) => t.id === currentTrack.id);
-    const prevIndex = (currentIndex - 1 + playlist.length) % playlist.length;
-    if (onTrackChange) {
-      onTrackChange(playlist[prevIndex]);
+    global.prevTrack();
+    if (onTrackChange && global.currentTrack) {
+      onTrackChange(global.currentTrack);
+    }
+  };
+
+  const handleClose = () => {
+    global.closePlayer();
+    if (onClose) {
+      onClose();
     }
   };
 
@@ -180,43 +119,6 @@ export function MusicPlayerBar({
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-[540px] z-50 animate-in slide-in-from-bottom-5 duration-300">
-      {/* Hidden standard audio player when direct mode is active */}
-      {!useDriveEmbed && (
-        <audio
-          ref={audioRef}
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleTimeUpdate}
-          onCanPlay={() => {
-            setIsLoading(false);
-            setAudioError(null);
-          }}
-          onWaiting={() => setIsLoading(true)}
-          onPlaying={() => {
-            setIsLoading(false);
-            setIsPlaying(true);
-            setAudioError(null);
-          }}
-          onEnded={() => {
-            if (isLoop) {
-              audioRef.current?.play();
-            } else {
-              handleNext();
-            }
-          }}
-          onError={() => {
-            setIsPlaying(false);
-            setIsLoading(false);
-            if (isDriveTrack) {
-              setAudioError(
-                "Đang kết nối luồng tệp lớn từ Google Drive. Bạn có thể bấm 'Bật Trình phát Drive Preview' để nghe ngay qua tài khoản Google của bạn."
-              );
-            } else {
-              setAudioError("Không thể tải nguồn âm thanh này.");
-            }
-          }}
-        />
-      )}
-
       <div className="rounded-3xl glass-card p-4 border border-white/20 shadow-2xl backdrop-blur-2xl bg-slate-950/90 text-white space-y-3">
         {/* Top Info Bar */}
         <div className="flex items-center justify-between gap-3">
@@ -264,11 +166,8 @@ export function MusicPlayerBar({
               <HelpCircle className="h-4 w-4" />
             </button>
             <button
-              onClick={() => {
-                if (audioRef.current) audioRef.current.pause();
-                onClose();
-              }}
-              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              onClick={handleClose}
+              className="p-1.5 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
               title="Đóng trình phát"
             >
               <X className="h-4 w-4" />
@@ -334,7 +233,7 @@ export function MusicPlayerBar({
             <div className="flex items-center justify-between pt-0.5">
               {/* Loop toggle */}
               <button
-                onClick={() => setIsLoop(!isLoop)}
+                onClick={toggleLoop}
                 className={cn(
                   "p-2 rounded-xl transition-colors text-xs",
                   isLoop ? "text-blue-400 bg-blue-500/20" : "text-slate-400 hover:text-white"

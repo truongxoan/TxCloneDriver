@@ -21,8 +21,10 @@ import {
   CheckCircle2,
   Sliders,
 } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/modules/auth/authContext";
 import { useTheme } from "@/modules/theme-engine/themeContext";
+import { useMusicPlayer } from "@/modules/audio/musicPlayerContext";
 import { cn } from "@/lib/utils";
 
 interface SystemNotification {
@@ -83,23 +85,38 @@ const SYSTEM_NOTIFICATIONS: SystemNotification[] = [
   },
 ];
 
+const formatSeconds = (sec: number) => {
+  if (isNaN(sec) || sec === 0) return "00:00";
+  const mins = Math.floor(sec / 60);
+  const secs = Math.floor(sec % 60);
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+};
+
 export function DynamicIsland() {
   const { currentTheme, themeId, setThemeId } = useTheme();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(75);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<"music" | "notifications">("music");
   const [notifIndex, setNotifIndex] = useState(0);
 
-  const playlist = [
-    { title: "Nightfall Lofi Coffee", artist: "ChilledCow & TxStudio", duration: "03:42" },
-    { title: "Beijing Autumn Rain (雨中北京)", artist: "Traditional Chill Beats", duration: "04:15" },
-    { title: "Cyber Horizon 2026", artist: "Synthwave Digital Nomad", duration: "03:20" },
-  ];
+  // Consume Global Music Player state connected to Google Drive
+  const {
+    currentTrack,
+    playlist,
+    isPlaying,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    togglePlay,
+    nextTrack,
+    prevTrack,
+    seek,
+    setVolume,
+    toggleMute,
+  } = useMusicPlayer();
 
-  const currentTrack = playlist[currentTrackIndex];
+  const activeTrackTitle = currentTrack ? currentTrack.title : "Google Drive Music Player";
+  const activeTrackArtist = currentTrack?.artist || "TxCloneDriver Audio Hub";
   const activeNotif = SYSTEM_NOTIFICATIONS[notifIndex];
 
   // Auto rotate notifications every 6 seconds in compact mode
@@ -110,16 +127,6 @@ export function DynamicIsland() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleNextTrack = () => {
-    setCurrentTrackIndex((prev) => (prev + 1) % playlist.length);
-    setIsPlaying(true);
-  };
-
-  const handlePrevTrack = () => {
-    setCurrentTrackIndex((prev) => (prev - 1 + playlist.length) % playlist.length);
-    setIsPlaying(true);
-  };
-
   const ActiveNotifIcon = activeNotif.icon;
 
   return (
@@ -129,29 +136,51 @@ export function DynamicIsland() {
         className={cn(
           "bg-slate-950/95 backdrop-blur-2xl text-white border border-white/15 shadow-2xl transition-all duration-500 ease-out cursor-pointer overflow-hidden",
           isExpanded
-            ? "w-[360px] sm:w-[440px] rounded-3xl p-4 ring-1 ring-primary/40 shadow-primary/20"
-            : "w-auto min-w-[280px] sm:min-w-[340px] h-9 rounded-full px-3.5 flex items-center justify-between gap-3 hover:scale-102 hover:border-white/30"
+            ? "w-[360px] sm:w-[460px] rounded-3xl p-4 ring-1 ring-primary/40 shadow-primary/20"
+            : "w-auto min-w-[280px] sm:min-w-[360px] h-9 rounded-full px-3.5 flex items-center justify-between gap-3 hover:scale-102 hover:border-white/30"
         )}
       >
         {!isExpanded ? (
           /* ========================================================= */
-          /* COMPACT ISLAND VIEW: MUSIC & SYSTEM NOTIFICATION ONLY     */
+          /* COMPACT ISLAND VIEW: LIVE DRIVE MUSIC & NOTIFICATION      */
           /* ========================================================= */
-          <div className="flex items-center justify-between w-full text-xs select-none">
+          <div className="flex items-center justify-between w-full text-xs select-none gap-2">
             {/* Left: Music Track & Equalizer */}
             <div className="flex items-center gap-2 min-w-0 pr-2">
-              <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center shrink-0">
+              <div
+                className={cn(
+                  "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all",
+                  isPlaying
+                    ? "bg-gradient-to-tr from-pink-500 to-rose-500 shadow-sm shadow-pink-500/50"
+                    : "bg-gradient-to-tr from-purple-600 to-pink-500"
+                )}
+              >
                 <Music className="w-2.5 h-2.5 text-white" />
               </div>
-              <span className="text-[11px] font-bold text-slate-200 truncate max-w-[100px] sm:max-w-[130px]">
-                {currentTrack.title}
+
+              {/* Title of track playing in Google Drive */}
+              <span className="text-[11px] font-bold text-slate-200 truncate max-w-[110px] sm:max-w-[150px]">
+                {currentTrack ? currentTrack.title : "Drive Audio (Sẵn sàng)"}
               </span>
-              {/* Sound waves animation */}
+
+              {/* Sound waves animation active when playing */}
               <div className="flex items-center gap-0.5 shrink-0">
-                <span className={cn("w-0.5 h-2 bg-primary", isPlaying && "animate-pulse")} />
-                <span className={cn("w-0.5 h-3 bg-primary/80", isPlaying && "animate-pulse delay-75")} />
-                <span className={cn("w-0.5 h-1.5 bg-primary/60", isPlaying && "animate-pulse delay-150")} />
+                <span className={cn("w-0.5 h-2 bg-pink-400 rounded-full", isPlaying && "animate-pulse")} />
+                <span className={cn("w-0.5 h-3 bg-pink-500 rounded-full", isPlaying && "animate-pulse delay-75")} />
+                <span className={cn("w-0.5 h-1.5 bg-pink-400 rounded-full", isPlaying && "animate-pulse delay-150")} />
               </div>
+
+              {/* Mini Play/Pause directly on compact island */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlay();
+                }}
+                className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 ml-0.5"
+                title={isPlaying ? "Tạm dừng" : "Phát tiếp"}
+              >
+                {isPlaying ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5 fill-current" />}
+              </button>
             </div>
 
             {/* Right: Rotating Non-Game Notification Pill */}
@@ -179,12 +208,12 @@ export function DynamicIsland() {
                   className={cn(
                     "px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5",
                     activeTab === "music"
-                      ? "bg-primary text-primary-foreground shadow-sm"
+                      ? "bg-pink-600 text-white shadow-sm shadow-pink-500/30"
                       : "bg-white/5 text-slate-400 hover:text-white"
                   )}
                 >
                   <Music className="w-3.5 h-3.5" />
-                  <span>Trình Phát Nhạc</span>
+                  <span>Trình Phát Nhạc Drive</span>
                 </button>
 
                 <button
@@ -210,20 +239,25 @@ export function DynamicIsland() {
               </button>
             </div>
 
-            {/* TAB 1: MUSIC PLAYER CONTROLS */}
+            {/* TAB 1: MUSIC PLAYER CONTROLS (LIVE DRIVE STREAMING) */}
             {activeTab === "music" && (
               <div className="space-y-3">
                 <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center shrink-0 shadow-lg">
-                      <Music className="w-5 h-5 text-white" />
+                    <div className={cn(
+                      "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                      isPlaying
+                        ? "bg-gradient-to-tr from-pink-500 to-rose-600 text-white animate-spin-slow shadow-pink-500/40"
+                        : "bg-gradient-to-tr from-purple-600 to-pink-600 text-white"
+                    )}>
+                      <Music className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="font-bold text-white text-xs truncate">
-                        {currentTrack.title}
+                      <div className="font-bold text-white text-xs truncate max-w-[180px] sm:max-w-[220px]" title={activeTrackTitle}>
+                        {activeTrackTitle}
                       </div>
-                      <div className="text-[11px] text-slate-400 truncate">
-                        {currentTrack.artist} &bull; {currentTrack.duration}
+                      <div className="text-[11px] text-pink-300/80 truncate">
+                        {activeTrackArtist}
                       </div>
                     </div>
                   </div>
@@ -231,22 +265,22 @@ export function DynamicIsland() {
                   {/* Playback Controls */}
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={handlePrevTrack}
-                      className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
+                      onClick={prevTrack}
+                      className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-transform active:scale-95"
                       title="Bài trước"
                     >
                       <SkipBack className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => setIsPlaying(!isPlaying)}
-                      className="w-8 h-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-md active:scale-95 transition-all"
+                      onClick={togglePlay}
+                      className="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white flex items-center justify-center shadow-lg shadow-pink-500/30 active:scale-95 transition-all"
                       title={isPlaying ? "Tạm dừng" : "Phát nhạc"}
                     >
-                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                      {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                     </button>
                     <button
-                      onClick={handleNextTrack}
-                      className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white"
+                      onClick={nextTrack}
+                      className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-transform active:scale-95"
                       title="Bài kế tiếp"
                     >
                       <SkipForward className="w-3.5 h-3.5" />
@@ -254,12 +288,30 @@ export function DynamicIsland() {
                   </div>
                 </div>
 
-                {/* Volume Slider & Sound Quality */}
+                {/* Progress Scrub Bar */}
+                <div className="space-y-1 px-1">
+                  <input
+                    type="range"
+                    min="0"
+                    max={duration || 100}
+                    step="0.5"
+                    value={currentTime}
+                    onChange={(e) => seek(parseFloat(e.target.value))}
+                    className="w-full accent-pink-500 h-1.5 bg-white/10 rounded-lg cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                    <span>{formatSeconds(currentTime)}</span>
+                    <span className="text-pink-300 font-semibold">{formatSeconds(duration)}</span>
+                  </div>
+                </div>
+
+                {/* Volume Slider & Audio Status */}
                 <div className="flex items-center justify-between gap-3 px-1 text-[11px] text-slate-400">
                   <div className="flex items-center gap-2 flex-1">
                     <button
-                      onClick={() => setIsMuted(!isMuted)}
+                      onClick={toggleMute}
                       className="text-slate-400 hover:text-white"
+                      title={isMuted ? "Bật âm thanh" : "Tắt tiếng"}
                     >
                       {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
                     </button>
@@ -267,21 +319,24 @@ export function DynamicIsland() {
                       type="range"
                       min="0"
                       max="100"
-                      value={isMuted ? 0 : volume}
-                      onChange={(e) => {
-                        setVolume(Number(e.target.value));
-                        setIsMuted(false);
-                      }}
-                      className="w-full accent-primary h-1.5 bg-white/10 rounded-lg cursor-pointer"
+                      value={isMuted ? 0 : Math.round(volume * 100)}
+                      onChange={(e) => setVolume(Number(e.target.value) / 100)}
+                      className="w-full accent-pink-500 h-1.5 bg-white/10 rounded-lg cursor-pointer"
                     />
                     <span className="font-mono text-[10px] w-8 text-right">
-                      {isMuted ? "0%" : `${volume}%`}
+                      {isMuted ? "0%" : `${Math.round(volume * 100)}%`}
                     </span>
                   </div>
 
-                  <span className="px-2 py-0.5 rounded-md bg-white/5 text-[10px] font-mono text-emerald-400 border border-white/10 shrink-0">
-                    320kbps Lossless
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href="/storage"
+                      onClick={() => setIsExpanded(false)}
+                      className="px-2 py-0.5 rounded-md bg-pink-500/20 text-[10px] text-pink-300 border border-pink-500/30 hover:bg-pink-500/30 transition-colors"
+                    >
+                      Mở Kho Drive &rarr;
+                    </Link>
+                  </div>
                 </div>
               </div>
             )}

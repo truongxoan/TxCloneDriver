@@ -4,7 +4,7 @@
 import React, { useState } from "react";
 import { useChat } from "@/modules/chat/chatContext";
 import { useAuth } from "@/modules/auth/authContext";
-import { Send, MessageSquare, Trash2, Crown, Lock, Unlock, KeyRound, Sparkles, AlertTriangle } from "lucide-react";
+import { Send, MessageSquare, Trash2, Crown, Lock, Unlock, KeyRound, Sparkles, AlertTriangle, Maximize2 } from "lucide-react";
 
 export function LiveChatWidget() {
   const { messages, sendMessage, clearChat, decryptMessage } = useChat();
@@ -48,7 +48,7 @@ export function LiveChatWidget() {
   };
 
   return (
-    <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col h-[400px]">
+    <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col h-[460px] sm:h-[480px]">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2">
@@ -65,10 +65,23 @@ export function LiveChatWidget() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Open Full Messenger Modal */}
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("open-floating-messenger"));
+              }
+            }}
+            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Mở rộng khung chat toàn diện (TxMessenger)"
+          >
+            <Maximize2 className="w-3.5 h-3.5 text-blue-400" />
+          </button>
+
           {/* Toggle Encrypted Chat Mode */}
           <button
             onClick={() => setIsEncryptMode(!isEncryptMode)}
-            className={`px-2 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all ${
+            className={`px-2 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
               isEncryptMode
                 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
                 : "bg-white/5 text-slate-400 hover:text-white"
@@ -82,7 +95,7 @@ export function LiveChatWidget() {
           {isAdmin && messages.length > 0 && (
             <button
               onClick={() => clearChat()}
-              className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1"
+              className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1 cursor-pointer"
               title="Admin dọn sạch tin nhắn"
             >
               <Trash2 className="w-3.5 h-3.5" />

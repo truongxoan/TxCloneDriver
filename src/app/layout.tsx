@@ -8,6 +8,7 @@ import { WatchPartyProvider } from "@/modules/watch-party/watchPartyContext";
 import { VaultProvider } from "@/modules/vault/vaultContext";
 import { ChatProvider } from "@/modules/chat/chatContext";
 import { FeedbackProvider } from "@/modules/feedback/feedbackContext";
+import { MusicPlayerProvider } from "@/modules/audio/musicPlayerContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
@@ -26,19 +27,21 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans antialiased selection:bg-primary/30 selection:text-white">
         <AuthProvider>
           <DriveEndpointsProvider>
-            <TelegramProvider>
-              <WatchPartyProvider>
-                <VaultProvider>
-                  <ChatProvider>
-                    <FeedbackProvider>
-                      <ThemeProvider>
-                        <AppShell>{children}</AppShell>
-                      </ThemeProvider>
-                    </FeedbackProvider>
-                  </ChatProvider>
-                </VaultProvider>
-              </WatchPartyProvider>
-            </TelegramProvider>
+            <MusicPlayerProvider>
+              <TelegramProvider>
+                <WatchPartyProvider>
+                  <VaultProvider>
+                    <ChatProvider>
+                      <FeedbackProvider>
+                        <ThemeProvider>
+                          <AppShell>{children}</AppShell>
+                        </ThemeProvider>
+                      </FeedbackProvider>
+                    </ChatProvider>
+                  </VaultProvider>
+                </WatchPartyProvider>
+              </TelegramProvider>
+            </MusicPlayerProvider>
           </DriveEndpointsProvider>
         </AuthProvider>
       </body>

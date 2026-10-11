@@ -49,6 +49,7 @@ import { MusicPlayerBar, AudioTrack } from "@/modules/storage/MusicPlayerBar";
 import CinemaVideoModal, { VideoItem } from "@/modules/storage/CinemaVideoModal";
 import { detectDuplicates } from "@/modules/storage/duplicateDetector";
 import { scanJunkFiles, getJunkDetail, JunkCategory, JunkDetail } from "@/modules/storage/junkFilter";
+import { useMusicPlayer } from "@/modules/audio/musicPlayerContext";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
 // Default demo junk & system files to demonstrate smart junk filtering
@@ -175,8 +176,8 @@ export default function StoragePage() {
   const [newEndpointUrl, setNewEndpointUrl] = useState("");
   const [testingId, setTestingId] = useState<string | null>(null);
 
-  // Music Player State
-  const [currentTrack, setCurrentTrack] = useState<AudioTrack | null>(null);
+  // Global Music Player State synchronized with Dynamic Island
+  const { currentTrack, playTrack, isPlaying: isGlobalPlaying, closePlayer } = useMusicPlayer();
 
   // Cinema Video Player State
   const [currentVideo, setCurrentVideo] = useState<VideoItem | null>(null);
@@ -354,8 +355,8 @@ export default function StoragePage() {
       artist: activeEndpoint?.name || "Google Drive Audio",
       url: streamUrl,
     };
-    setCurrentTrack(track);
-    triggerAction(`Đang phát: "${track.title}"`);
+    playTrack(track, audioPlaylist);
+    triggerAction(`Đang phát: "${track.title}" (Đã kết nối Dynamic Island)`);
   };
 
   const playFileVideo = (item: DriveFileItem) => {
@@ -470,8 +471,8 @@ export default function StoragePage() {
       <MusicPlayerBar
         currentTrack={currentTrack}
         playlist={audioPlaylist}
-        onClose={() => setCurrentTrack(null)}
-        onTrackChange={(track) => setCurrentTrack(track)}
+        onClose={closePlayer}
+        onTrackChange={(track) => playTrack(track, audioPlaylist)}
       />
 
       {/* Cinema Video Player Modal */}
@@ -514,7 +515,7 @@ export default function StoragePage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                if (audioPlaylist[0]) setCurrentTrack(audioPlaylist[0]);
+                if (audioPlaylist[0]) playTrack(audioPlaylist[0], audioPlaylist);
               }}
               className="gap-1.5 text-xs bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border-pink-500/30"
             >
@@ -1094,7 +1095,7 @@ export default function StoragePage() {
                   {filteredFiles.map((item) => {
                     const audio = isAudioFile(item);
                     const video = isVideoFile(item);
-                    const isCurrentPlayingAudio = currentTrack?.id === item.id;
+                    const isCurrentPlayingAudio = currentTrack?.id === item.id && isGlobalPlaying;
                     const isDuplicate = duplicateScan.duplicateIds.has(item.id);
                     const junkDetail = getJunkDetail(item);
 
@@ -1211,7 +1212,7 @@ export default function StoragePage() {
             {filteredFiles.map((item) => {
               const audio = isAudioFile(item);
               const video = isVideoFile(item);
-              const isCurrentPlayingAudio = currentTrack?.id === item.id;
+              const isCurrentPlayingAudio = currentTrack?.id === item.id && isGlobalPlaying;
               const isDuplicate = duplicateScan.duplicateIds.has(item.id);
               const junkDetail = getJunkDetail(item);
 
