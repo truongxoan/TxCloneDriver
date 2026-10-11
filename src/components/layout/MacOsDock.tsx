@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -97,9 +97,20 @@ export function MacOsDock() {
   const pathname = usePathname();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isCinemaOpen, setIsCinemaOpen] = useState(false);
 
-  // If on login page, hide dock
-  if (pathname === "/login") return null;
+  useEffect(() => {
+    const update = () => {
+      setIsCinemaOpen(document.body.classList.contains("cinema-video-open"));
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  // If on login page or cinema mode is open, hide dock
+  if (pathname === "/login" || isCinemaOpen) return null;
 
   return (
     <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center select-none pointer-events-auto">

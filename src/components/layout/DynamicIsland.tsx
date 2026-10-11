@@ -127,6 +127,19 @@ export function DynamicIsland() {
     return () => clearInterval(interval);
   }, []);
 
+  const [isCinemaOpen, setIsCinemaOpen] = useState(false);
+  useEffect(() => {
+    const update = () => {
+      setIsCinemaOpen(document.body.classList.contains("cinema-video-open"));
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  if (isCinemaOpen) return null;
+
   const ActiveNotifIcon = activeNotif.icon;
 
   return (

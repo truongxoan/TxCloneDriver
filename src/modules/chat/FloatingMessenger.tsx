@@ -282,6 +282,19 @@ export function FloatingMessenger() {
       (m.sender === currentUsername || m.targetUser === currentUsername)
   ).length;
 
+  const [isCinemaOpen, setIsCinemaOpen] = useState(false);
+  useEffect(() => {
+    const update = () => {
+      setIsCinemaOpen(document.body.classList.contains("cinema-video-open"));
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  if (isCinemaOpen) return null;
+
   return (
     <>
       {/* Floating Messenger Icon Button (Bottom Right) */}
