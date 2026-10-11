@@ -14,6 +14,9 @@ import {
   CloudSun,
   Users2,
   KeyRound,
+  Gamepad2,
+  GraduationCap,
+  Car,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
 import { AppModuleId } from "@/modules/auth/types";
@@ -36,6 +39,9 @@ const MODULE_NAMES: Record<AppModuleId, { name: string; href: string; icon: Reac
   weather: { name: "Thời tiết", href: "/weather", icon: CloudSun },
   settings: { name: "Cài đặt", href: "/settings", icon: Lock },
   telegram: { name: "Telegram Bot", href: "/telegram", icon: ShieldAlert },
+  games: { name: "Game Giải Trí", href: "/games", icon: Gamepad2 },
+  study: { name: "Học Ngoại Ngữ", href: "/study", icon: GraduationCap },
+  driver_license: { name: "Ôn Thi GPLX", href: "/driver-license", icon: Car },
 };
 
 export function ModuleGuard({ moduleId, moduleName, children }: ModuleGuardProps) {

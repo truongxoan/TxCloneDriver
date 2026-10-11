@@ -11,7 +11,10 @@ export type AppModuleId =
   | "settings"
   | "telegram"
   | "watch_together"
-  | "vault";
+  | "vault"
+  | "games"
+  | "study"
+  | "driver_license";
 
 export interface AuthUser {
   id?: string;

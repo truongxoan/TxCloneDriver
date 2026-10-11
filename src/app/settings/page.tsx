@@ -51,6 +51,9 @@ const ALL_MODULES: { id: AppModuleId; label: string; icon: string; desc: string 
   { id: "weather", label: "Thời tiết", icon: "🌤️", desc: "Dự báo thời tiết các tỉnh thành" },
   { id: "settings", label: "Cài đặt", icon: "⚙️", desc: "Cấu hình hệ thống & thông số" },
   { id: "telegram", label: "Telegram Bot", icon: "✈️", desc: "Tương tác và nhận thông báo qua Telegram" },
+  { id: "games", label: "Game & Giải Trí", icon: "🎮", desc: "Chơi Tài Xỉu, Xóc Đĩa, Baccarat, Cờ Tướng, Caro, Tetris cùng bạn bè" },
+  { id: "study", label: "Học Ngoại Ngữ", icon: "🎓", desc: "HSK 1-6 Tiếng Trung, Tiếng Anh, Hàn, Nhật & Pomodoro" },
+  { id: "driver_license", label: "Ôn Thi GPLX", icon: "🚗", desc: "600 câu hỏi Bộ GTVT, thi thử sát hạch A1, A2, B1, B2, C" },
 ];
 
 export default function SettingsPage() {

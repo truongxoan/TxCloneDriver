@@ -19,6 +19,9 @@ import {
   Lock,
   Users2,
   KeyRound,
+  Gamepad2,
+  GraduationCap,
+  Car,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -42,6 +45,9 @@ const SIDEBAR_LINKS: SidebarLinkItem[] = [
   { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
   { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
   { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
+  { href: "/games", label: "Game & Giải Trí", icon: Gamepad2, module: "games" },
+  { href: "/study", label: "Học Ngoại Ngữ", icon: GraduationCap, module: "study" },
+  { href: "/driver-license", label: "Ôn Thi GPLX", icon: Car, module: "driver_license" },
   { href: "/vault", label: "Két Sắt & 2FA", icon: KeyRound, module: "vault" },
   { href: "/notes", label: "Ghi chú & Link", icon: Link2, module: "notes" },
   { href: "/projects", label: "Dự án", icon: Folder, module: "projects" },
