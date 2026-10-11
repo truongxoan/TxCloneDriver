@@ -31,6 +31,7 @@ import {
   Layers,
   ArrowRight,
   LogOut,
+  Moon,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -39,6 +40,9 @@ import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { useWatchParty } from "@/modules/watch-party/watchPartyContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { getYouTubeEmbedUrl, detectMediaSource } from "@/modules/watch-party/youtubeHelper";
+import { LofiCyberRoomWidget } from "@/modules/exotic/LofiCyberRoomWidget";
+import { TarotDreamWidget } from "@/modules/exotic/TarotDreamWidget";
+import { SelfDestructNoteWidget } from "@/modules/exotic/SelfDestructNoteWidget";
 
 export default function WatchTogetherPage() {
   const { user } = useAuth();
@@ -63,7 +67,9 @@ export default function WatchTogetherPage() {
   } = useWatchParty();
 
   // Lobby states
-  const [activeLobbyTab, setActiveLobbyTab] = useState<"rooms" | "create" | "bookmarks">("rooms");
+  const [activeLobbyTab, setActiveLobbyTab] = useState<
+    "rooms" | "create" | "bookmarks" | "lofi_room" | "tarot_dream" | "burn_note"
+  >("rooms");
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [joinPassInput, setJoinPassInput] = useState("");
 
@@ -622,11 +628,14 @@ export default function WatchTogetherPage() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+            <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-3">
               {[
                 { id: "rooms", label: "Phòng Đang Hoạt Động", icon: Users2, count: rooms.length },
+                { id: "lofi_room", label: "📻 Phòng Chill Lo-fi 3D", icon: Sparkles },
+                { id: "tarot_dream", label: "🔮 Tarot & Giấc Mơ AI", icon: Moon },
+                { id: "burn_note", label: "🔥 Thư Mật Tự Hủy 60s", icon: Flame },
                 { id: "create", label: "Tạo Phòng Mới", icon: Plus },
-                { id: "bookmarks", label: "Bài Hát Yêu Thích Của Tôi", icon: Bookmark, count: savedBookmarks.length },
+                { id: "bookmarks", label: "Kho Bài Hát Yêu Thích", icon: Bookmark, count: savedBookmarks.length },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeLobbyTab === tab.id;
@@ -867,6 +876,15 @@ export default function WatchTogetherPage() {
                 )}
               </div>
             )}
+
+            {/* TAB 4: LO-FI CYBER ROOM 3D */}
+            {activeLobbyTab === "lofi_room" && <LofiCyberRoomWidget />}
+
+            {/* TAB 5: TAROT & AI DREAM JOURNAL */}
+            {activeLobbyTab === "tarot_dream" && <TarotDreamWidget />}
+
+            {/* TAB 6: SELF DESTRUCT BURN NOTE */}
+            {activeLobbyTab === "burn_note" && <SelfDestructNoteWidget />}
           </div>
         )}
 

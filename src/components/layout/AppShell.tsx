@@ -9,6 +9,7 @@ import { QuickSearchModal } from "./QuickSearchModal";
 import { FloatingMessenger } from "@/modules/chat/FloatingMessenger";
 import { DynamicIsland } from "./DynamicIsland";
 import { MacOsDock } from "./MacOsDock";
+import { MouseEffectsProvider } from "@/modules/interactions/MouseEffectsProvider";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { Wrench } from "lucide-react";
@@ -28,7 +29,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="relative min-h-screen text-foreground flex overflow-hidden">
+    <MouseEffectsProvider>
+      <div className="relative min-h-screen text-foreground flex overflow-hidden">
       {/* Layer 0: Scenic Fullscreen Wallpaper */}
       {currentTheme.bgImage ? (
         <div
@@ -131,5 +133,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <DynamicIsland />
       <MacOsDock />
     </div>
-  );
+  </MouseEffectsProvider>
+);
 }
