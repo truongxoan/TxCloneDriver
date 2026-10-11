@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useGames } from "../gamesContext";
-import { Sparkles, RotateCcw } from "lucide-react";
+import { useAuth } from "@/modules/auth/authContext";
+import { Sparkles, RotateCcw, Crown } from "lucide-react";
 
 type AnimalId = "nai" | "bau" | "ga" | "ca" | "cua" | "tom";
 
@@ -23,7 +24,8 @@ const ANIMALS: AnimalDef[] = [
 ];
 
 export function BauCuaGame() {
-  const { coins, addCoins, deductCoins } = useGames();
+  const { coins, addCoins, deductCoins, bauCuaRiggedAnimals, setBauCuaRiggedAnimals } = useGames();
+  const { isAdmin } = useAuth();
 
   const [selectedChip, setSelectedChip] = useState<number>(5000);
   const [bets, setBets] = useState<Record<AnimalId, number>>({
@@ -79,11 +81,17 @@ export function BauCuaGame() {
     setResultMsg(null);
 
     setTimeout(() => {
-      const a1 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-      const a2 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-      const a3 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+      let results: [AnimalDef, AnimalDef, AnimalDef];
+      if (bauCuaRiggedAnimals && bauCuaRiggedAnimals.length === 3) {
+        const findA = (id: string) => ANIMALS.find((a) => a.id === id) || ANIMALS[0];
+        results = [findA(bauCuaRiggedAnimals[0]), findA(bauCuaRiggedAnimals[1]), findA(bauCuaRiggedAnimals[2])];
+      } else {
+        const a1 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        const a2 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        const a3 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+        results = [a1, a2, a3];
+      }
 
-      const results: [AnimalDef, AnimalDef, AnimalDef] = [a1, a2, a3];
       setDiceResult(results);
       setIsShaking(false);
 
@@ -135,6 +143,69 @@ export function BauCuaGame() {
 
   return (
     <div className="space-y-6">
+      {/* SECRET ADMIN GOD-MODE (Chỉ Admin mới nhìn thấy) */}
+      {isAdmin && (
+        <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2 text-amber-300 font-bold">
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>ADMIN GOD-MODE (ẨN VỚI THÀNH VIÊN):</span>
+            <span className="text-muted-foreground font-normal">Điều hướng 3 con Bầu Cua</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-xl border border-amber-500/30">
+            <button
+              onClick={() => setBauCuaRiggedAnimals(null)}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                bauCuaRiggedAnimals === null
+                  ? "bg-amber-500 text-slate-950 shadow font-black"
+                  : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              🎲 Tự Nhiên
+            </button>
+            <button
+              onClick={() => setBauCuaRiggedAnimals(["bau", "bau", "bau"])}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                bauCuaRiggedAnimals?.[0] === "bau" && bauCuaRiggedAnimals?.[1] === "bau"
+                  ? "bg-amber-500 text-slate-950 shadow font-black"
+                  : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              🎃 3 BẦU (x3)
+            </button>
+            <button
+              onClick={() => setBauCuaRiggedAnimals(["cua", "cua", "cua"])}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                bauCuaRiggedAnimals?.[0] === "cua" && bauCuaRiggedAnimals?.[1] === "cua"
+                  ? "bg-amber-500 text-slate-950 shadow font-black"
+                  : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              🦀 3 CUA (x3)
+            </button>
+            <button
+              onClick={() => setBauCuaRiggedAnimals(["tom", "tom", "tom"])}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                bauCuaRiggedAnimals?.[0] === "tom" && bauCuaRiggedAnimals?.[1] === "tom"
+                  ? "bg-amber-500 text-slate-950 shadow font-black"
+                  : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              🦐 3 TÔM (x3)
+            </button>
+            <button
+              onClick={() => setBauCuaRiggedAnimals(["bau", "cua", "tom"])}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                bauCuaRiggedAnimals?.[0] === "bau" && bauCuaRiggedAnimals?.[1] === "cua"
+                  ? "bg-amber-500 text-slate-950 shadow font-black"
+                  : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              🎃🦀🦐 Bầu-Cua-Tôm
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl glass-card border border-white/10">
         <div>

@@ -74,6 +74,7 @@ export default function DriverLicensePage() {
       });
     }, 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabMode, isSubmitted, examQuestions, userAnswers]);
 
   const handleSelectOption = (qIdx: number, optionIdx: number) => {

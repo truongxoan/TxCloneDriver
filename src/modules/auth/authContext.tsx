@@ -16,6 +16,8 @@ const INITIAL_USERS: ManagedUser[] = [
     username: "admin",
     password: "kdkctrkn@123",
     name: "Quản trị viên Tối cao",
+    avatarInitials: "TX",
+    coins: 50000,
     role: "admin",
     status: "approved",
     allowedModules: [
@@ -40,6 +42,8 @@ const INITIAL_USERS: ManagedUser[] = [
     username: "11",
     password: "21",
     name: "Thành viên A (Chỉ Google Drive)",
+    avatarInitials: "11",
+    coins: 50000,
     role: "user",
     status: "approved",
     allowedModules: ["storage"], // Đúng như yêu cầu: Thành viên A chỉ được mở mục Google Driver
@@ -50,6 +54,8 @@ const INITIAL_USERS: ManagedUser[] = [
     username: "userb",
     password: "21",
     name: "Thành viên B (Google Drive & Dự án)",
+    avatarInitials: "UB",
+    coins: 50000,
     role: "user",
     status: "approved",
     allowedModules: ["storage", "projects"], // Đúng như yêu cầu: Thành viên B chỉ được mở Google Driver và Dự án
@@ -60,6 +66,8 @@ const INITIAL_USERS: ManagedUser[] = [
     username: "hocvien_moi",
     password: "21",
     name: "Học viên Đăng ký mới (Chờ duyệt)",
+    avatarInitials: "HV",
+    coins: 50000,
     role: "user",
     status: "pending",
     allowedModules: [],
@@ -272,6 +280,117 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user.allowedModules?.includes(moduleKey) || false;
   };
 
+  const updateProfile = (newName: string, avatarUrl?: string, bio?: string) => {
+    if (!user) return { success: false, message: "Chưa đăng nhập!" };
+    const trimmedName = newName.trim();
+    const isNameChanged = trimmedName && trimmedName !== user.name;
+
+    if (user.role === "admin") {
+      const updatedUser: AuthUser = {
+        ...user,
+        name: trimmedName || user.name,
+        avatarUrl: avatarUrl !== undefined ? avatarUrl : user.avatarUrl,
+        bio: bio !== undefined ? bio : user.bio,
+      };
+      setUser(updatedUser);
+      setSessionCookie(updatedUser);
+
+      const updated = managedUsers.map((item) =>
+        item.id === user.id || item.username === user.username
+          ? { ...item, name: updatedUser.name, avatarUrl: updatedUser.avatarUrl, bio: updatedUser.bio }
+          : item
+      );
+      saveUsersList(updated);
+      return { success: true, message: "Quản trị viên đã đổi tên hiển thị và hồ sơ thành công!" };
+    } else {
+      const updatedUser: AuthUser = {
+        ...user,
+        avatarUrl: avatarUrl !== undefined ? avatarUrl : user.avatarUrl,
+        bio: bio !== undefined ? bio : user.bio,
+        pendingNameChange: isNameChanged ? trimmedName : user.pendingNameChange,
+      };
+      setUser(updatedUser);
+      setSessionCookie(updatedUser);
+
+      const updated = managedUsers.map((item) =>
+        item.id === user.id || item.username === user.username
+          ? {
+              ...item,
+              avatarUrl: updatedUser.avatarUrl,
+              bio: updatedUser.bio,
+              pendingNameChange: updatedUser.pendingNameChange,
+            }
+          : item
+      );
+      saveUsersList(updated);
+
+      if (isNameChanged) {
+        return {
+          success: true,
+          message: `Đã cập nhật Avatar & Bio! Yêu cầu đổi tên thành "${trimmedName}" đang chờ Quản trị viên duyệt.`,
+          requiresApproval: true,
+        };
+      } else {
+        return { success: true, message: "Đã cập nhật Avatar & Bio thành công!" };
+      }
+    }
+  };
+
+  const approveNameChange = (userId: string) => {
+    const target = managedUsers.find((u) => u.id === userId);
+    if (!target || !target.pendingNameChange) return;
+
+    const newName = target.pendingNameChange;
+    const updated = managedUsers.map((item) =>
+      item.id === userId
+        ? { ...item, name: newName, pendingNameChange: undefined }
+        : item
+    );
+    saveUsersList(updated);
+
+    if (user && user.id === userId) {
+      const updatedUser: AuthUser = { ...user, name: newName, pendingNameChange: undefined };
+      setUser(updatedUser);
+      setSessionCookie(updatedUser);
+    }
+  };
+
+  const rejectNameChange = (userId: string) => {
+    const updated = managedUsers.map((item) =>
+      item.id === userId ? { ...item, pendingNameChange: undefined } : item
+    );
+    saveUsersList(updated);
+
+    if (user && user.id === userId) {
+      const updatedUser: AuthUser = { ...user, pendingNameChange: undefined };
+      setUser(updatedUser);
+      setSessionCookie(updatedUser);
+    }
+  };
+
+  const adjustUserCoins = (userId: string, deltaCoins: number) => {
+    const updated = managedUsers.map((item) => {
+      if (item.id === userId) {
+        const current = item.coins ?? 50000;
+        const next = Math.max(0, current + deltaCoins);
+        return { ...item, coins: next };
+      }
+      return item;
+    });
+    saveUsersList(updated);
+
+    if (user && user.id === userId) {
+      const current = user.coins ?? 50000;
+      const next = Math.max(0, current + deltaCoins);
+      const updatedUser = { ...user, coins: next };
+      setUser(updatedUser);
+      setSessionCookie(updatedUser);
+      try {
+        localStorage.setItem("txclonedriver_fun_coins", next.toString());
+      } catch {}
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -287,6 +406,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         rejectUser,
         deleteUser,
         hasModuleAccess,
+        updateProfile,
+        approveNameChange,
+        rejectNameChange,
+        adjustUserCoins,
       }}
     >
       {initialized ? children : null}

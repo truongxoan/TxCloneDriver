@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useGames } from "../gamesContext";
-import { Sparkles, RotateCcw } from "lucide-react";
+import { useAuth } from "@/modules/auth/authContext";
+import { Sparkles, RotateCcw, Crown } from "lucide-react";
 
 type BaccaratBet = "player" | "banker" | "tie";
 
@@ -41,7 +42,8 @@ function calculateHandScore(cards: Card[]): number {
 }
 
 export function BaccaratGame() {
-  const { coins, addCoins, deductCoins } = useGames();
+  const { coins, addCoins, deductCoins, baccaratRiggedOutcome, setBaccaratRiggedOutcome } = useGames();
+  const { isAdmin } = useAuth();
 
   const [selectedChip, setSelectedChip] = useState<number>(5000);
   const [bets, setBets] = useState<Record<BaccaratBet, number>>({
@@ -98,13 +100,22 @@ export function BaccaratGame() {
     setResultMsg(null);
 
     // Initial 2 cards for Player and Banker
-    const p1 = drawCard();
-    const p2 = drawCard();
-    const b1 = drawCard();
-    const b2 = drawCard();
+    let pHand: Card[];
+    let bHand: Card[];
 
-    const pHand = [p1, p2];
-    const bHand = [b1, b2];
+    if (baccaratRiggedOutcome === "player") {
+      pHand = [{ suit: "♠", val: "9", points: 9 }, { suit: "♦", val: "K", points: 0 }]; // Natural 9
+      bHand = [{ suit: "♥", val: "3", points: 3 }, { suit: "♣", val: "3", points: 3 }]; // 6
+    } else if (baccaratRiggedOutcome === "banker") {
+      pHand = [{ suit: "♠", val: "2", points: 2 }, { suit: "♦", val: "3", points: 3 }]; // 5
+      bHand = [{ suit: "♥", val: "9", points: 9 }, { suit: "♣", val: "K", points: 0 }]; // Natural 9
+    } else if (baccaratRiggedOutcome === "tie") {
+      pHand = [{ suit: "♠", val: "8", points: 8 }, { suit: "♦", val: "K", points: 0 }]; // Natural 8
+      bHand = [{ suit: "♥", val: "8", points: 8 }, { suit: "♣", val: "K", points: 0 }]; // Natural 8
+    } else {
+      pHand = [drawCard(), drawCard()];
+      bHand = [drawCard(), drawCard()];
+    }
 
     setTimeout(() => {
       let pScore = calculateHandScore(pHand);
@@ -196,6 +207,37 @@ export function BaccaratGame() {
 
   return (
     <div className="space-y-6">
+      {/* SECRET ADMIN GOD-MODE (Chỉ Admin mới nhìn thấy) */}
+      {isAdmin && (
+        <div className="p-3.5 rounded-2xl bg-indigo-950/40 border border-indigo-500/40 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2 text-indigo-300 font-bold">
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>ADMIN GOD-MODE (ẨN VỚI THÀNH VIÊN):</span>
+            <span className="text-muted-foreground font-normal">Thao túng ván bài Baccarat</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-xl border border-indigo-500/30">
+            {[
+              { id: "random", label: "🎲 Tự Nhiên" },
+              { id: "player", label: "🔵 Ép PLAYER THẮNG (9đ)" },
+              { id: "banker", label: "🔴 Ép BANKER THẮNG (9đ)" },
+              { id: "tie", label: "🟢 Ép TIE HÒA x8 (8-8)" },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setBaccaratRiggedOutcome(mode.id as any)}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                  baccaratRiggedOutcome === mode.id
+                    ? "bg-indigo-500 text-white shadow font-black"
+                    : "text-muted-foreground hover:text-white"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header & Cầu Baccarat */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl glass-card border border-white/10">
         <div>

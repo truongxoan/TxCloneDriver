@@ -21,9 +21,13 @@ export interface AuthUser {
   username: string;
   role: UserRole;
   name: string;
-  avatarInitials: string;
+  avatarInitials?: string;
+  avatarUrl?: string;
+  bio?: string;
+  coins?: number;
   status: UserStatus;
   allowedModules: string[];
+  pendingNameChange?: string;
 }
 
 export interface ManagedUser {
@@ -31,10 +35,15 @@ export interface ManagedUser {
   username: string;
   password?: string;
   name: string;
+  avatarInitials?: string;
+  avatarUrl?: string;
+  bio?: string;
+  coins?: number;
   role: UserRole;
   status: UserStatus;
   allowedModules: string[];
   createdAt: string;
+  pendingNameChange?: string;
 }
 
 export interface AuthContextType {
@@ -50,4 +59,8 @@ export interface AuthContextType {
   rejectUser: (userId: string) => void;
   deleteUser: (userId: string) => void;
   hasModuleAccess: (moduleKey: AppModuleId) => boolean;
+  updateProfile: (newName: string, avatarUrl?: string, bio?: string) => { success: boolean; message: string; requiresApproval?: boolean };
+  approveNameChange: (userId: string) => void;
+  rejectNameChange: (userId: string) => void;
+  adjustUserCoins: (userId: string, deltaCoins: number) => void;
 }

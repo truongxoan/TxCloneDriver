@@ -146,6 +146,7 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
     if (activeEndpoint) {
       refreshFiles();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEndpoint?.id]);
 
   const addEndpoint = (name: string, url: string) => {

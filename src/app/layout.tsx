@@ -6,6 +6,8 @@ import { DriveEndpointsProvider } from "@/modules/storage/driveEndpointsContext"
 import { TelegramProvider } from "@/modules/telegram/telegramContext";
 import { WatchPartyProvider } from "@/modules/watch-party/watchPartyContext";
 import { VaultProvider } from "@/modules/vault/vaultContext";
+import { ChatProvider } from "@/modules/chat/chatContext";
+import { FeedbackProvider } from "@/modules/feedback/feedbackContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
@@ -27,9 +29,13 @@ export default function RootLayout({
             <TelegramProvider>
               <WatchPartyProvider>
                 <VaultProvider>
-                  <ThemeProvider>
-                    <AppShell>{children}</AppShell>
-                  </ThemeProvider>
+                  <ChatProvider>
+                    <FeedbackProvider>
+                      <ThemeProvider>
+                        <AppShell>{children}</AppShell>
+                      </ThemeProvider>
+                    </FeedbackProvider>
+                  </ChatProvider>
                 </VaultProvider>
               </WatchPartyProvider>
             </TelegramProvider>

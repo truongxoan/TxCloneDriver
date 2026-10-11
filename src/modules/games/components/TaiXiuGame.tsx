@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useGames } from "../gamesContext";
-import { Sparkles, RotateCcw, Volume2, VolumeX, Flame } from "lucide-react";
+import { useAuth } from "@/modules/auth/authContext";
+import { Sparkles, RotateCcw, Volume2, VolumeX, Flame, Crown } from "lucide-react";
 
 type BetZone = "tai" | "xiu" | "chan" | "le" | "bao";
 
@@ -12,7 +13,8 @@ interface BetPlaced {
 }
 
 export function TaiXiuGame() {
-  const { coins, addCoins, deductCoins } = useGames();
+  const { coins, addCoins, deductCoins, taiXiuRiggedOutcome, setTaiXiuRiggedOutcome } = useGames();
+  const { isAdmin } = useAuth();
 
   const [selectedChip, setSelectedChip] = useState<number>(5000);
   const [bets, setBets] = useState<Record<BetZone, number>>({
@@ -69,11 +71,19 @@ export function TaiXiuGame() {
     setIsBowlCovered(true);
     setLastWinMessage(null);
 
-    // Roll animation delay
     setTimeout(() => {
-      const d1 = Math.floor(Math.random() * 6) + 1;
-      const d2 = Math.floor(Math.random() * 6) + 1;
-      const d3 = Math.floor(Math.random() * 6) + 1;
+      let d1 = 3, d2 = 4, d3 = 4;
+      if (taiXiuRiggedOutcome === "tai") {
+        d1 = 5; d2 = 5; d3 = 4; // 14 TÀI
+      } else if (taiXiuRiggedOutcome === "xiu") {
+        d1 = 2; d2 = 3; d3 = 4; // 9 XỈU
+      } else if (taiXiuRiggedOutcome === "bao") {
+        d1 = 5; d2 = 5; d3 = 5; // BÃO 15 x30
+      } else {
+        d1 = Math.floor(Math.random() * 6) + 1;
+        d2 = Math.floor(Math.random() * 6) + 1;
+        d3 = Math.floor(Math.random() * 6) + 1;
+      }
       const sum = d1 + d2 + d3;
       const isTriple = d1 === d2 && d2 === d3;
       const isTai = sum >= 11 && sum <= 17;
@@ -138,6 +148,37 @@ export function TaiXiuGame() {
 
   return (
     <div className="space-y-6">
+      {/* SECRET ADMIN GOD-MODE (Chỉ Admin mới nhìn thấy) */}
+      {isAdmin && (
+        <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2 text-amber-300 font-bold">
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>ADMIN GOD-MODE (ẨN VỚI THÀNH VIÊN):</span>
+            <span className="text-muted-foreground font-normal">Điều hướng kết quả xúc xắc ván tới</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-xl border border-amber-500/30">
+            {[
+              { id: "random", label: "🎲 Tự Nhiên" },
+              { id: "tai", label: "🎯 Ép TÀI (14đ)" },
+              { id: "xiu", label: "🎯 Ép XỈU (9đ)" },
+              { id: "bao", label: "⚡ Ép BÃO (5-5-5)" },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setTaiXiuRiggedOutcome(mode.id as any)}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                  taiXiuRiggedOutcome === mode.id
+                    ? "bg-amber-500 text-slate-950 shadow font-black"
+                    : "text-muted-foreground hover:text-white"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Table Header & Soi Cầu */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl glass-card border border-white/10">
         <div>

@@ -2,12 +2,14 @@
 
 import React, { useState } from "react";
 import { useGames } from "../gamesContext";
-import { Sparkles, RotateCcw } from "lucide-react";
+import { useAuth } from "@/modules/auth/authContext";
+import { Sparkles, RotateCcw, Crown } from "lucide-react";
 
 type XocDiaBetZone = "chan" | "le" | "tu_do" | "tu_trang" | "ba_do" | "ba_trang";
 
 export function XocDiaGame() {
-  const { coins, addCoins, deductCoins } = useGames();
+  const { coins, addCoins, deductCoins, xocDiaRiggedOutcome, setXocDiaRiggedOutcome } = useGames();
+  const { isAdmin } = useAuth();
 
   const [selectedChip, setSelectedChip] = useState<number>(5000);
   const [bets, setBets] = useState<Record<XocDiaBetZone, number>>({
@@ -66,13 +68,23 @@ export function XocDiaGame() {
     setResultMsg(null);
 
     setTimeout(() => {
-      // Generate 4 coin flips
-      const c1 = Math.random() < 0.5;
-      const c2 = Math.random() < 0.5;
-      const c3 = Math.random() < 0.5;
-      const c4 = Math.random() < 0.5;
+      let newCoins: [boolean, boolean, boolean, boolean];
+      if (xocDiaRiggedOutcome === "chan") {
+        newCoins = [true, false, true, false]; // 2 Đỏ 2 Trắng (Chẵn)
+      } else if (xocDiaRiggedOutcome === "le") {
+        newCoins = [true, true, true, false]; // 3 Đỏ 1 Trắng (Lẻ)
+      } else if (xocDiaRiggedOutcome === "tu_do") {
+        newCoins = [true, true, true, true]; // Tứ Đỏ
+      } else if (xocDiaRiggedOutcome === "tu_trang") {
+        newCoins = [false, false, false, false]; // Tứ Trắng
+      } else {
+        const c1 = Math.random() < 0.5;
+        const c2 = Math.random() < 0.5;
+        const c3 = Math.random() < 0.5;
+        const c4 = Math.random() < 0.5;
+        newCoins = [c1, c2, c3, c4];
+      }
 
-      const newCoins: [boolean, boolean, boolean, boolean] = [c1, c2, c3, c4];
       const redCount = newCoins.filter(Boolean).length;
       const isChan = redCount % 2 === 0;
 
@@ -142,6 +154,38 @@ export function XocDiaGame() {
 
   return (
     <div className="space-y-6">
+      {/* SECRET ADMIN GOD-MODE (Chỉ Admin mới nhìn thấy) */}
+      {isAdmin && (
+        <div className="p-3.5 rounded-2xl bg-rose-950/40 border border-rose-500/40 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in">
+          <div className="flex items-center gap-2 text-rose-300 font-bold">
+            <Crown className="w-4 h-4 text-amber-400" />
+            <span>ADMIN GOD-MODE (ẨN VỚI THÀNH VIÊN):</span>
+            <span className="text-muted-foreground font-normal">Thao túng 4 đồng xu ván tới</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-xl border border-rose-500/30">
+            {[
+              { id: "random", label: "🎲 Tự Nhiên" },
+              { id: "chan", label: "🔴 Ép CHẴN (2-2)" },
+              { id: "le", label: "⚪ Ép LẺ (3-1)" },
+              { id: "tu_do", label: "⚡ TỨ ĐỎ x12" },
+              { id: "tu_trang", label: "⚡ TỨ TRẮNG x12" },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setXocDiaRiggedOutcome(mode.id as any)}
+                className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
+                  xocDiaRiggedOutcome === mode.id
+                    ? "bg-rose-500 text-white shadow font-black"
+                    : "text-muted-foreground hover:text-white"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header & Bảng Vị */}
       <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl glass-card border border-white/10">
         <div>

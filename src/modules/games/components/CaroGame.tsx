@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import { useGames } from "../gamesContext";
-import { RotateCcw, Bot, Users, Trophy } from "lucide-react";
+import { useAuth } from "@/modules/auth/authContext";
+import { RotateCcw, Bot, Users, Trophy, Crown, Sparkles } from "lucide-react";
 
 const BOARD_SIZE = 15;
 type CellVal = "X" | "O" | null;
 
 export function CaroGame() {
-  const { addCoins } = useGames();
+  const { addCoins, caroGodHint, setCaroGodHint } = useGames();
+  const { isAdmin } = useAuth();
   const [board, setBoard] = useState<CellVal[][]>(() =>
     Array(BOARD_SIZE)
       .fill(null)
@@ -171,6 +173,31 @@ export function CaroGame() {
     setHistoryCount(0);
   };
 
+  // Admin AI Golden Hint calculation
+  const getGodMove = (): [number, number] | null => {
+    if (!isAdmin || !caroGodHint || winner !== null) return null;
+    let bestScore = -Infinity;
+    let best: [number, number] | null = null;
+    const opponent = currentTurn === "X" ? "O" : "X";
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (board[r][c] === null) {
+          let score = 0;
+          if (checkWin(board, r, c, currentTurn)) score += 100000;
+          if (checkWin(board, r, c, opponent)) score += 50000;
+          score += 14 - Math.abs(r - 7) - Math.abs(c - 7);
+          if (score > bestScore) {
+            bestScore = score;
+            best = [r, c];
+          }
+        }
+      }
+    }
+    return best;
+  };
+  const godMove = getGodMove();
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -217,6 +244,21 @@ export function CaroGame() {
               <Users className="w-3.5 h-3.5" /> 2 Người (PvP)
             </button>
           </div>
+
+          {isAdmin && (
+            <button
+              onClick={() => setCaroGodHint(!caroGodHint)}
+              className={`px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 text-xs transition-all ${
+                caroGodHint
+                  ? "bg-amber-500 text-slate-950 font-black shadow-lg shadow-amber-500/30 ring-2 ring-amber-400"
+                  : "bg-amber-950/40 text-amber-300 border border-amber-500/30 hover:bg-amber-950/70"
+              }`}
+              title="Chỉ Admin mới nhìn thấy nước đi vàng AI"
+            >
+              <Crown className="w-3.5 h-3.5" />
+              {caroGodHint ? "AI Nước Vàng (BẬT)" : "Bật AI Nước Đi Vàng"}
+            </button>
+          )}
 
           <button
             onClick={handleReset}
@@ -267,6 +309,7 @@ export function CaroGame() {
               row.map((cell, c) => {
                 const isLast = lastMove && lastMove[0] === r && lastMove[1] === c;
                 const isWinCell = winningLine?.some(([wr, wc]) => wr === r && wc === c);
+                const isGodCell = godMove && godMove[0] === r && godMove[1] === c && cell === null;
 
                 return (
                   <button
@@ -292,6 +335,11 @@ export function CaroGame() {
                     )}
                     {isLast && (
                       <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    )}
+                    {isGodCell && (
+                      <span className="absolute inset-0.5 border-2 border-amber-500 bg-amber-400/30 animate-pulse rounded flex items-center justify-center pointer-events-none">
+                        <Sparkles className="w-3 h-3 text-amber-500 animate-spin-slow" />
+                      </span>
                     )}
                   </button>
                 );

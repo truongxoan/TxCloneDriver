@@ -19,12 +19,27 @@ interface GamesContextType {
   setActiveGameId: (id: GameId) => void;
   soundEnabled: boolean;
   setSoundEnabled: (v: boolean) => void;
+
+  // Secret Admin Rigging & AI God Mode (Hidden from users)
+  taiXiuRiggedOutcome: "random" | "tai" | "xiu" | "bao";
+  setTaiXiuRiggedOutcome: (v: "random" | "tai" | "xiu" | "bao") => void;
+  xocDiaRiggedOutcome: "random" | "chan" | "le" | "tu_do" | "tu_trang";
+  setXocDiaRiggedOutcome: (v: "random" | "chan" | "le" | "tu_do" | "tu_trang") => void;
+  baccaratRiggedOutcome: "random" | "player" | "banker" | "tie";
+  setBaccaratRiggedOutcome: (v: "random" | "player" | "banker" | "tie") => void;
+  bauCuaRiggedAnimals: string[] | null;
+  setBauCuaRiggedAnimals: (v: string[] | null) => void;
+  caroGodHint: boolean;
+  setCaroGodHint: (v: boolean) => void;
+  coTuongGodHint: boolean;
+  setCoTuongGodHint: (v: boolean) => void;
 }
 
 const GamesContext = createContext<GamesContextType | undefined>(undefined);
 
 const COINS_KEY = "txclonedriver_fun_coins";
 const CLAIM_DATE_KEY = "txclonedriver_last_daily_claim";
+const RESET_DATE_KEY = "txclonedriver_last_daily_reset";
 
 export function GamesProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -34,16 +49,36 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
   const [activeGameId, setActiveGameId] = useState<GameId>("taixiu");
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
-  // Load coins from localStorage on mount
+  // Secret Admin Rigging Controls
+  const [taiXiuRiggedOutcome, setTaiXiuRiggedOutcome] = useState<"random" | "tai" | "xiu" | "bao">("random");
+  const [xocDiaRiggedOutcome, setXocDiaRiggedOutcome] = useState<"random" | "chan" | "le" | "tu_do" | "tu_trang">("random");
+  const [baccaratRiggedOutcome, setBaccaratRiggedOutcome] = useState<"random" | "player" | "banker" | "tie">("random");
+  const [bauCuaRiggedAnimals, setBauCuaRiggedAnimals] = useState<string[] | null>(null);
+  const [caroGodHint, setCaroGodHint] = useState<boolean>(false);
+  const [coTuongGodHint, setCoTuongGodHint] = useState<boolean>(false);
+
+  // Load coins and perform daily 24h 50,000 reset if lower
   useEffect(() => {
     try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const lastReset = localStorage.getItem(RESET_DATE_KEY);
+
+      let currentCoins = 50000;
       const savedCoins = localStorage.getItem(COINS_KEY);
       if (savedCoins !== null) {
-        setCoins(parseInt(savedCoins, 10));
-      } else {
-        localStorage.setItem(COINS_KEY, "50000");
-        setCoins(50000);
+        currentCoins = parseInt(savedCoins, 10);
       }
+
+      // 24h reset: Every new day, if user has less than 50,000 coins, restore to 50,000!
+      if (lastReset !== todayStr) {
+        if (currentCoins < 50000) {
+          currentCoins = 50000;
+          localStorage.setItem(COINS_KEY, "50000");
+        }
+        localStorage.setItem(RESET_DATE_KEY, todayStr);
+      }
+
+      setCoins(currentCoins);
 
       const savedClaim = localStorage.getItem(CLAIM_DATE_KEY);
       setLastClaimDate(savedClaim);
@@ -81,7 +116,19 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
     if (!canClaimDaily) {
       return { success: false, amount: 0, message: "Hôm nay bạn đã nhận thưởng điểm danh rồi!" };
     }
-    const reward = 10000;
+
+    // Check if it's the last day of the month for +100,000 bonus
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const isEndOfMonth = tomorrow.getDate() === 1;
+
+    let reward = 10000;
+    let bonusText = "";
+    if (isEndOfMonth) {
+      reward = 100000;
+      bonusText = " (ĐẶC BIỆT: Ngày cuối tháng thưởng lớn +100,000 điểm!)";
+    }
+
     addCoins(reward, "Điểm danh hàng ngày");
     try {
       localStorage.setItem(CLAIM_DATE_KEY, todayStr);
@@ -90,7 +137,7 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
     return {
       success: true,
       amount: reward,
-      message: `Chúc mừng! Bạn đã nhận thành công ${reward.toLocaleString()} Xu vui vẻ!`,
+      message: `Chúc mừng! Bạn đã nhận ${reward.toLocaleString()} Xu vui vẻ!${bonusText}`,
     };
   };
 
@@ -105,7 +152,6 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
       status: "ready",
     };
 
-    // Add mock friend bots to simulate multiplayer room atmosphere
     const mockFriends: PlayerInRoom[] = [
       { id: "p2", name: "Nguyễn Tuấn", avatar: "NT", coins: 85000, isHost: false, status: "ready" },
       { id: "p3", name: "Minh Trang", avatar: "MT", coins: 120000, isHost: false, status: "ready" },
@@ -174,6 +220,20 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
         setActiveGameId,
         soundEnabled,
         setSoundEnabled,
+
+        // Secret Admin God Mode
+        taiXiuRiggedOutcome,
+        setTaiXiuRiggedOutcome,
+        xocDiaRiggedOutcome,
+        setXocDiaRiggedOutcome,
+        baccaratRiggedOutcome,
+        setBaccaratRiggedOutcome,
+        bauCuaRiggedAnimals,
+        setBauCuaRiggedAnimals,
+        caroGodHint,
+        setCaroGodHint,
+        coTuongGodHint,
+        setCoTuongGodHint,
       }}
     >
       {children}
