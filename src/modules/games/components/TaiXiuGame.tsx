@@ -37,10 +37,14 @@ export function TaiXiuGame() {
   ]);
   const [lastWinMessage, setLastWinMessage] = useState<string | null>(null);
 
+  const [autoRun, setAutoRun] = useState<boolean>(true);
+  const [countdown, setCountdown] = useState<number>(10);
+  const [roundId, setRoundId] = useState<number>(8801);
+
   const totalBet = Object.values(bets).reduce((a, b) => a + b, 0);
 
   const handlePlaceBet = (zone: BetZone) => {
-    if (isRolling) return;
+    if (isRolling || countdown <= 3) return;
     if (coins < selectedChip) {
       alert("Bạn không đủ Xu để đặt cược thêm!");
       return;
@@ -55,18 +59,12 @@ export function TaiXiuGame() {
   };
 
   const handleClearBets = () => {
-    if (isRolling || totalBet === 0) return;
+    if (isRolling || totalBet === 0 || countdown <= 3) return;
     addCoins(totalBet, "Hủy cược");
     setBets({ tai: 0, xiu: 0, chan: 0, le: 0, bao: 0 });
   };
 
-  const handleRoll = () => {
-    if (isRolling) return;
-    if (totalBet === 0) {
-      alert("Vui lòng đặt cược trước khi lắc xúc xắc!");
-      return;
-    }
-
+  const executeRoll = () => {
     setIsRolling(true);
     setIsBowlCovered(true);
     setLastWinMessage(null);
@@ -92,15 +90,14 @@ export function TaiXiuGame() {
       setDice([d1, d2, d3]);
       setIsRolling(false);
 
-      // Automatic open or wait for user to open
+      // Open bowl after 1s
       setTimeout(() => {
         setIsBowlCovered(false);
 
-        // Calculate payout
+        // Calculate payout if bet placed
         let totalWin = 0;
         let details: string[] = [];
 
-        // Tài / Xỉu
         if (isTai && bets.tai > 0) {
           const win = bets.tai * 2;
           totalWin += win;
@@ -111,7 +108,6 @@ export function TaiXiuGame() {
           details.push(`Xỉu (+${win.toLocaleString()})`);
         }
 
-        // Chẵn / Lẻ
         if (isEven && bets.chan > 0) {
           const win = bets.chan * 1.95;
           totalWin += win;
@@ -122,7 +118,6 @@ export function TaiXiuGame() {
           details.push(`Lẻ (+${Math.round(win).toLocaleString()})`);
         }
 
-        // Bão (Bộ 3 giống nhau)
         if (isTriple && bets.bao > 0) {
           const win = bets.bao * 30;
           totalWin += win;
@@ -132,16 +127,41 @@ export function TaiXiuGame() {
         if (totalWin > 0) {
           addCoins(Math.round(totalWin), "Thắng Tài Xỉu");
           setLastWinMessage(`🎉 THẮNG LỚN: +${Math.round(totalWin).toLocaleString()} Xu! (${details.join(", ")})`);
-        } else {
+        } else if (totalBet > 0) {
           setLastWinMessage(`Rất tiếc! Kết quả: ${sum} điểm (${isTai ? "TÀI" : "XỈU"}). Chúc bạn may mắn lần sau!`);
+        } else {
+          setLastWinMessage(`Phiên #${roundId} hoàn tất: ${sum} điểm (${isTai ? "TÀI" : "XỈU"}).`);
         }
 
-        // Save history
         setHistory((prev) => [{ sum, isTai, dice: [d1, d2, d3] }, ...prev.slice(0, 19)]);
-        // Reset bets
-        setBets({ tai: 0, xiu: 0, chan: 0, le: 0, bao: 0 });
-      }, 1200);
-    }, 1500);
+      }, 800);
+    }, 1200);
+  };
+
+  // Continuous 10s auto-run loop
+  useEffect(() => {
+    if (!autoRun) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === 4) {
+          executeRoll();
+          return 3;
+        }
+        if (prev <= 1) {
+          setRoundId((r) => r + 1);
+          setBets({ tai: 0, xiu: 0, chan: 0, le: 0, bao: 0 });
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, bets, coins, taiXiuRiggedOutcome, roundId]);
+
+  const handleRoll = () => {
+    if (isRolling) return;
+    executeRoll();
   };
 
   const currentSum = dice[0] + dice[1] + dice[2];
@@ -209,6 +229,39 @@ export function TaiXiuGame() {
               {h.isTai ? "T" : "X"}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* 10s Auto-Run Live Round Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 px-4 rounded-2xl bg-slate-900/80 border border-white/10">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-300">
+            Phiên <strong className="text-white font-mono">#{roundId}</strong>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`px-3 py-1 rounded-xl font-black text-xs flex items-center gap-1.5 ${
+                countdown > 3
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse"
+                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-bounce"
+              }`}
+            >
+              ⏱️ {countdown}s ({countdown > 3 ? "🟢 Đang đặt cược" : "🔴 Đóng cược & Mở bát"})
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAutoRun(!autoRun)}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+              autoRun
+                ? "bg-emerald-600 text-white shadow"
+                : "bg-white/5 text-slate-400 hover:text-white"
+            }`}
+          >
+            {autoRun ? "⚡ Tự động 10s: BẬT" : "Tự động 10s: TẮT"}
+          </button>
         </div>
       </div>
 

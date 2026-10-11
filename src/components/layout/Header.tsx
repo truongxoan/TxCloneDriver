@@ -18,7 +18,11 @@ import {
   LogOut,
   Shield,
   ShieldAlert,
+  Mic,
+  Headphones,
 } from "lucide-react";
+import { VoiceAssistantModal } from "@/components/voice/VoiceAssistantModal";
+import { AmbientSoundPlayer } from "@/components/audio/AmbientSoundPlayer";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { THEMES } from "@/modules/theme-engine/themesData";
 import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar/lunarConverter";
@@ -59,6 +63,8 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+  const [ambientPlayerOpen, setAmbientPlayerOpen] = useState(false);
 
   const weather = getWeather("hanoi");
 
@@ -205,6 +211,28 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           )}
         </div>
 
+        {/* Voice Assistant Mic Button */}
+        <button
+          onClick={() => setVoiceModalOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-sky-400 hover:text-sky-300 transition-all relative group"
+          title="Trợ lý giọng nói AI Tiếng Việt (Web Speech)"
+        >
+          <Mic className="h-4 w-4 transition-transform group-hover:scale-110" />
+          <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+          </span>
+        </button>
+
+        {/* Ambient Relaxing Sound Button */}
+        <button
+          onClick={() => setAmbientPlayerOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-purple-400 hover:text-purple-300 transition-all relative group"
+          title="Không gian âm thanh thư giãn (Lofi & White Noise)"
+        >
+          <Headphones className="h-4 w-4 transition-transform group-hover:scale-110" />
+        </button>
+
         {/* Notifications Button */}
         <button
           onClick={() => setNotificationsOpen(!notificationsOpen)}
@@ -296,6 +324,19 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           )}
         </div>
       </div>
+
+      {/* Voice Assistant Modal */}
+      <VoiceAssistantModal
+        isOpen={voiceModalOpen}
+        onClose={() => setVoiceModalOpen(false)}
+        onOpenAmbientMusic={() => setAmbientPlayerOpen(true)}
+      />
+
+      {/* Ambient Sound Relax Player */}
+      <AmbientSoundPlayer
+        isOpen={ambientPlayerOpen}
+        onClose={() => setAmbientPlayerOpen(false)}
+      />
     </header>
   );
 }

@@ -6,6 +6,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
 import { QuickSearchModal } from "./QuickSearchModal";
+import { FloatingMessenger } from "@/modules/chat/FloatingMessenger";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +73,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Global Quick Search Ctrl+K Modal */}
       <QuickSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+
+      {/* Global Floating Messenger Widget */}
+      <FloatingMessenger />
     </div>
   );
 }

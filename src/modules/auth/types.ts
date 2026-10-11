@@ -16,7 +16,9 @@ export type AppModuleId =
   | "study"
   | "driver_license"
   | "expenses"
-  | "qr";
+  | "qr"
+  | "downloader"
+  | "memories";
 
 export interface AuthUser {
   id?: string;

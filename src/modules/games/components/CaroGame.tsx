@@ -304,7 +304,10 @@ export function CaroGame() {
       {/* Caro 15x15 Board */}
       <div className="flex justify-center overflow-x-auto p-2">
         <div className="inline-block p-3 rounded-2xl bg-[#d8b078] shadow-2xl border-4 border-[#8c5e2d]">
-          <div className="grid grid-cols-15 gap-[1px] bg-[#8c5e2d] border border-[#8c5e2d]">
+          <div
+            className="grid gap-[1px] bg-[#8c5e2d] border border-[#8c5e2d]"
+            style={{ gridTemplateColumns: "repeat(15, minmax(0, 1fr))" }}
+          >
             {board.map((row, r) =>
               row.map((cell, c) => {
                 const isLast = lastMove && lastMove[0] === r && lastMove[1] === c;

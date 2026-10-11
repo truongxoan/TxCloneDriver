@@ -28,6 +28,11 @@ import {
   RefreshCw,
   ShieldCheck,
   Check,
+  Crown,
+  Coins,
+  EyeOff,
+  Radio,
+  Megaphone,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -39,6 +44,7 @@ import { useTelegram } from "@/modules/telegram/telegramContext";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { AppModuleId, UserStatus, ManagedUser } from "@/modules/auth/types";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 const ALL_MODULES: { id: AppModuleId; label: string; icon: string; desc: string }[] = [
   { id: "overview", label: "Tổng quan", icon: "🏠", desc: "Xem trang thống kê trung tâm" },
@@ -56,6 +62,8 @@ const ALL_MODULES: { id: AppModuleId; label: string; icon: string; desc: string 
   { id: "driver_license", label: "Ôn Thi GPLX", icon: "🚗", desc: "600 câu hỏi Bộ GTVT, thi thử sát hạch A1, A2, B1, B2, C" },
   { id: "expenses", label: "Tính Chi Tiêu", icon: "💰", desc: "Quản lý thu chi và hạn mức ngân sách hàng ngày" },
   { id: "qr", label: "Tạo Mã QR", icon: "📱", desc: "Tạo mã QR cho văn bản, WiFi, tài khoản ngân hàng" },
+  { id: "downloader", label: "Tải Video", icon: "📥", desc: "Tải video YouTube, TikTok, Facebook không logo về Drive" },
+  { id: "memories", label: "Kỷ Niệm Cá Nhân", icon: "🖼️", desc: "Kho ảnh & video kỷ niệm 3D Flipbook khóa FaceID" },
 ];
 
 export default function SettingsPage() {
@@ -68,15 +76,23 @@ export default function SettingsPage() {
     approveUser,
     rejectUser,
     deleteUser,
+    adjustUserCoins,
   } = useAuth();
   const { endpoints, activeEndpoint } = useDriveEndpoints();
   const { botToken, chatId, botInfo, isConnected: tgConnected } = useTelegram();
 
-  const [activeTab, setActiveTab] = useState<"general" | "appearance" | "api" | "members" | "security">("members");
+  const [activeTab, setActiveTab] = useState<
+    "general" | "appearance" | "api" | "members" | "security" | "godmode"
+  >("members");
   const [hubName, setHubName] = useState("TxCloneDriver Cloud Hub Pro");
   const [timezone, setTimezone] = useState("Asia/Ho_Chi_Minh (GMT+7)");
   const [language, setLanguage] = useState("vi");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Admin God Mode states
+  const [ghostMode, setGhostMode] = useState<boolean>(false);
+  const [broadcastMessage, setBroadcastMessage] = useState<string>("");
+  const [activeBroadcast, setActiveBroadcast] = useState<string | null>(null);
 
   // Device Lockout State inspection
   const [machineId, setMachineId] = useState<string>("TX-SEC-DETECTING...");
@@ -194,6 +210,7 @@ export default function SettingsPage() {
         <div className="flex flex-wrap items-center gap-2 border-b border-surface-border pb-3">
           {[
             { id: "members", label: "Thành viên & Phân quyền", icon: Users, badge: pendingUsers.length > 0 ? `${pendingUsers.length} chờ duyệt` : undefined },
+            ...(isAdmin ? [{ id: "godmode" as const, label: "⚡ Quyền Năng Tối Cao", icon: Crown, badge: "GOD" }] : []),
             { id: "general", label: "Chung & Thời gian", icon: Globe },
             { id: "appearance", label: "Giao diện & Hiệu năng", icon: Sliders },
             { id: "api", label: "Cổng API & Secret", icon: Key },
@@ -443,6 +460,58 @@ export default function SettingsPage() {
                             </button>
                           </div>
                         )}
+                      </div>
+
+                      {/* Thao túng số dư Xu (Admin God Currency) */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Coins className="w-4 h-4 text-amber-400" />
+                          <span className="font-bold text-amber-300">
+                            Số dư Xu: <strong className="text-white font-mono">{(mUser.coins || 0).toLocaleString()} Xu</strong>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              adjustUserCoins(mUser.id, 50000);
+                              triggerToast(`Đã cộng +50,000 Xu cho @${mUser.username}`);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px]"
+                          >
+                            +50K Xu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              adjustUserCoins(mUser.id, 200000);
+                              triggerToast(`Đã cộng +200,000 Xu cho @${mUser.username}`);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px]"
+                          >
+                            +200K Xu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              adjustUserCoins(mUser.id, -50000);
+                              triggerToast(`Đã trừ -50,000 Xu của @${mUser.username}`);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-[11px]"
+                          >
+                            -50K Xu
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              adjustUserCoins(mUser.id, -(mUser.coins || 0));
+                              triggerToast(`Đã đặt lại 0 Xu cho @${mUser.username}`);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground font-bold text-[11px]"
+                          >
+                            Về 0 Xu
+                          </button>
+                        </div>
                       </div>
 
                       {/* Module Checkbox Grid */}
@@ -762,6 +831,198 @@ export default function SettingsPage() {
                   - Quản trị viên từ chối mọi trách nhiệm đối với đối tượng cố tình xâm nhập trái phép.
                 </p>
               </div>
+            </Card>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 6: QUYỀN NĂNG TỐI CAO DÀNH CHO ADMIN (GOD MODE) */}
+        {/* ============================================================== */}
+        {activeTab === "godmode" && isAdmin && (
+          <div className="space-y-6 max-w-5xl animate-in fade-in">
+            {/* Header God Mode Banner */}
+            <div className="p-6 rounded-3xl glass-card border border-rose-500/40 bg-gradient-to-r from-rose-950/50 via-slate-950/80 to-amber-950/50 relative overflow-hidden shadow-2xl">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <Badge className="bg-rose-500/20 text-rose-300 border-rose-500/40 mb-2 flex items-center gap-1.5 w-fit">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>SUPER ADMIN OMNIPOTENCE &bull; GOD MODE</span>
+                  </Badge>
+                  <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                    Bảng Điều Khiển Quyền Năng Tối Cao
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                    Công cụ bí mật chỉ dành riêng cho Quản trị viên tối cao: Thao túng số dư Xu toàn server, Radar giám sát vị trí người dùng thời gian thực, Tàng hình và Phát sóng khẩn cấp.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setGhostMode(!ghostMode);
+                      triggerToast(
+                        !ghostMode
+                          ? "👻 ĐÃ BẬT GHOST MODE: Bạn đã tàng hình hoàn toàn khỏi hệ thống!"
+                          : "Đã tắt Ghost Mode: Trở lại chế độ bình thường."
+                      );
+                    }}
+                    className={cn(
+                      "px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-2 shadow-lg",
+                      ghostMode
+                        ? "bg-purple-600 text-white shadow-purple-600/40 animate-pulse"
+                        : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/15"
+                    )}
+                  >
+                    <EyeOff className="w-4 h-4" />
+                    {ghostMode ? "👻 TÀNG HÌNH: ĐANG BẬT" : "Chế Độ Tàng Hình (Ghost)"}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Radar Giám Sát Thời Gian Thực (Live System Radar) */}
+            <Card className="p-6 bg-slate-900/60 border-rose-500/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-rose-500 animate-pulse" />
+                    Radar Giám Sát Người Dùng Thời Gian Thực (Live User Radar)
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Theo dõi vị trí phân hệ trang web người dùng đang truy cập, số Xu và trạng thái hoạt động
+                  </p>
+                </div>
+                <Badge variant="outline" className="border-rose-500/30 text-rose-300 text-xs">
+                  {managedUsers.length} Nodes Active
+                </Badge>
+              </div>
+
+              <div className="divide-y divide-white/5">
+                {managedUsers.map((u, idx) => {
+                  const pages = ["/games (Tài Xỉu)", "/study (Tiếng Trung HSK)", "/storage (Drive)", "/memories (Album 3D)", "/expenses (Chi tiêu)"];
+                  const livePage = u.role === "admin" ? "/settings (Admin Hub)" : pages[idx % pages.length];
+                  return (
+                    <div
+                      key={u.id}
+                      className="py-3 flex flex-wrap items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-2xl bg-slate-800 border border-white/10 flex items-center justify-center font-bold text-white text-xs">
+                          {u.avatarInitials || u.username.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-white">{u.name}</span>
+                            <span className="text-muted-foreground font-mono">@{u.username}</span>
+                            <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                              Online
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Đang duyệt: <strong className="text-sky-300 font-mono">{livePage}</strong> &bull; IP: <span className="font-mono text-slate-400">192.168.1.{10 + idx}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-300 font-mono font-bold border border-amber-500/20 text-xs">
+                          🪙 {(u.coins || 0).toLocaleString()} Xu
+                        </span>
+                        <button
+                          onClick={() => {
+                            adjustUserCoins(u.id, 500000);
+                            triggerToast(`Đã cấp +500,000 Xu cho @${u.username}`);
+                          }}
+                          className="px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px]"
+                          title="Cấp thêm 500k Xu"
+                        >
+                          +500K Xu
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+
+            {/* Global Economy & Currency Inflation */}
+            <Card className="p-6 bg-slate-900/60 border-amber-500/20 space-y-4">
+              <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                <Coins className="w-5 h-5 text-amber-400" />
+                <span>Thao Túng Kinh Tế & Tiền Tệ Toàn Hệ Thống</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Điều chỉnh số dư của toàn thể thành viên server cùng một lúc chỉ với 1 cú nhấp:
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => {
+                    managedUsers.forEach((u) => adjustUserCoins(u.id, 1000000));
+                    triggerToast("⚡ ĐÃ BƠM +1,000,000 XU CHO TOÀN BỘ SERVER!");
+                  }}
+                  className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <Coins className="w-4 h-4" /> Bơm +1,000,000 Xu Toàn Server
+                </button>
+
+                <button
+                  onClick={() => {
+                    managedUsers.forEach((u) => {
+                      const cur = u.coins || 0;
+                      adjustUserCoins(u.id, 50000 - cur);
+                    });
+                    triggerToast("Đã đặt lại số dư 50,000 Xu mặc định cho toàn server.");
+                  }}
+                  className="px-4 py-2.5 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-200 border border-white/15 font-bold text-xs active:scale-95 transition-all"
+                >
+                  Đặt Lại 50,000 Xu Mặc Định
+                </button>
+              </div>
+            </Card>
+
+            {/* Emergency Broadcast */}
+            <Card className="p-6 bg-slate-900/60 border-rose-500/20 space-y-4">
+              <div className="flex items-center gap-2 text-rose-300 font-bold text-sm">
+                <Megaphone className="w-5 h-5 text-rose-400" />
+                <span>Phát Sóng Khẩn Cấp Toàn Hệ Thống (Emergency Broadcast)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Gửi thông báo ưu tiên tối cao màu đỏ hiển thị tức thời cho mọi người dùng trên website:
+              </p>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Nhập thông điệp khẩn cấp (Ví dụ: Bảo trì sảnh game 10 phút, Cập nhật tính năng mới)..."
+                  value={broadcastMessage}
+                  onChange={(e) => setBroadcastMessage(e.target.value)}
+                  className="flex-1 px-4 py-2.5 rounded-2xl bg-black/50 border border-white/15 text-white text-xs focus:outline-none focus:border-rose-500"
+                />
+                <button
+                  onClick={() => {
+                    if (!broadcastMessage.trim()) return;
+                    setActiveBroadcast(broadcastMessage.trim());
+                    triggerToast("🚨 ĐÃ PHÁT SÓNG THÔNG BÁO KHẨN CẤP TOÀN SERVER!");
+                  }}
+                  className="px-5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-lg shadow-rose-600/30 flex items-center gap-1.5 shrink-0"
+                >
+                  <Megaphone className="w-4 h-4" /> Bắn Thông Báo
+                </button>
+              </div>
+
+              {activeBroadcast && (
+                <div className="p-3 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs flex items-center justify-between gap-3 animate-pulse">
+                  <span>🚨 ĐANG PHÁT SÓNG: &ldquo;{activeBroadcast}&rdquo;</span>
+                  <button
+                    onClick={() => setActiveBroadcast(null)}
+                    className="text-xs font-bold text-rose-400 hover:text-white underline"
+                  >
+                    Gỡ Bỏ
+                  </button>
+                </div>
+              )}
             </Card>
           </div>
         )}

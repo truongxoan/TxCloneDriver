@@ -36,6 +36,8 @@ const INITIAL_USERS: ManagedUser[] = [
       "driver_license",
       "expenses",
       "qr",
+      "downloader",
+      "memories",
     ],
     createdAt: "10/10/2026",
   },

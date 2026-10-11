@@ -19,6 +19,8 @@ import {
   Car,
   Wallet,
   QrCode,
+  Download,
+  Images,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
 import { AppModuleId } from "@/modules/auth/types";
@@ -46,6 +48,8 @@ const MODULE_NAMES: Record<AppModuleId, { name: string; href: string; icon: Reac
   driver_license: { name: "Ôn Thi GPLX", href: "/driver-license", icon: Car },
   expenses: { name: "Tính Chi Tiêu", href: "/expenses", icon: Wallet },
   qr: { name: "Tạo Mã QR", href: "/qr", icon: QrCode },
+  downloader: { name: "Tải Video", href: "/downloader", icon: Download },
+  memories: { name: "Kỷ Niệm Cá Nhân", href: "/memories", icon: Images },
 };
 
 export function ModuleGuard({ moduleId, moduleName, children }: ModuleGuardProps) {

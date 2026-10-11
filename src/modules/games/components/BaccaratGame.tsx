@@ -65,12 +65,15 @@ export function BaccaratGame() {
   const [history, setHistory] = useState<Array<"player" | "banker" | "tie">>([
     "player", "banker", "banker", "player", "tie", "banker"
   ]);
+  const [autoRun, setAutoRun] = useState<boolean>(true);
+  const [countdown, setCountdown] = useState<number>(10);
+  const [roundId, setRoundId] = useState<number>(6601);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
 
   const totalBet = bets.player + bets.banker + bets.tie;
 
   const handlePlaceBet = (zone: BaccaratBet) => {
-    if (isDealing) return;
+    if (isDealing || countdown <= 3) return;
     if (coins < selectedChip) {
       alert("Bạn không đủ Xu để đặt cược thêm!");
       return;
@@ -84,18 +87,12 @@ export function BaccaratGame() {
   };
 
   const handleClearBets = () => {
-    if (isDealing || totalBet === 0) return;
+    if (isDealing || totalBet === 0 || countdown <= 3) return;
     addCoins(totalBet, "Hủy cược Baccarat");
     setBets({ player: 0, banker: 0, tie: 0 });
   };
 
-  const handleDeal = () => {
-    if (isDealing) return;
-    if (totalBet === 0) {
-      alert("Vui lòng đặt cược trước khi chia bài!");
-      return;
-    }
-
+  const executeDeal = () => {
     setIsDealing(true);
     setResultMsg(null);
 
@@ -189,17 +186,48 @@ export function BaccaratGame() {
             outcome === "player" ? pScore : bScore
           } điểm)`
         );
-      } else {
+      } else if (totalBet > 0) {
         setResultMsg(
           `Kết thúc ván: Player ${pScore} - Banker ${bScore} (${
+            outcome === "tie" ? "HÒA (TIE)" : outcome === "player" ? "PLAYER THẮNG" : "BANKER THẮNG"
+          })`
+        );
+      } else {
+        setResultMsg(
+          `Phiên #${roundId}: Player ${pScore} - Banker ${bScore} (${
             outcome === "tie" ? "HÒA (TIE)" : outcome === "player" ? "PLAYER THẮNG" : "BANKER THẮNG"
           })`
         );
       }
 
       setHistory((prev) => [outcome, ...prev.slice(0, 19)]);
-      setBets({ player: 0, banker: 0, tie: 0 });
     }, 1200);
+  };
+
+  // Continuous 10s auto-run loop
+  React.useEffect(() => {
+    if (!autoRun) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === 4) {
+          executeDeal();
+          return 3;
+        }
+        if (prev <= 1) {
+          setRoundId((r) => r + 1);
+          setBets({ player: 0, banker: 0, tie: 0 });
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, bets, coins, baccaratRiggedOutcome, roundId]);
+
+  const handleDeal = () => {
+    if (isDealing) return;
+    executeDeal();
   };
 
   const pScoreNow = calculateHandScore(playerCards);
@@ -270,6 +298,39 @@ export function BaccaratGame() {
               {res === "player" ? "P" : res === "banker" ? "B" : "T"}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* 10s Auto-Run Live Round Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 px-4 rounded-2xl bg-slate-900/80 border border-white/10">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-300">
+            Phiên <strong className="text-white font-mono">#{roundId}</strong>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`px-3 py-1 rounded-xl font-black text-xs flex items-center gap-1.5 ${
+                countdown > 3
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse"
+                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-bounce"
+              }`}
+            >
+              ⏱️ {countdown}s ({countdown > 3 ? "🟢 Đang đặt cược" : "🔴 Đóng cược & Chia bài"})
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAutoRun(!autoRun)}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+              autoRun
+                ? "bg-emerald-600 text-white shadow"
+                : "bg-white/5 text-slate-400 hover:text-white"
+            }`}
+          >
+            {autoRun ? "⚡ Tự động 10s: BẬT" : "Tự động 10s: TẮT"}
+          </button>
         </div>
       </div>
 
@@ -420,8 +481,8 @@ export function BaccaratGame() {
           {totalBet > 0 && (
             <button
               onClick={handleClearBets}
-              disabled={isDealing}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5"
+              disabled={isDealing || countdown <= 3}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5 disabled:opacity-50"
             >
               <RotateCcw className="w-3.5 h-3.5" /> Hủy Cược ({totalBet.toLocaleString()})
             </button>
@@ -429,11 +490,15 @@ export function BaccaratGame() {
 
           <button
             onClick={handleDeal}
-            disabled={isDealing}
-            className="px-6 py-2.5 rounded-xl font-black text-sm text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-95 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all flex items-center gap-2"
+            disabled={isDealing || countdown <= 3}
+            className="px-6 py-2.5 rounded-xl font-black text-sm text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:opacity-95 shadow-lg shadow-indigo-600/30 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4" />
-            {isDealing ? "ĐANG CHIA BÀI..." : "CHIA BÀI"}
+            {isDealing
+              ? "ĐANG CHIA BÀI..."
+              : countdown <= 3
+              ? "ĐANG LẬT BÀI..."
+              : "CHIA BÀI"}
           </button>
         </div>
       </div>

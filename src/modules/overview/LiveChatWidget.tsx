@@ -29,9 +29,9 @@ export function LiveChatWidget() {
         alert("Vui lòng đặt mật khẩu mã hóa tin nhắn!");
         return;
       }
-      sendMessage(inputText, true, encryptPassword.trim());
+      sendMessage(inputText, "public", true, encryptPassword.trim());
     } else {
-      sendMessage(inputText, false);
+      sendMessage(inputText, "public", false);
     }
     setInputText("");
   };
@@ -81,7 +81,7 @@ export function LiveChatWidget() {
 
           {isAdmin && messages.length > 0 && (
             <button
-              onClick={clearChat}
+              onClick={() => clearChat()}
               className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1"
               title="Admin dọn sạch tin nhắn"
             >

@@ -43,6 +43,9 @@ export function BauCuaGame() {
     ANIMALS[5], // Tôm
   ]);
 
+  const [autoRun, setAutoRun] = useState<boolean>(true);
+  const [countdown, setCountdown] = useState<number>(10);
+  const [roundId, setRoundId] = useState<number>(5501);
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [isCovered, setIsCovered] = useState<boolean>(false);
   const [resultMsg, setResultMsg] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export function BauCuaGame() {
   const totalBet = Object.values(bets).reduce((a, b) => a + b, 0);
 
   const handlePlaceBet = (animalId: AnimalId) => {
-    if (isShaking) return;
+    if (isShaking || countdown <= 3) return;
     if (coins < selectedChip) {
       alert("Bạn không đủ Xu để đặt cược thêm!");
       return;
@@ -64,18 +67,12 @@ export function BauCuaGame() {
   };
 
   const handleClearBets = () => {
-    if (isShaking || totalBet === 0) return;
+    if (isShaking || totalBet === 0 || countdown <= 3) return;
     addCoins(totalBet, "Hủy cược Bầu Cua");
     setBets({ nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 });
   };
 
-  const handleShake = () => {
-    if (isShaking) return;
-    if (totalBet === 0) {
-      alert("Vui lòng đặt cược ít nhất 1 linh vật trước khi lắc!");
-      return;
-    }
-
+  const executeShake = () => {
     setIsShaking(true);
     setIsCovered(true);
     setResultMsg(null);
@@ -130,15 +127,43 @@ export function BauCuaGame() {
         if (totalWin > 0) {
           addCoins(totalWin, "Thắng Bầu Cua");
           setResultMsg(`🎉 THẮNG: +${totalWin.toLocaleString()} Xu! Trúng: ${wonItems.join(", ")}`);
-        } else {
+        } else if (totalBet > 0) {
           setResultMsg(
             `Kết quả: ${results.map((r) => r.name).join(" - ")}. Chúc bạn may mắn lượt sau!`
           );
+        } else {
+          setResultMsg(
+            `Phiên #${roundId}: ${results.map((r) => r.name).join(" - ")}.`
+          );
         }
+      }, 800);
+    }, 1200);
+  };
 
-        setBets({ nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 });
-      }, 1000);
-    }, 1500);
+  // Continuous 10s auto-run loop
+  React.useEffect(() => {
+    if (!autoRun) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev === 4) {
+          executeShake();
+          return 3;
+        }
+        if (prev <= 1) {
+          setRoundId((r) => r + 1);
+          setBets({ nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 });
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, bets, coins, bauCuaRiggedAnimals, roundId]);
+
+  const handleShake = () => {
+    if (isShaking) return;
+    executeShake();
   };
 
   return (
@@ -218,6 +243,39 @@ export function BauCuaGame() {
           <p className="text-xs text-muted-foreground mt-0.5">
             6 linh vật truyền thống. Đặt linh vật nào, lắc ra bấy nhiêu con ăn gấp bấy nhiêu lần tiền thưởng!
           </p>
+        </div>
+      </div>
+
+      {/* 10s Auto-Run Live Round Banner */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 px-4 rounded-2xl bg-slate-900/80 border border-white/10">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-300">
+            Phiên <strong className="text-white font-mono">#{roundId}</strong>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`px-3 py-1 rounded-xl font-black text-xs flex items-center gap-1.5 ${
+                countdown > 3
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                  : "bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-bounce"
+              }`}
+            >
+              ⏱️ {countdown}s ({countdown > 3 ? "🟢 Đang đặt cược" : "🔴 Đóng cược & Lắc đĩa"})
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAutoRun(!autoRun)}
+            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+              autoRun
+                ? "bg-amber-500 text-slate-950 font-black shadow"
+                : "bg-white/5 text-slate-400 hover:text-white"
+            }`}
+          >
+            {autoRun ? "⚡ Tự động 10s: BẬT" : "Tự động 10s: TẮT"}
+          </button>
         </div>
       </div>
 
@@ -315,8 +373,8 @@ export function BauCuaGame() {
           {totalBet > 0 && (
             <button
               onClick={handleClearBets}
-              disabled={isShaking}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5"
+              disabled={isShaking || countdown <= 3}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 flex items-center gap-1.5 disabled:opacity-50"
             >
               <RotateCcw className="w-3.5 h-3.5" /> Hủy Cược ({totalBet.toLocaleString()})
             </button>
@@ -324,11 +382,15 @@ export function BauCuaGame() {
 
           <button
             onClick={handleShake}
-            disabled={isShaking}
-            className="px-6 py-2.5 rounded-xl font-black text-sm text-slate-950 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:opacity-95 shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center gap-2"
+            disabled={isShaking || countdown <= 3}
+            className="px-6 py-2.5 rounded-xl font-black text-sm text-slate-950 bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 hover:opacity-95 shadow-lg shadow-amber-500/30 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4" />
-            {isShaking ? "ĐANG LẮC..." : "LẮC & MỞ BÁT"}
+            {isShaking
+              ? "ĐANG LẮC..."
+              : countdown <= 3
+              ? "ĐANG MỞ BÁT..."
+              : "LẮC & MỞ BÁT"}
           </button>
         </div>
       </div>

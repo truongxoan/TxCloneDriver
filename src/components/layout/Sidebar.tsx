@@ -24,6 +24,8 @@ import {
   Car,
   Wallet,
   QrCode,
+  Download,
+  Images,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -47,6 +49,8 @@ const SIDEBAR_LINKS: SidebarLinkItem[] = [
   { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
   { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
   { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
+  { href: "/downloader", label: "Tải Video", icon: Download, module: "downloader" },
+  { href: "/memories", label: "Kỷ Niệm Cá Nhân", icon: Images, module: "memories" },
   { href: "/games", label: "Game & Giải Trí", icon: Gamepad2, module: "games" },
   { href: "/study", label: "Học Ngoại Ngữ", icon: GraduationCap, module: "study" },
   { href: "/driver-license", label: "Ôn Thi GPLX", icon: Car, module: "driver_license" },
