@@ -5,7 +5,11 @@ export type NoteCategory =
   | "github"
   | "terminal"
   | "prompt"
-  | "doc";
+  | "doc"
+  | "windows"
+  | "triennguyen"
+  | "cheatsheet"
+  | "tips";
 
 export interface NoteItem {
   id: string;
@@ -16,6 +20,14 @@ export interface NoteItem {
   tags: string[];
   isPinned: boolean;
   updatedAt: string;
+  stars?: number;
+  forks?: number;
+  language?: string;
+  codeSnippet?: string;
+  shortcut?: string;
+  author?: string;
+  targetAudience?: string;
+  badgeLabel?: string;
 }
 
 export type ProjectStatus =
