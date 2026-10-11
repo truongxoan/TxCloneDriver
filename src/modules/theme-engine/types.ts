@@ -6,7 +6,11 @@ export type ThemeId =
   | "cyber-3d"
   | "midnight-luxury"
   | "ocean-glass"
-  | "minimal-pro";
+  | "minimal-pro"
+  | "bento-grid"
+  | "vision-os"
+  | "cyber-hud"
+  | "neo-brutalism";
 
 export type EffectType =
   | "blossom"
@@ -16,6 +20,8 @@ export type EffectType =
   | "cyber"
   | "stars"
   | "bubbles"
+  | "hud-grid"
+  | "particles"
   | "none";
 
 export interface ThemeDefinition {

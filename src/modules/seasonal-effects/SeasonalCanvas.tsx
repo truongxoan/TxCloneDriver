@@ -63,6 +63,8 @@ export function SeasonalCanvas() {
       cyber: ["#06b6d4", "#ec4899", "#a855f7", "#3b82f6"],
       stars: ["#fef08a", "#fef9c3", "#e0e7ff", "#ffffff"],
       bubbles: ["#2dd4bf", "#38bdf8", "#99f6e4", "#7dd3fc"],
+      "hud-grid": ["#00ffcc", "#06b6d4", "#38bdf8", "#3b82f6"],
+      particles: ["#a855f7", "#ec4899", "#8b5cf6", "#f472b6"],
     };
 
     const colors = colorPalettes[effect] || ["#ffffff"];

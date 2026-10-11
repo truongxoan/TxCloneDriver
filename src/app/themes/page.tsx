@@ -106,7 +106,7 @@ export default function ThemesPage() {
         </div>
       </Card>
 
-      {/* 8 Themes Grid */}
+      {/* 12 Modern Themes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {THEMES.map((theme) => {
           const isSelected = theme.id === themeId;

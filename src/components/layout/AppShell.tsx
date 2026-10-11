@@ -7,6 +7,8 @@ import { Header } from "./Header";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
 import { QuickSearchModal } from "./QuickSearchModal";
 import { FloatingMessenger } from "@/modules/chat/FloatingMessenger";
+import { DynamicIsland } from "./DynamicIsland";
+import { MacOsDock } from "./MacOsDock";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { Wrench } from "lucide-react";
@@ -124,6 +126,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Global Floating Messenger Widget */}
       <FloatingMessenger />
+
+      {/* Modern Dynamic Island Capsule & macOS Tahoe Dock */}
+      <DynamicIsland />
+      <MacOsDock />
     </div>
   );
 }
