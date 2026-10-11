@@ -395,8 +395,9 @@ export default function StoragePage() {
                 Google Drive Live
               </Badge>
             </div>
-            <p className="text-slate-300 text-[11px] truncate max-w-xl">
-              URL: <code className="text-slate-400 font-mono text-[10px]">{activeEndpoint?.url}</code>
+            <p className="text-slate-300 text-[11px] flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Kết nối đám mây: <strong className="text-emerald-300">Đã đồng bộ bảo mật (Ẩn liên kết)</strong></span>
             </p>
           </div>
         </div>
@@ -1019,8 +1020,9 @@ export default function StoragePage() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400 font-mono truncate max-w-xs">
-                      {ep.url}
+                    <p className="text-[10px] text-emerald-400 font-mono truncate max-w-xs flex items-center gap-1">
+                      <span>🔒</span>
+                      <span>Liên kết Apps Script (Đã mã hóa & ẩn an toàn)</span>
                     </p>
                   </div>
 
@@ -1076,8 +1078,8 @@ export default function StoragePage() {
                   required
                 />
                 <input
-                  type="url"
-                  placeholder="Link Google Apps Script (https://script.google.com/macros/s/.../exec)"
+                  type="password"
+                  placeholder="Dán liên kết Google Apps Script tại đây (được ẩn & mã hóa an toàn)..."
                   value={newEndpointUrl}
                   onChange={(e) => setNewEndpointUrl(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono"

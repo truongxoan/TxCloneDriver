@@ -338,7 +338,7 @@ export default function VaultPage() {
                     required
                   />
                   <p className="text-[11px] text-slate-400">
-                    💡 Mã PIN mặc định ban đầu: <strong className="text-sky-300 font-mono">123456</strong> (có thể đổi sau khi mở khóa).
+                    💡 Mã PIN mặc định ban đầu: <strong className="text-sky-300 font-mono">080497</strong> (có thể đổi sau khi mở khóa).
                   </p>
                 </div>
 
@@ -1074,7 +1074,7 @@ export default function VaultPage() {
                     type="password"
                     value={oldPin}
                     onChange={(e) => setOldPin(e.target.value)}
-                    placeholder="Mã PIN cũ (mặc định 123456)..."
+                    placeholder="Mã PIN cũ (mặc định 080497)..."
                     className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                     required
                   />

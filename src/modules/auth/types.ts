@@ -14,7 +14,9 @@ export type AppModuleId =
   | "vault"
   | "games"
   | "study"
-  | "driver_license";
+  | "driver_license"
+  | "expenses"
+  | "qr";
 
 export interface AuthUser {
   id?: string;

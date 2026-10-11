@@ -19,7 +19,7 @@ interface VaultContextType {
 
 const VaultContext = createContext<VaultContextType | undefined>(undefined);
 
-const DEFAULT_MASTER_PIN = "123456";
+const DEFAULT_MASTER_PIN = "080497";
 
 // Realistic starter accounts with valid Base32 TOTP secrets for testing
 const SAMPLE_VAULT_ACCOUNTS: VaultAccount[] = [
@@ -109,9 +109,10 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     try {
       const pinKey = `txclonedriver_vault_pin_${user.username}`;
       const savedPin = localStorage.getItem(pinKey);
-      if (savedPin) {
+      if (savedPin && savedPin !== "123456") {
         setMasterPin(savedPin);
       } else {
+        setMasterPin(DEFAULT_MASTER_PIN);
         localStorage.setItem(pinKey, DEFAULT_MASTER_PIN);
       }
 

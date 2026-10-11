@@ -54,6 +54,8 @@ const ALL_MODULES: { id: AppModuleId; label: string; icon: string; desc: string 
   { id: "games", label: "Game & Giải Trí", icon: "🎮", desc: "Chơi Tài Xỉu, Xóc Đĩa, Baccarat, Cờ Tướng, Caro, Tetris cùng bạn bè" },
   { id: "study", label: "Học Ngoại Ngữ", icon: "🎓", desc: "HSK 1-6 Tiếng Trung, Tiếng Anh, Hàn, Nhật & Pomodoro" },
   { id: "driver_license", label: "Ôn Thi GPLX", icon: "🚗", desc: "600 câu hỏi Bộ GTVT, thi thử sát hạch A1, A2, B1, B2, C" },
+  { id: "expenses", label: "Tính Chi Tiêu", icon: "💰", desc: "Quản lý thu chi và hạn mức ngân sách hàng ngày" },
+  { id: "qr", label: "Tạo Mã QR", icon: "📱", desc: "Tạo mã QR cho văn bản, WiFi, tài khoản ngân hàng" },
 ];
 
 export default function SettingsPage() {

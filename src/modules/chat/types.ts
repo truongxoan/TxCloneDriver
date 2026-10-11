@@ -7,10 +7,18 @@ export interface ChatMessage {
   avatarUrl?: string;
   text: string;
   time: string;
+  isEncrypted?: boolean;
+  cipherText?: string;
+  keyHash?: string;
 }
 
 export interface ChatContextType {
   messages: ChatMessage[];
-  sendMessage: (text: string) => void;
+  sendMessage: (text: string, isEncrypted?: boolean, password?: string) => void;
   clearChat: () => void;
+  decryptMessage: (
+    cipherText: string,
+    keyHash: string,
+    guessKey: string
+  ) => { success: boolean; text: string };
 }

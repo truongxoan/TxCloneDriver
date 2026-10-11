@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { ChatMessage, ChatContextType } from "./types";
 import { useAuth } from "@/modules/auth/authContext";
+import { encryptChatMessage, decryptChatMessage } from "./cryptoHelper";
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
@@ -15,11 +16,23 @@ const INITIAL_MESSAGES: ChatMessage[] = [
     name: "Quản trị viên Tối cao",
     role: "admin",
     avatar: "TX",
-    text: "Chào mừng toàn thể anh em đến với TxCloneDriver Cloud Hub! Hãy cùng trải nghiệm xem phim, nghe nhạc và các trò chơi mới nhé!",
+    text: "Chào mừng toàn thể anh em đến với TxCloneDriver Cloud Hub! Hệ thống hỗ trợ kênh chat trực tiếp và chat mã hóa bảo mật bí mật.",
     time: "08:00",
   },
   {
     id: "m-2",
+    sender: "admin",
+    name: "Quản trị viên Tối cao",
+    role: "admin",
+    avatar: "TX",
+    text: "🔒 [Tin nhắn mật đã mã hóa] (Mật mã mở: 080497)",
+    time: "08:05",
+    isEncrypted: true,
+    cipherText: "0b1d03091942000f1a4e10170a4501170705",
+    keyHash: "6c2",
+  },
+  {
+    id: "m-3",
     sender: "userb",
     name: "Thành viên B",
     role: "user",
@@ -51,10 +64,21 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  const sendMessage = (text: string) => {
+  const sendMessage = (text: string, isEncrypted?: boolean, password?: string) => {
     if (!text.trim() || !user) return;
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+    let cipherText: string | undefined;
+    let keyHash: string | undefined;
+    let displayText = text.trim();
+
+    if (isEncrypted && password && password.trim()) {
+      const encrypted = encryptChatMessage(text.trim(), password.trim());
+      cipherText = encrypted.cipherText;
+      keyHash = encrypted.keyHash;
+      displayText = `🔒 [Tin nhắn mã hóa bảo mật #${encrypted.keyHash}]`;
+    }
 
     const newMsg: ChatMessage = {
       id: `m-${Date.now()}`,
@@ -63,8 +87,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       role: user.role,
       avatar: user.avatarInitials || "TX",
       avatarUrl: user.avatarUrl,
-      text: text.trim(),
+      text: displayText,
       time: timeStr,
+      isEncrypted: !!isEncrypted,
+      cipherText,
+      keyHash,
     };
 
     saveMessages([...messages, newMsg]);
@@ -80,6 +107,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         messages,
         sendMessage,
         clearChat,
+        decryptMessage: decryptChatMessage,
       }}
     >
       {children}
@@ -88,9 +116,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useChat() {
-  const context = useContext(ChatContext);
-  if (!context) {
+  const ctx = useContext(ChatContext);
+  if (!ctx) {
     throw new Error("useChat must be used within a ChatProvider");
   }
-  return context;
+  return ctx;
 }

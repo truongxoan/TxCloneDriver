@@ -17,6 +17,8 @@ import {
   Gamepad2,
   GraduationCap,
   Car,
+  Wallet,
+  QrCode,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
 import { AppModuleId } from "@/modules/auth/types";
@@ -42,6 +44,8 @@ const MODULE_NAMES: Record<AppModuleId, { name: string; href: string; icon: Reac
   games: { name: "Game Giải Trí", href: "/games", icon: Gamepad2 },
   study: { name: "Học Ngoại Ngữ", href: "/study", icon: GraduationCap },
   driver_license: { name: "Ôn Thi GPLX", href: "/driver-license", icon: Car },
+  expenses: { name: "Tính Chi Tiêu", href: "/expenses", icon: Wallet },
+  qr: { name: "Tạo Mã QR", href: "/qr", icon: QrCode },
 };
 
 export function ModuleGuard({ moduleId, moduleName, children }: ModuleGuardProps) {

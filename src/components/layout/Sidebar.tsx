@@ -22,6 +22,8 @@ import {
   Gamepad2,
   GraduationCap,
   Car,
+  Wallet,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -49,6 +51,8 @@ const SIDEBAR_LINKS: SidebarLinkItem[] = [
   { href: "/study", label: "Học Ngoại Ngữ", icon: GraduationCap, module: "study" },
   { href: "/driver-license", label: "Ôn Thi GPLX", icon: Car, module: "driver_license" },
   { href: "/vault", label: "Két Sắt & 2FA", icon: KeyRound, module: "vault" },
+  { href: "/expenses", label: "Tính Chi Tiêu", icon: Wallet, module: "expenses" },
+  { href: "/qr", label: "Tạo Mã QR", icon: QrCode, module: "qr" },
   { href: "/notes", label: "Ghi chú & Link", icon: Link2, module: "notes" },
   { href: "/projects", label: "Dự án", icon: Folder, module: "projects" },
   { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays, module: "events" },

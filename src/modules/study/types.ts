@@ -24,6 +24,27 @@ export interface QuizQuestion {
   targetVocab: VocabItem;
 }
 
+export interface DuolingoSentenceExercise {
+  id: string;
+  vietnamese: string;
+  pinyin: string;
+  words: string[]; // Các khối chữ rời rạc để bấm sắp xếp
+  correctSentence: string;
+  audioText: string;
+  difficulty: string;
+  explanation: string;
+}
+
+export interface DriveCourseResource {
+  id: string;
+  title: string;
+  type: "file" | "folder";
+  url: string;
+  description: string;
+  tag: string;
+  badge: string;
+}
+
 export interface StudyStats {
   wordsLearned: number;
   streakDays: number;
