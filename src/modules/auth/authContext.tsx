@@ -2,12 +2,53 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId } from "./types";
+import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem } from "./types";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const COOKIE_NAME = "txclonedriver_session";
 const STORAGE_USERS_KEY = "txclonedriver_managed_users";
+const STORAGE_AUDIT_KEY = "txclonedriver_security_audit_logs";
+const STORAGE_MAINTENANCE_KEY = "txclonedriver_maintenance_mode";
+
+const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
+  {
+    id: "log-1",
+    timestamp: "11/10/2026 12:35:10",
+    username: "admin",
+    action: "Admin Login",
+    details: "Đăng nhập thành công từ IP an toàn",
+    ip: "192.168.1.10",
+    status: "success",
+  },
+  {
+    id: "log-2",
+    timestamp: "11/10/2026 12:20:45",
+    username: "hocvien_moi",
+    action: "User Registration",
+    details: "Tài khoản đăng ký mới đang chờ duyệt",
+    ip: "192.168.1.45",
+    status: "warning",
+  },
+  {
+    id: "log-3",
+    timestamp: "11/10/2026 11:58:12",
+    username: "11",
+    action: "Access Denied",
+    details: "Cố truy cập phân hệ /vault khi chưa có quyền",
+    ip: "192.168.1.18",
+    status: "blocked",
+  },
+  {
+    id: "log-4",
+    timestamp: "11/10/2026 11:45:00",
+    username: "admin",
+    action: "Economy Calibration",
+    details: "Reset số dư 50,000 Xu hàng ngày cho toàn hệ thống",
+    ip: "192.168.1.10",
+    status: "success",
+  },
+];
 
 // Default initial users
 const INITIAL_USERS: ManagedUser[] = [
@@ -111,6 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(INITIAL_USERS);
   const [initialized, setInitialized] = useState(false);
+  const [originalAdminUser, setOriginalAdminUser] = useState<AuthUser | null>(null);
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(false);
+  const [securityAuditLogs, setSecurityAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
 
   // Load managed users and session
   useEffect(() => {
@@ -120,6 +164,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setManagedUsers(JSON.parse(savedUsers));
       } else {
         localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const savedMaintenance = localStorage.getItem(STORAGE_MAINTENANCE_KEY);
+      if (savedMaintenance !== null) {
+        setIsMaintenanceMode(savedMaintenance === "true");
+      }
+      const savedLogs = localStorage.getItem(STORAGE_AUDIT_KEY);
+      if (savedLogs) {
+        setSecurityAuditLogs(JSON.parse(savedLogs));
+      }
+      const savedOriginalAdmin = sessionStorage.getItem("tx_original_admin");
+      if (savedOriginalAdmin) {
+        setOriginalAdminUser(JSON.parse(savedOriginalAdmin));
       }
     } catch {
       // ignore
@@ -395,6 +456,114 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const logSecurityAudit = (
+    action: string,
+    details?: string,
+    status: "success" | "blocked" | "warning" = "success"
+  ) => {
+    const now = new Date();
+    const ts = `${String(now.getDate()).padStart(2, "0")}/${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(
+      now.getMinutes()
+    ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    const newEntry: AuditLogItem = {
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      timestamp: ts,
+      username: user?.username || "anonymous",
+      action,
+      details,
+      ip: "192.168.1.10",
+      status,
+    };
+    setSecurityAuditLogs((prev) => {
+      const updated = [newEntry, ...prev].slice(0, 100);
+      try {
+        localStorage.setItem(STORAGE_AUDIT_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  const clearSecurityLogs = () => {
+    setSecurityAuditLogs([]);
+    try {
+      localStorage.removeItem(STORAGE_AUDIT_KEY);
+    } catch {}
+  };
+
+  const toggleMaintenanceMode = (enabled?: boolean) => {
+    setIsMaintenanceMode((prev) => {
+      const next = enabled !== undefined ? enabled : !prev;
+      try {
+        localStorage.setItem(STORAGE_MAINTENANCE_KEY, String(next));
+      } catch {}
+      logSecurityAudit(
+        "Maintenance Mode",
+        next ? "Đã bật chế độ bảo trì toàn hệ thống" : "Đã tắt chế độ bảo trì",
+        next ? "warning" : "success"
+      );
+      return next;
+    });
+  };
+
+  const impersonateUser = (userId: string) => {
+    const targetUser = managedUsers.find((u) => u.id === userId);
+    if (!targetUser) return;
+
+    if (!originalAdminUser && user && user.role === "admin") {
+      setOriginalAdminUser(user);
+      try {
+        sessionStorage.setItem("tx_original_admin", JSON.stringify(user));
+      } catch {}
+    }
+
+    const initials =
+      targetUser.name
+        .split(" ")
+        .map((s) => s[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "US";
+
+    const impersonatedAuth: AuthUser = {
+      id: targetUser.id,
+      username: targetUser.username,
+      role: targetUser.role,
+      name: targetUser.name,
+      avatarInitials: initials,
+      avatarUrl: targetUser.avatarUrl,
+      bio: targetUser.bio,
+      coins: targetUser.coins,
+      status: targetUser.status,
+      allowedModules: targetUser.allowedModules,
+    };
+
+    setUser(impersonatedAuth);
+    setSessionCookie(impersonatedAuth);
+    logSecurityAudit(
+      "Impersonate User",
+      `Admin đóng vai @${targetUser.username} (${targetUser.role})`,
+      "warning"
+    );
+  };
+
+  const stopImpersonating = () => {
+    if (originalAdminUser) {
+      setUser(originalAdminUser);
+      setSessionCookie(originalAdminUser);
+      logSecurityAudit(
+        "Stop Impersonating",
+        `Quay trở lại tài khoản Quản trị viên @${originalAdminUser.username}`,
+        "success"
+      );
+      setOriginalAdminUser(null);
+      try {
+        sessionStorage.removeItem("tx_original_admin");
+      } catch {}
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -414,6 +583,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         approveNameChange,
         rejectNameChange,
         adjustUserCoins,
+        originalAdminUser,
+        impersonateUser,
+        stopImpersonating,
+        isMaintenanceMode,
+        toggleMaintenanceMode,
+        securityAuditLogs,
+        logSecurityAudit,
+        clearSecurityLogs,
       }}
     >
       {initialized ? children : null}

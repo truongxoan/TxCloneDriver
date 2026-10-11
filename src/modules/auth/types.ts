@@ -50,6 +50,16 @@ export interface ManagedUser {
   pendingNameChange?: string;
 }
 
+export interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  username: string;
+  action: string;
+  details?: string;
+  ip: string;
+  status: "success" | "blocked" | "warning";
+}
+
 export interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
@@ -67,4 +77,14 @@ export interface AuthContextType {
   approveNameChange: (userId: string) => void;
   rejectNameChange: (userId: string) => void;
   adjustUserCoins: (userId: string, deltaCoins: number) => void;
+  // Admin Superpowers
+  originalAdminUser: AuthUser | null;
+  impersonateUser: (userId: string) => void;
+  stopImpersonating: () => void;
+  isMaintenanceMode: boolean;
+  toggleMaintenanceMode: (enabled?: boolean) => void;
+  securityAuditLogs: AuditLogItem[];
+  logSecurityAudit: (action: string, details?: string, status?: "success" | "blocked" | "warning") => void;
+  clearSecurityLogs: () => void;
 }
+

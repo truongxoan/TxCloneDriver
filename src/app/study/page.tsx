@@ -10,6 +10,7 @@ import {
   CHINESE_DRIVE_RESOURCES,
   DUOLINGO_CHINESE_EXERCISES,
 } from "@/modules/study/vocabData";
+import { BilingualReaderWidget } from "@/modules/study/BilingualReaderWidget";
 import {
   GraduationCap,
   Sparkles,
@@ -38,7 +39,7 @@ import {
 export default function StudyPage() {
   const [selectedLang, setSelectedLang] = useState<LanguageId>("chinese");
   const [hskFilter, setHskFilter] = useState<string>("HSK 1");
-  const [studyMode, setStudyMode] = useState<"quiz" | "duolingo" | "drive_course" | "flashcard" | "pomodoro" | "tips">("quiz");
+  const [studyMode, setStudyMode] = useState<"quiz" | "duolingo" | "bilingual_reader" | "drive_course" | "flashcard" | "pomodoro" | "tips">("quiz");
 
   // Infinite Quiz state
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion>(() =>
@@ -265,6 +266,7 @@ export default function StudyPage() {
         <div className="flex flex-wrap items-center gap-2">
           {[
             { id: "quiz", label: "❓ Trắc Nghiệm Vô Hạn", icon: HelpCircle },
+            { id: "bilingual_reader", label: "📖 Đọc & Dịch Song Ngữ AI", icon: BookOpen },
             { id: "duolingo", label: "🦉 Ghép Câu Duolingo", icon: Sparkles },
             { id: "drive_course", label: "📁 Khóa Học Drive Độc Quyền", icon: Folder },
             { id: "flashcard", label: "📇 Flashcard Từ Vựng", icon: BookOpen },
@@ -400,6 +402,11 @@ export default function StudyPage() {
             )}
           </div>
         )}
+
+        {/* ========================================================= */}
+        {/* TAB: BILINGUAL READER & VIDEO AI                         */}
+        {/* ========================================================= */}
+        {studyMode === "bilingual_reader" && <BilingualReaderWidget />}
 
         {/* ========================================================= */}
         {/* TAB 2: DUOLINGO SENTENCE BUILDER                          */}

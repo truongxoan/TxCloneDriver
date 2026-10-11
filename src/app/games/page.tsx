@@ -12,6 +12,8 @@ import { CaroGame } from "@/modules/games/components/CaroGame";
 import { CoTuongGame } from "@/modules/games/components/CoTuongGame";
 import { TetrisGame } from "@/modules/games/components/TetrisGame";
 import { WordChainGame } from "@/modules/games/components/WordChainGame";
+import { PvPArenaGame } from "@/modules/games/components/PvPArenaGame";
+import { LuckyWheelGame } from "@/modules/games/components/LuckyWheelGame";
 import {
   Coins,
   Sparkles,
@@ -25,6 +27,8 @@ import {
 } from "lucide-react";
 
 const GAME_TABS: Array<{ id: GameId; label: string; icon: string; category: string }> = [
+  { id: "pvp_arena", label: "⚔️ Đấu Trường PvP", icon: "⚔️", category: "Đối Kháng Cược Xu" },
+  { id: "lucky_wheel", label: "🎰 Vòng Quay & Xổ Số", icon: "🎰", category: "May Mắn & Jackpot" },
   { id: "taixiu", label: "Tài Xỉu", icon: "🎲", category: "Dân Gian & Casino" },
   { id: "xocdia", label: "Xóc Đĩa", icon: "⚪🔴", category: "Dân Gian & Casino" },
   { id: "baccarat", label: "Baccarat", icon: "♠️", category: "Dân Gian & Casino" },
@@ -183,6 +187,8 @@ function GamesContent() {
 
       {/* Active Game Component Area */}
       <div className="min-h-[500px]">
+        {activeGameId === "pvp_arena" && <PvPArenaGame />}
+        {activeGameId === "lucky_wheel" && <LuckyWheelGame />}
         {activeGameId === "taixiu" && <TaiXiuGame />}
         {activeGameId === "xocdia" && <XocDiaGame />}
         {activeGameId === "baccarat" && <BaccaratGame />}

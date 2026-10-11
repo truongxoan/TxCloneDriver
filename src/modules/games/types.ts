@@ -6,7 +6,9 @@ export type GameId =
   | "caro"
   | "cotuong"
   | "tetris"
-  | "wordchain";
+  | "wordchain"
+  | "pvp_arena"
+  | "lucky_wheel";
 
 export interface GameInfo {
   id: GameId;

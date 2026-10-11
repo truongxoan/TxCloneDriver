@@ -33,6 +33,11 @@ import {
   EyeOff,
   Radio,
   Megaphone,
+  Zap,
+  Power,
+  ShieldAlert,
+  FileDown,
+  UserCog,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -43,6 +48,7 @@ import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
 import { useTelegram } from "@/modules/telegram/telegramContext";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { AppModuleId, UserStatus, ManagedUser } from "@/modules/auth/types";
+import { SmartAutomationWidget } from "@/modules/automation/SmartAutomationWidget";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -77,12 +83,19 @@ export default function SettingsPage() {
     rejectUser,
     deleteUser,
     adjustUserCoins,
+    impersonateUser,
+    stopImpersonating,
+    originalAdminUser,
+    isMaintenanceMode,
+    toggleMaintenanceMode,
+    securityAuditLogs,
+    clearSecurityLogs,
   } = useAuth();
   const { endpoints, activeEndpoint } = useDriveEndpoints();
   const { botToken, chatId, botInfo, isConnected: tgConnected } = useTelegram();
 
   const [activeTab, setActiveTab] = useState<
-    "general" | "appearance" | "api" | "members" | "security" | "godmode"
+    "general" | "appearance" | "api" | "members" | "security" | "godmode" | "automation"
   >("members");
   const [hubName, setHubName] = useState("TxCloneDriver Cloud Hub Pro");
   const [timezone, setTimezone] = useState("Asia/Ho_Chi_Minh (GMT+7)");
@@ -211,6 +224,7 @@ export default function SettingsPage() {
           {[
             { id: "members", label: "Thành viên & Phân quyền", icon: Users, badge: pendingUsers.length > 0 ? `${pendingUsers.length} chờ duyệt` : undefined },
             ...(isAdmin ? [{ id: "godmode" as const, label: "⚡ Quyền Năng Tối Cao", icon: Crown, badge: "GOD" }] : []),
+            { id: "automation", label: "🤖 Tự Động Hóa Đa Nhiệm", icon: Zap, badge: "24/7" },
             { id: "general", label: "Chung & Thời gian", icon: Globe },
             { id: "appearance", label: "Giao diện & Hiệu năng", icon: Sliders },
             { id: "api", label: "Cổng API & Secret", icon: Key },
@@ -444,6 +458,23 @@ export default function SettingsPage() {
                             >
                               Toàn quyền
                             </Button>
+
+                            {/* Impersonate Button for Admin */}
+                            {isAdmin && mUser.id !== currentUser?.id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  impersonateUser(mUser.id);
+                                  triggerToast(`🎭 Đang đóng vai @${mUser.username}. Bạn có thể trải nghiệm web dưới góc nhìn của thành viên này!`);
+                                }}
+                                className="h-7 px-2.5 text-[11px] gap-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border-purple-500/30 font-bold"
+                                title={`Đóng vai @${mUser.username}`}
+                              >
+                                <UserCog className="h-3.5 w-3.5" />
+                                <span>Đóng vai</span>
+                              </Button>
+                            )}
 
                             {/* Delete Button */}
                             <button
@@ -939,6 +970,18 @@ export default function SettingsPage() {
                         >
                           +500K Xu
                         </button>
+                        {u.id !== currentUser?.id && (
+                          <button
+                            onClick={() => {
+                              impersonateUser(u.id);
+                              triggerToast(`🎭 Đang đóng vai @${u.username}.`);
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold text-[11px] flex items-center gap-1"
+                            title="Đóng vai user này"
+                          >
+                            <UserCog className="w-3.5 h-3.5" /> Đóng vai
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1024,8 +1067,142 @@ export default function SettingsPage() {
                 </div>
               )}
             </Card>
+
+            {/* 1-Click Maintenance Mode */}
+            <Card className="p-6 bg-slate-900/60 border-rose-500/20 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Power className={cn("w-5 h-5", isMaintenanceMode ? "text-rose-400 animate-pulse" : "text-emerald-400")} />
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Chế Độ Bảo Trì Khẩn Cấp (1-Click Maintenance Mode)</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Khóa toàn bộ website với thành viên thường và khách, chỉ cho phép Quản trị viên truy cập
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className={cn("text-xs font-bold shrink-0", isMaintenanceMode ? "border-rose-500 text-rose-300 bg-rose-500/20" : "border-emerald-500 text-emerald-300 bg-emerald-500/20")}>
+                  {isMaintenanceMode ? "🚨 ĐANG BẬT BẢO TRÌ" : "✅ HOẠT ĐỘNG BÌNH THƯỜNG"}
+                </Badge>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <p className="text-xs text-slate-300">
+                  {isMaintenanceMode
+                    ? "Toàn bộ thành viên truy cập sẽ nhận cảnh báo bảo trì 503 Service Unavailable."
+                    : "Mọi thành viên đều có thể đăng nhập và sử dụng hệ thống bình thường theo phân quyền."}
+                </p>
+                <Button
+                  variant={isMaintenanceMode ? "primary" : "secondary"}
+                  size="sm"
+                  onClick={() => {
+                    toggleMaintenanceMode();
+                    triggerToast(!isMaintenanceMode ? "🚨 ĐÃ KÍCH HOẠT BẢO TRÌ TOÀN MÁY CHỦ!" : "Đã tắt bảo trì, hệ thống hoạt động lại.");
+                  }}
+                  className={cn("gap-2 font-bold shrink-0", isMaintenanceMode ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-rose-600/30 hover:bg-rose-600/50 text-rose-200 border-rose-500/40")}
+                >
+                  <Power className="w-4 h-4" />
+                  <span>{isMaintenanceMode ? "Tắt Chế Độ Bảo Trì" : "Khóa Bảo Trì Ngay Lập Tức"}</span>
+                </Button>
+              </div>
+            </Card>
+
+            {/* Security Audit Log */}
+            <Card className="p-6 bg-slate-900/60 border-white/10 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Nhật Ký Kiểm Toán An Ninh (Security Audit Log)</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Theo dõi thời gian thực: Đăng nhập, đóng vai, thay đổi số dư Xu, cấp quyền và chặn truy cập
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const blob = new Blob([JSON.stringify(securityAuditLogs, null, 2)], { type: "application/json" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `tx_audit_logs_${Date.now()}.json`;
+                      a.click();
+                      triggerToast("Đã xuất file kiểm toán an ninh JSON thành công.");
+                    }}
+                    className="text-xs gap-1.5 h-8 bg-white/5 border-white/10 text-slate-200"
+                  >
+                    <FileDown className="w-3.5 h-3.5" /> Xuất JSON
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      clearSecurityLogs();
+                      triggerToast("Đã xóa toàn bộ nhật ký an ninh.");
+                    }}
+                    className="text-xs text-rose-300 hover:text-rose-200 gap-1.5 h-8 bg-rose-500/10 border-rose-500/20"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Xóa Log
+                  </Button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border border-white/5">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="text-[10px] uppercase font-bold text-slate-400 bg-white/5 border-b border-white/10">
+                    <tr>
+                      <th className="py-2.5 px-3">Thời gian</th>
+                      <th className="py-2.5 px-3">Người dùng</th>
+                      <th className="py-2.5 px-3">Hành động</th>
+                      <th className="py-2.5 px-3">Chi tiết</th>
+                      <th className="py-2.5 px-3">Địa chỉ IP</th>
+                      <th className="py-2.5 px-3">Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-mono text-[11px]">
+                    {securityAuditLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-6 text-center text-slate-500">
+                          Chưa có nhật ký nào được ghi nhận.
+                        </td>
+                      </tr>
+                    ) : (
+                      securityAuditLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-white/5 transition-all">
+                          <td className="py-2.5 px-3 text-slate-400 whitespace-nowrap">{log.timestamp}</td>
+                          <td className="py-2.5 px-3 text-white font-bold whitespace-nowrap">@{log.username}</td>
+                          <td className="py-2.5 px-3 text-amber-300 font-semibold">{log.action}</td>
+                          <td className="py-2.5 px-3 text-slate-300 text-[11px] max-w-xs truncate">{log.details}</td>
+                          <td className="py-2.5 px-3 text-slate-400">{log.ip}</td>
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={cn(
+                                "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                                log.status === "success" && "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
+                                log.status === "warning" && "bg-amber-500/20 text-amber-300 border border-amber-500/30",
+                                log.status === "blocked" && "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                              )}
+                            >
+                              {log.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </div>
         )}
+
+        {/* ============================================================== */}
+        {/* TAB 3: TỰ ĐỘNG HÓA ĐA NHIỆM (SMART CLOUD AUTOMATION 24/7) */}
+        {/* ============================================================== */}
+        {activeTab === "automation" && <SmartAutomationWidget />}
       </div>
     </ModuleGuard>
   );
