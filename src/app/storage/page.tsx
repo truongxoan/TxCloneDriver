@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   HardDrive,
   Upload,
@@ -48,7 +48,40 @@ import { useDriveEndpoints, DriveFileItem } from "@/modules/storage/driveEndpoin
 import { MusicPlayerBar, AudioTrack } from "@/modules/storage/MusicPlayerBar";
 import CinemaVideoModal, { VideoItem } from "@/modules/storage/CinemaVideoModal";
 import { detectDuplicates } from "@/modules/storage/duplicateDetector";
+import { scanJunkFiles, getJunkDetail, JunkCategory, JunkDetail } from "@/modules/storage/junkFilter";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
+
+// Default demo junk & system files to demonstrate smart junk filtering
+const DEFAULT_DEMO_JUNK_FILES: DriveFileItem[] = [
+  {
+    id: "junk-demo-1",
+    name: ".DS_Store",
+    mimeType: "application/octet-stream",
+    sizeBytes: 6148,
+    updatedAt: "26/04/2025",
+  },
+  {
+    id: "junk-demo-2",
+    name: "Thumbs.db",
+    mimeType: "application/octet-stream",
+    sizeBytes: 24576,
+    updatedAt: "25/04/2025",
+  },
+  {
+    id: "junk-demo-3",
+    name: "~$KeHoachDuAn2026.docx",
+    mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    sizeBytes: 162,
+    updatedAt: "25/04/2025",
+  },
+  {
+    id: "junk-demo-4",
+    name: "clip_trailer_4k.crdownload",
+    mimeType: "application/octet-stream",
+    sizeBytes: 45088768,
+    updatedAt: "24/04/2025",
+  },
+];
 
 // Default soothing audio tracks in Drive for testing & immediate experience
 const DEFAULT_DRIVE_AUDIO_TRACKS: DriveFileItem[] = [
@@ -118,7 +151,22 @@ export default function StoragePage() {
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showToast, setShowToast] = useState<string | null>(null);
 
-  // Deleted Duplicate IDs (tracked locally for cleanup)
+  // Auto Junk Filter Toggle (default: true - protects user from junk/ghost files)
+  const [autoFilterJunk, setAutoFilterJunk] = useState(true);
+
+  // Load auto filter preference
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("datavault_auto_filter_junk");
+      if (saved !== null) {
+        setAutoFilterJunk(JSON.parse(saved));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Deleted Duplicate / Junk IDs (tracked locally for cleanup)
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
 
   // Manage endpoints modal
@@ -133,27 +181,38 @@ export default function StoragePage() {
   // Cinema Video Player State
   const [currentVideo, setCurrentVideo] = useState<VideoItem | null>(null);
 
-  // Combine real Drive files with default audio/video items if empty, filtering deleted IDs
+  // Combine real Drive files with default audio/video and demo junk items if empty, filtering deleted IDs
   const allDisplayFiles = useMemo(() => {
-    let baseList = files.length > 0 ? files : [...DEFAULT_DRIVE_AUDIO_TRACKS, ...DEFAULT_DRIVE_VIDEO_ITEMS];
+    let baseList =
+      files.length > 0
+        ? files
+        : [...DEFAULT_DRIVE_AUDIO_TRACKS, ...DEFAULT_DRIVE_VIDEO_ITEMS, ...DEFAULT_DEMO_JUNK_FILES];
     return baseList.filter((item) => !deletedIds.has(item.id));
   }, [files, deletedIds]);
 
-  // Scan for duplicate files
-  const duplicateScan = useMemo(() => {
-    return detectDuplicates(allDisplayFiles);
+  // Scan for junk, ghost, temp, and OS metadata files
+  const junkScan = useMemo(() => {
+    return scanJunkFiles(allDisplayFiles);
   }, [allDisplayFiles]);
 
-  // Playlist of all audio files available in drive
+  // Scan for duplicate files among clean items
+  const duplicateScan = useMemo(() => {
+    const listToScan = autoFilterJunk ? junkScan.cleanItems : allDisplayFiles;
+    return detectDuplicates(listToScan);
+  }, [allDisplayFiles, autoFilterJunk, junkScan.cleanItems]);
+
+  // Playlist of all audio files available in drive (excluding junk files)
   const audioPlaylist: AudioTrack[] = useMemo(() => {
     return allDisplayFiles
       .filter(
         (f) =>
-          f.mimeType?.includes("audio") ||
-          f.name.endsWith(".mp3") ||
-          f.name.endsWith(".m4a") ||
-          f.name.endsWith(".wav") ||
-          f.name.endsWith(".ogg")
+          !junkScan.junkIds.has(f.id) &&
+          (f.mimeType?.includes("audio") ||
+            f.name.endsWith(".mp3") ||
+            f.name.endsWith(".m4a") ||
+            f.name.endsWith(".wav") ||
+            f.name.endsWith(".ogg") ||
+            f.name.endsWith(".flac"))
       )
       .map((f) => ({
         id: f.id,
@@ -163,18 +222,19 @@ export default function StoragePage() {
           ? f.downloadUrl || ""
           : `/api/drive/stream?id=${f.id}`,
       }));
-  }, [allDisplayFiles]);
+  }, [allDisplayFiles, junkScan.junkIds]);
 
-  // Playlist of all video items available in drive
+  // Playlist of all video items available in drive (excluding junk files)
   const videoPlaylist: VideoItem[] = useMemo(() => {
     return allDisplayFiles
       .filter(
         (f) =>
-          f.mimeType?.includes("video") ||
-          f.name.endsWith(".mp4") ||
-          f.name.endsWith(".mkv") ||
-          f.name.endsWith(".mov") ||
-          f.name.endsWith(".webm")
+          !junkScan.junkIds.has(f.id) &&
+          (f.mimeType?.includes("video") ||
+            f.name.endsWith(".mp4") ||
+            f.name.endsWith(".mkv") ||
+            f.name.endsWith(".mov") ||
+            f.name.endsWith(".webm"))
       )
       .map((f) => ({
         id: f.id,
@@ -185,12 +245,22 @@ export default function StoragePage() {
           ? f.downloadUrl || ""
           : `/api/drive/stream?id=${f.id}&mime=video/mp4`,
       }));
-  }, [allDisplayFiles]);
+  }, [allDisplayFiles, junkScan.junkIds]);
 
   const filteredFiles = useMemo(() => {
     return allDisplayFiles.filter((item) => {
       const matchSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       if (!matchSearch) return false;
+
+      // When specifically in the Junk category tab, only show junk files
+      if (selectedCategory === "junk") {
+        return junkScan.junkIds.has(item.id);
+      }
+
+      // If autoFilterJunk is ON, automatically hide junk files from all other views
+      if (autoFilterJunk && junkScan.junkIds.has(item.id)) {
+        return false;
+      }
 
       if (selectedCategory === "all") return true;
       if (selectedCategory === "duplicates") {
@@ -201,7 +271,8 @@ export default function StoragePage() {
           item.mimeType?.includes("audio") ||
           item.name.endsWith(".mp3") ||
           item.name.endsWith(".m4a") ||
-          item.name.endsWith(".wav")
+          item.name.endsWith(".wav") ||
+          item.name.endsWith(".flac")
         );
       }
       if (selectedCategory === "video") {
@@ -224,7 +295,7 @@ export default function StoragePage() {
       }
       return true;
     });
-  }, [allDisplayFiles, searchTerm, selectedCategory, duplicateScan]);
+  }, [allDisplayFiles, searchTerm, selectedCategory, duplicateScan, autoFilterJunk, junkScan]);
 
   const triggerAction = (msg: string) => {
     setShowToast(msg);
@@ -332,6 +403,40 @@ export default function StoragePage() {
       setDeletedIds((prev) => new Set([...Array.from(prev), ...Array.from(duplicateScan.duplicateIds)]));
       triggerAction(
         `Đã dọn dẹp ${count} tệp trùng lặp, giải phóng ${formatBytes(duplicateScan.totalWastedBytes)}!`
+      );
+      setSelectedCategory("all");
+    }
+  };
+
+  // Delete an individual junk / ghost file
+  const handleDeleteJunk = (id: string, name: string) => {
+    if (!isAdmin) {
+      triggerAction("Chỉ Quản trị viên (Admin) mới có quyền dọn tệp rác!");
+      return;
+    }
+    if (confirm(`Bạn có chắc muốn dọn sạch tệp rác "${name}" không?`)) {
+      setDeletedIds((prev) => new Set([...Array.from(prev), id]));
+      triggerAction(`Đã dọn dẹp tệp rác "${name}"!`);
+    }
+  };
+
+  // Batch delete all detected junk and ghost files
+  const handleBatchDeleteJunk = () => {
+    if (!isAdmin) {
+      triggerAction("Chỉ Quản trị viên (Admin) mới có quyền dọn tệp rác!");
+      return;
+    }
+    const count = junkScan.totalCount;
+    if (count === 0) return;
+
+    if (
+      confirm(
+        `Xác nhận dọn dẹp sạch toàn bộ ${count} tệp rác hệ thống & tệp hỏng (${formatBytes(junkScan.totalBytes)})?`
+      )
+    ) {
+      setDeletedIds((prev) => new Set([...Array.from(prev), ...Array.from(junkScan.junkIds)]));
+      triggerAction(
+        `Đã dọn sạch ${count} tệp rác hệ thống, làm gọn kho lưu trữ Google Drive!`
       );
       setSelectedCategory("all");
     }
@@ -503,6 +608,42 @@ export default function StoragePage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Auto Junk Filter Toggle */}
+            <button
+              onClick={() => {
+                const next = !autoFilterJunk;
+                setAutoFilterJunk(next);
+                try {
+                  localStorage.setItem("datavault_auto_filter_junk", JSON.stringify(next));
+                } catch {
+                  // ignore
+                }
+                triggerAction(next ? "Đã BẬT tự động lọc & ẩn file rác!" : "Đã TẮT bộ lọc file rác (Hiển thị file thô)");
+              }}
+              className={cn(
+                "px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all shrink-0 cursor-pointer",
+                autoFilterJunk
+                  ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25"
+                  : "bg-surface-elevated text-muted-foreground border-surface-border hover:text-foreground"
+              )}
+              title={
+                autoFilterJunk
+                  ? "Tự động giấu các tệp rác hệ thống (.DS_Store, Thumbs.db, ~$)"
+                  : "Đang hiển thị toàn bộ tệp thô bao gồm cả file rác"
+              }
+            >
+              <ShieldCheck className={cn("h-3.5 w-3.5", autoFilterJunk ? "text-emerald-400" : "text-muted-foreground")} />
+              <span className="hidden sm:inline">Lọc file rác:</span>
+              <strong className={autoFilterJunk ? "text-emerald-300" : "text-slate-400"}>
+                {autoFilterJunk ? "BẬT" : "TẮT"}
+              </strong>
+              {autoFilterJunk && junkScan.totalCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-200 font-mono">
+                  -{junkScan.totalCount}
+                </span>
+              )}
+            </button>
+
             <span className="text-xs text-muted-foreground">
               Tìm thấy: <strong className="text-white">{filteredFiles.length}</strong> tệp
             </span>
@@ -540,7 +681,7 @@ export default function StoragePage() {
         {/* Category Filter Pills */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-t border-white/10 pt-2.5">
           {[
-            { id: "all", label: "Tất cả tệp", count: allDisplayFiles.length },
+            { id: "all", label: "Tất cả tệp", count: autoFilterJunk ? junkScan.cleanItems.length : allDisplayFiles.length },
             { id: "audio", label: "Âm nhạc & Audio 🎵", count: audioPlaylist.length },
             { id: "video", label: "Video & Phim 🎬", count: videoPlaylist.length },
             {
@@ -550,19 +691,25 @@ export default function StoragePage() {
               badgeColor: duplicateScan.totalDuplicateCount > 0 ? "bg-amber-500/20 text-amber-300 border border-amber-400/40" : "",
             },
             {
+              id: "junk",
+              label: "File rác & File ẩn 🗑️",
+              count: junkScan.totalCount,
+              badgeColor: junkScan.totalCount > 0 ? "bg-rose-500/20 text-rose-300 border border-rose-400/40" : "",
+            },
+            {
               id: "document",
               label: "Tài liệu",
-              count: allDisplayFiles.filter((f) => f.mimeType?.includes("pdf") || f.mimeType?.includes("sheet")).length,
+              count: (autoFilterJunk ? junkScan.cleanItems : allDisplayFiles).filter((f) => f.mimeType?.includes("pdf") || f.mimeType?.includes("sheet")).length,
             },
             {
               id: "image",
               label: "Hình ảnh",
-              count: allDisplayFiles.filter((f) => f.mimeType?.includes("image")).length,
+              count: (autoFilterJunk ? junkScan.cleanItems : allDisplayFiles).filter((f) => f.mimeType?.includes("image")).length,
             },
             {
               id: "archive",
               label: "Lưu trữ (Zip/Tar)",
-              count: allDisplayFiles.filter((f) => f.mimeType?.includes("zip")).length,
+              count: (autoFilterJunk ? junkScan.cleanItems : allDisplayFiles).filter((f) => f.mimeType?.includes("zip")).length,
             },
           ].map((cat) => (
             <button
@@ -571,14 +718,18 @@ export default function StoragePage() {
               className={cn(
                 "px-3 py-1.5 rounded-xl transition-all font-medium flex items-center gap-1.5 shrink-0",
                 selectedCategory === cat.id
-                  ? "bg-blue-600 text-white shadow-sm font-semibold"
+                  ? cat.id === "junk"
+                    ? "bg-rose-600 text-white shadow-sm font-semibold"
+                    : "bg-blue-600 text-white shadow-sm font-semibold"
                   : cat.id === "duplicates" && duplicateScan.totalDuplicateCount > 0
                   ? "bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20"
+                  : cat.id === "junk" && junkScan.totalCount > 0
+                  ? "bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20"
                   : "bg-white/5 text-slate-300 hover:text-white hover:bg-white/10"
               )}
             >
               <span>{cat.label}</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
                 {cat.count}
               </span>
             </button>
@@ -730,6 +881,159 @@ export default function StoragePage() {
         </div>
       )}
 
+      {/* TAB: JUNK & GHOST FILES MANAGEMENT PANEL (When selectedCategory === 'junk') */}
+      {selectedCategory === "junk" && (
+        <div className="space-y-4 animate-in fade-in">
+          {junkScan.totalCount === 0 ? (
+            <Card className="p-8 text-center space-y-3">
+              <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mx-auto">
+                <ShieldCheck className="h-8 w-8" />
+              </div>
+              <h3 className="text-base font-bold text-white">Kho lưu trữ Google Drive hoàn toàn sạch sẽ!</h3>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Không phát hiện tệp rác hệ thống (.DS_Store, Thumbs.db), tệp khóa tạm MS Office (~$), tệp tải dở (.crdownload) hay tệp rỗng 0-Byte.
+              </p>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {/* Banner with stats and actions */}
+              <div className="p-4 rounded-3xl bg-rose-500/15 border border-rose-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-rose-400 shrink-0 mt-0.5">
+                    <Trash2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>Bộ lọc tự động: Phát hiện {junkScan.totalCount} tệp rác & file ẩn</span>
+                      <span className="text-rose-300 font-mono font-bold">
+                        ({formatBytes(junkScan.totalBytes)})
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Các tệp rác hệ thống, tệp tạm MS Office, tệp tải dang dở và file rỗng 0-Byte được phân loại tại đây.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <button
+                    onClick={() => {
+                      const next = !autoFilterJunk;
+                      setAutoFilterJunk(next);
+                      try {
+                        localStorage.setItem("datavault_auto_filter_junk", JSON.stringify(next));
+                      } catch {
+                        // ignore
+                      }
+                      triggerAction(next ? "Đã BẬT tự động ẩn file rác!" : "Đã TẮT bộ lọc file rác");
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-xl font-bold text-xs border transition-all flex items-center gap-1.5 cursor-pointer",
+                      autoFilterJunk
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                        : "bg-slate-800 text-slate-300 border-white/20"
+                    )}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>{autoFilterJunk ? "Tự động ẩn: BẬT" : "Tự động ẩn: TẮT"}</span>
+                  </button>
+
+                  {isAdmin ? (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={handleBatchDeleteJunk}
+                      className="gap-2 font-bold cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Dọn sạch toàn bộ ({junkScan.totalCount})</span>
+                    </Button>
+                  ) : (
+                    <Badge variant="warning" size="sm" className="text-[10px]">
+                      User: Chỉ xem &bull; Admin mới có quyền dọn tệp
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Junk Categories Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {Object.entries(junkScan.byCategory).map(([catKey, data]) => {
+                  if (data.count === 0) return null;
+                  return (
+                    <div
+                      key={catKey}
+                      className="p-3 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1"
+                    >
+                      <span className="text-base font-bold text-rose-300 font-mono block">
+                        {data.count}
+                      </span>
+                      <span className="text-[10px] text-slate-300 leading-tight block">
+                        {data.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Junk Items List */}
+              <div className="space-y-2.5">
+                {junkScan.junkItems.map((item) => {
+                  const detail = getJunkDetail(item);
+                  return (
+                    <Card key={item.id} className="p-3.5 border-rose-500/20 bg-rose-500/5 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="p-1.5 rounded-xl bg-surface-elevated shrink-0">
+                            {getFileIcon(item.mimeType, item.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-white text-xs truncate max-w-sm">
+                                {item.name}
+                              </span>
+                              {detail && (
+                                <span className={cn("text-[10px] px-2 py-0.5 rounded-full border font-medium", detail.badgeColor)}>
+                                  {detail.categoryLabel}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {formatBytes(item.sizeBytes)} &bull; {item.updatedAt}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isAdmin ? (
+                            <button
+                              onClick={() => handleDeleteJunk(item.id, item.name)}
+                              className="px-2.5 py-1 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Dọn tệp này</span>
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 italic">Chỉ Admin được xóa</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {detail && (
+                        <div className="text-[11px] text-slate-300 bg-black/20 p-2.5 rounded-xl border border-white/5 space-y-0.5">
+                          <p><strong className="text-white">Lý do lọc:</strong> {detail.reason}</p>
+                          <p className="text-slate-400"><strong className="text-slate-300">Khuyến nghị:</strong> {detail.safetyAdvice}</p>
+                        </div>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Helpful Audio Streaming Tip Banner when viewing music */}
       {selectedCategory === "audio" && (
         <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-400/25 flex items-start gap-3 text-xs text-slate-300 animate-in fade-in">
@@ -772,7 +1076,7 @@ export default function StoragePage() {
       )}
 
       {/* Main Files Area: Normal Categories View */}
-      {selectedCategory !== "duplicates" && (
+      {selectedCategory !== "duplicates" && selectedCategory !== "junk" && (
         viewMode === "list" ? (
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
@@ -792,13 +1096,15 @@ export default function StoragePage() {
                     const video = isVideoFile(item);
                     const isCurrentPlayingAudio = currentTrack?.id === item.id;
                     const isDuplicate = duplicateScan.duplicateIds.has(item.id);
+                    const junkDetail = getJunkDetail(item);
 
                     return (
                       <tr
                         key={item.id}
                         className={cn(
                           "hover:bg-surface-elevated/40 transition-colors group",
-                          isCurrentPlayingAudio && "bg-blue-600/10"
+                          isCurrentPlayingAudio && "bg-blue-600/10",
+                          junkDetail && "bg-rose-500/5"
                         )}
                       >
                         <td className="py-3 px-4 flex items-center gap-3 font-medium text-foreground">
@@ -806,13 +1112,18 @@ export default function StoragePage() {
                             {getFileIcon(item.mimeType, item.name)}
                           </span>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="truncate max-w-[260px] sm:max-w-md font-semibold text-white">
                                 {item.name}
                               </p>
                               {isDuplicate && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
                                   Bản sao
+                                </span>
+                              )}
+                              {junkDetail && (
+                                <span className={cn("text-[9px] px-1.5 py-0.2 rounded-full border font-medium", junkDetail.badgeColor)}>
+                                  {junkDetail.categoryLabel}
                                 </span>
                               )}
                             </div>
@@ -902,6 +1213,7 @@ export default function StoragePage() {
               const video = isVideoFile(item);
               const isCurrentPlayingAudio = currentTrack?.id === item.id;
               const isDuplicate = duplicateScan.duplicateIds.has(item.id);
+              const junkDetail = getJunkDetail(item);
 
               return (
                 <Card
@@ -909,7 +1221,8 @@ export default function StoragePage() {
                   className={cn(
                     "p-4 flex flex-col justify-between hover:border-primary/50 transition-all group",
                     isCurrentPlayingAudio && "border-pink-500/50 bg-pink-500/5",
-                    isDuplicate && "border-amber-500/40 bg-amber-500/5"
+                    isDuplicate && "border-amber-500/40 bg-amber-500/5",
+                    junkDetail && "border-rose-500/40 bg-rose-500/5"
                   )}
                 >
                   <div>
@@ -921,6 +1234,11 @@ export default function StoragePage() {
                         {isDuplicate && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
                             Bản sao
+                          </span>
+                        )}
+                        {junkDetail && (
+                          <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full border font-medium", junkDetail.badgeColor)}>
+                            {junkDetail.categoryLabel}
                           </span>
                         )}
                         {audio && (
