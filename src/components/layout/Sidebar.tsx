@@ -26,6 +26,7 @@ import {
   QrCode,
   Download,
   Images,
+  Wand2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -48,6 +49,7 @@ interface SidebarLinkItem {
 const SIDEBAR_LINKS: SidebarLinkItem[] = [
   { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
   { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
+  { href: "/image-studio", label: "AI Image Studio", icon: Wand2, module: "image_studio" },
   { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
   { href: "/downloader", label: "Tải Video", icon: Download, module: "downloader" },
   { href: "/memories", label: "Kỷ Niệm Cá Nhân", icon: Images, module: "memories" },
@@ -99,13 +101,31 @@ export function Sidebar({
               href="/overview"
               className="flex items-center gap-3 overflow-hidden group"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 text-white shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform">
-                <Cloud className="h-5 w-5 fill-white/20" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform p-1.5 relative overflow-hidden">
+                {/* Embedded High-Resolution Mystic Cyber Daoist Icon */}
+                <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow">
+                  <defs>
+                    <linearGradient id="yinGradSide" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#38bdf8" />
+                      <stop offset="100%" stop-color="#c084fc" />
+                    </linearGradient>
+                  </defs>
+                  {/* Outer Mystic Bagua Circle */}
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.6" stroke-dasharray="6 4" />
+                  {/* Yin Yang Symbol */}
+                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradSide)" stroke-width="2.5" />
+                  <path d="M 50 12 A 38 38 0 0 1 50 88 A 19 19 0 0 1 50 50 A 19 19 0 0 0 50 12 Z" fill="url(#yinGradSide)" />
+                  {/* Dots */}
+                  <circle cx="50" cy="31" r="5" fill="#090d16" />
+                  <circle cx="50" cy="31" r="2.5" fill="#fde047" />
+                  <circle cx="50" cy="69" r="5" fill="#ffffff" />
+                  <circle cx="50" cy="69" r="2.5" fill="#6366f1" />
+                </svg>
               </div>
               {!collapsed && (
                 <div className="flex flex-col truncate">
                   <span className="text-base font-black tracking-tight text-white leading-none">
-                    TxCloneDriver
+                    MêÂmĐạoSỹ
                   </span>
                   <span className="text-[11px] font-semibold text-sky-400/90 tracking-wide mt-0.5">
                     Cloud Hub

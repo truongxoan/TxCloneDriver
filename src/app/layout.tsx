@@ -12,9 +12,14 @@ import { MusicPlayerProvider } from "@/modules/audio/musicPlayerContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "TxCloneDriver — Hệ thống Quản trị & Đồng bộ Đám mây",
+  title: "MêÂmĐạoSỹ — Hệ thống Quản trị & Đồng bộ Đám mây",
   description:
-    "Nền tảng quản lý dữ liệu cá nhân cao cấp TxCloneDriver tích hợp Google Drive, Telegram, Lịch âm dương Việt Nam và kiểm soát phân quyền thành viên.",
+    "Nền tảng quản lý dữ liệu cá nhân cao cấp MêÂmĐạoSỹ tích hợp Google Drive, Telegram, Lịch âm dương Việt Nam và kiểm soát phân quyền thành viên.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -124,11 +124,21 @@ export default function CinemaVideoModal({
     setMounted(true);
     document.body.style.overflow = "hidden";
     document.body.classList.add("cinema-video-open");
+    window.dispatchEvent(
+      new CustomEvent("tx_cinema_state", {
+        detail: { isOpen: true, video: currentVideo },
+      })
+    );
     return () => {
       document.body.style.overflow = "";
       document.body.classList.remove("cinema-video-open");
+      window.dispatchEvent(
+        new CustomEvent("tx_cinema_state", {
+          detail: { isOpen: false, video: null },
+        })
+      );
     };
-  }, []);
+  }, [currentVideo]);
 
   // Play / Pause toggle
   const togglePlay = () => {
@@ -153,10 +163,21 @@ export default function CinemaVideoModal({
   // Seek time
   const handleTimeUpdate = () => {
     if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
-        setDuration(videoRef.current.duration);
+      const cur = videoRef.current.currentTime;
+      const dur = videoRef.current.duration && !isNaN(videoRef.current.duration) ? videoRef.current.duration : 0;
+      setCurrentTime(cur);
+      if (dur > 0) {
+        setDuration(dur);
       }
+      window.dispatchEvent(
+        new CustomEvent("tx_cinema_sync", {
+          detail: {
+            currentTime: cur,
+            duration: dur,
+            isPlaying: !videoRef.current.paused,
+          },
+        })
+      );
     }
   };
 
@@ -408,7 +429,7 @@ export default function CinemaVideoModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 tracking-wide uppercase">
-                  TxCloneDriver Cinema
+                  MêÂmĐạoSỹ Cinema
                 </span>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/15">
                   {currentVideo.resolution || "1080p FHD"}

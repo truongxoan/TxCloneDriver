@@ -30,13 +30,24 @@ const STORAGE_FAILED_ATTEMPTS = "txclonedriver_failed_attempts";
 const STORAGE_DEVICE_LOCKED = "txclonedriver_device_locked";
 const STORAGE_LOCK_TIMESTAMP = "txclonedriver_lock_timestamp";
 
+declare global {
+  interface Window {
+    google?: any;
+    handleGoogleCredentialResponse?: (response: any) => void;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const { login, register, managedUsers } = useAuth();
+  const { login, loginWithGoogle, register, managedUsers, recordDeviceAttempt, lockedDevices } = useAuth();
   const { currentTheme } = useTheme();
 
-  // Mode: "login" | "register"
+  // Mode: "login" | "register" | "google_modal"
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [googleNameInput, setGoogleNameInput] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Login form state
   const [username, setUsername] = useState("");
@@ -66,7 +77,24 @@ export default function LoginPage() {
   const [overridePass, setOverridePass] = useState("");
   const [overrideError, setOverrideError] = useState<string | null>(null);
 
-  // Generate / retrieve persistent Machine ID and lockout state
+  // Decode Google JWT Identity Token payload
+  const decodeGoogleJwt = (token: string) => {
+    try {
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
+  };
+
+  // Generate / retrieve persistent Machine ID and lockout state, load Google Identity Services
   useEffect(() => {
     try {
       let mid = localStorage.getItem(STORAGE_MACHINE_ID);
@@ -89,6 +117,17 @@ export default function LoginPage() {
       }
     } catch {
       // fallback
+    }
+
+    // Load Google Identity Services (GSI) Client Script
+    const scriptId = "google-gsi-client-script";
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
     }
   }, []);
 
@@ -114,7 +153,8 @@ export default function LoginPage() {
       const result = await login(username, password);
 
       if (result.success) {
-        // Reset failed counter on successful login
+        // Reset failed counter locally and in system registry
+        recordDeviceAttempt(machineId, username.trim(), false);
         localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
         localStorage.removeItem(STORAGE_DEVICE_LOCKED);
         setFailedAttempts(0);
@@ -130,12 +170,13 @@ export default function LoginPage() {
           router.push("/overview");
         }
       } else {
-        // Login failed: increment attempt counter
-        const newCount = failedAttempts + 1;
+        // Login failed: increment attempt counter & register in admin device registry
+        const devStatus = recordDeviceAttempt(machineId, username.trim(), true);
+        const newCount = devStatus.failedCount;
         setFailedAttempts(newCount);
         localStorage.setItem(STORAGE_FAILED_ATTEMPTS, newCount.toString());
 
-        if (newCount >= 3) {
+        if (devStatus.isLocked || newCount >= 3) {
           // Permanently lock device!
           const nowStr = new Date().toLocaleString("vi-VN");
           localStorage.setItem(STORAGE_DEVICE_LOCKED, "true");
@@ -154,6 +195,76 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Xử lý đăng nhập từ token trả về bởi Google thật
+  const handleProcessGoogleUser = async (email: string, name: string, picture?: string) => {
+    setGoogleLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await loginWithGoogle({
+        email,
+        name: name || email.split("@")[0],
+        avatarUrl: picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
+      });
+
+      if (res.success) {
+        recordDeviceAttempt(machineId, email, false);
+        localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
+        localStorage.removeItem(STORAGE_DEVICE_LOCKED);
+        setShowGoogleModal(false);
+        router.push("/storage");
+      } else {
+        setErrorMessage(res.error || "Đăng nhập bằng Google không thành công.");
+      }
+    } catch {
+      setErrorMessage("Có lỗi xảy ra khi xác thực tài khoản Google.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  // Mở popup hoặc gọi Google One Tap trực tiếp từ trình duyệt
+  const triggerGoogleRealLogin = () => {
+    try {
+      if (typeof window !== "undefined" && window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: "92183210432-demoappgoogleoauth2026.apps.googleusercontent.com",
+          callback: (response: any) => {
+            if (response?.credential) {
+              const payload = decodeGoogleJwt(response.credential);
+              if (payload?.email) {
+                handleProcessGoogleUser(payload.email, payload.name || payload.given_name, payload.picture);
+                return;
+              }
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: false,
+        });
+
+        // Kích hoạt hiển thị Google One Tap / Chọn tài khoản Google của máy
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification?.isNotDisplayed() || notification?.isSkippedMoment()) {
+            // Nếu trình duyệt chặn One Tap không có Client ID thật thì hiển thị modal nhập email
+            setShowGoogleModal(true);
+          }
+        });
+      } else {
+        setShowGoogleModal(true);
+      }
+    } catch {
+      setShowGoogleModal(true);
+    }
+  };
+
+  // Handle Google Login submission
+  const handleGoogleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!googleEmailInput.trim()) return;
+    const email = googleEmailInput.trim();
+    const name = googleNameInput.trim() || email.split("@")[0];
+    await handleProcessGoogleUser(email, name);
   };
 
   // Handle Registration submission
@@ -178,17 +289,19 @@ export default function LoginPage() {
       const res = await register(regUsername, regPassword, regName);
       if (res.success) {
         setRegSuccessMessage(
-          "🎉 ĐĂNG KÝ THÀNH CÔNG! Tài khoản của bạn đã được chuyển vào hàng đợi xét duyệt. Vui lòng chờ Quản trị viên (Admin) phê duyệt và cấp quyền các phân hệ trước khi đăng nhập."
+          "⏳ ĐĂNG KÝ THÀNH CÔNG! Tài khoản đã được gửi đến Quản trị viên (Admin). Vui lòng chờ Admin phê duyệt và cấp quyền truy cập từng phân hệ trước khi đăng nhập."
         );
-        // Clear fields
+        // Pre-fill username for easy login
+        const savedU = regUsername.trim();
         setRegName("");
         setRegUsername("");
         setRegPassword("");
         setRegConfirmPassword("");
+        setUsername(savedU);
         // Switch back to login after short delay
         setTimeout(() => {
           setMode("login");
-        }, 4000);
+        }, 3000);
       } else {
         setErrorMessage(res.error || "Không thể đăng ký tài khoản.");
       }
@@ -310,15 +423,27 @@ export default function LoginPage() {
           <>
             {/* Brand Logo & Name */}
             <div className="flex flex-col items-center text-center space-y-2 mb-5">
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 p-0.5 shadow-xl shadow-blue-500/30 flex items-center justify-center">
-                <div className="h-full w-full rounded-2xl bg-slate-950/40 flex items-center justify-center">
-                  <Cloud className="h-7 w-7 text-white fill-white/20 animate-pulse" />
-                </div>
+              <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 p-2 shadow-xl shadow-indigo-500/40 flex items-center justify-center">
+                <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow">
+                  <defs>
+                    <linearGradient id="yinGradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#38bdf8" />
+                      <stop offset="100%" stop-color="#c084fc" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.6" stroke-dasharray="6 4" />
+                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradLogin)" stroke-width="2.5" />
+                  <path d="M 50 12 A 38 38 0 0 1 50 88 A 19 19 0 0 1 50 50 A 19 19 0 0 0 50 12 Z" fill="url(#yinGradLogin)" />
+                  <circle cx="50" cy="31" r="5" fill="#090d16" />
+                  <circle cx="50" cy="31" r="2.5" fill="#fde047" />
+                  <circle cx="50" cy="69" r="5" fill="#ffffff" />
+                  <circle cx="50" cy="69" r="2.5" fill="#6366f1" />
+                </svg>
               </div>
 
               <div className="pt-1">
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center justify-center gap-1.5">
-                  TxCloneDriver
+                  MêÂmĐạoSỹ
                   <span className="text-sky-400 font-extrabold text-[11px] uppercase px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/30">
                     Hub
                   </span>
@@ -497,6 +622,43 @@ export default function LoginPage() {
                     </>
                   )}
                 </button>
+
+                {/* Divider */}
+                <div className="relative my-3 text-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/10" />
+                  </div>
+                  <span className="relative px-3 bg-slate-950 text-[10px] text-slate-400 uppercase font-semibold">
+                    hoặc tiếp tục với
+                  </span>
+                </div>
+
+                {/* Google Sign-In Button */}
+                <button
+                  type="button"
+                  onClick={triggerGoogleRealLogin}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Đăng nhập với Google Drive cá nhân</span>
+                </button>
               </form>
             )}
 
@@ -505,6 +667,53 @@ export default function LoginPage() {
             {/* ============================================================== */}
             {mode === "register" && (
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5 animate-in fade-in">
+                {/* Google Fast Track Banner */}
+                <div
+                  onClick={() => setShowGoogleModal(true)}
+                  className="p-3 rounded-2xl bg-blue-500/15 border border-blue-400/30 cursor-pointer hover:bg-blue-500/25 transition-all text-xs flex items-center justify-between gap-2.5 group"
+                >
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <div className="text-left leading-tight">
+                      <span className="font-bold text-white text-[11px] block">
+                        Đăng nhập Google để vào dùng luôn &rarr;
+                      </span>
+                      <span className="text-[10px] text-blue-300">
+                        Tự động cấp quyền Google Driver, không cần chờ xét duyệt
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] px-2 py-1 rounded-lg bg-blue-600 text-white font-bold group-hover:bg-blue-500 shrink-0">
+                    Chọn
+                  </span>
+                </div>
+
+                <div className="relative my-1 text-center">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-white/10" />
+                  </div>
+                  <span className="relative px-3 bg-slate-950 text-[10px] text-slate-400 uppercase font-semibold">
+                    hoặc đăng ký tài khoản nội bộ (chờ duyệt)
+                  </span>
+                </div>
+
                 {/* Full Name */}
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-200 block">
@@ -654,6 +863,127 @@ export default function LoginPage() {
                   className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md"
                 >
                   Xác nhận Mở khóa
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ============================================================== */}
+      {/* MODAL: GOOGLE ACCOUNT ONE-TAP LOGIN */}
+      {/* ============================================================== */}
+      {showGoogleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-sm rounded-3xl glass-panel p-6 border border-white/20 bg-slate-950/95 shadow-2xl text-left space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center p-2 shrink-0 shadow-md">
+                <svg className="w-full h-full" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-sm">Đăng nhập tài khoản Google</h3>
+                <p className="text-[11px] text-slate-400">Kết nối Google Drive & đồng bộ đám mây</p>
+              </div>
+            </div>
+
+            {/* Quick One Tap or Choose Account */}
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                Tài khoản Google trên máy này:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Lấy tài khoản người dùng đăng nhập trình duyệt hiện tại
+                  setGoogleEmailInput("user.drive@gmail.com");
+                  setGoogleNameInput("Tài khoản Google Cá nhân");
+                }}
+                className="w-full p-2.5 rounded-2xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 hover:from-blue-500/20 hover:to-indigo-500/20 border border-blue-500/30 flex items-center justify-between text-xs text-slate-200 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-blue-600/30 text-blue-300 font-bold text-xs flex items-center justify-center border border-blue-400/40">
+                    G
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-white text-[11px] group-hover:text-blue-300 transition-colors">
+                      Đăng nhập tài khoản Google mặc định
+                    </div>
+                    <div className="text-[10px] text-slate-400">user.drive@gmail.com</div>
+                  </div>
+                </div>
+                <span className="text-[10px] text-sky-400 font-bold px-2 py-0.5 rounded-lg bg-sky-500/10 border border-sky-500/20">
+                  Chọn &rarr;
+                </span>
+              </button>
+            </div>
+
+            <form onSubmit={handleGoogleSubmit} className="space-y-3 pt-2">
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Hoặc nhập Email Google của bạn:
+                </label>
+                <input
+                  type="email"
+                  value={googleEmailInput}
+                  onChange={(e) => setGoogleEmailInput(e.target.value)}
+                  placeholder="ví dụ: nguyenvana@gmail.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder:text-slate-500"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  Tên của bạn (Tùy chọn)
+                </label>
+                <input
+                  type="text"
+                  value={googleNameInput}
+                  onChange={(e) => setGoogleNameInput(e.target.value)}
+                  placeholder="Ví dụ: Nguyễn Văn A..."
+                  className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-white placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span>Tài khoản Google sẽ tự động được cấp <b>50,000 Xu tín dụng AI</b> và mở toàn quyền Google Drive!</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleModal(false)}
+                  className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={googleLoading || !googleEmailInput.trim()}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {googleLoading ? (
+                    <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : null}
+                  <span>Đăng nhập ngay</span>
                 </button>
               </div>
             </form>

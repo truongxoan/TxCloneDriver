@@ -4,6 +4,7 @@ export type UserStatus = "approved" | "pending" | "rejected";
 export type AppModuleId =
   | "overview"
   | "storage"
+  | "image_studio"
   | "notes"
   | "projects"
   | "events"
@@ -20,6 +21,17 @@ export type AppModuleId =
   | "downloader"
   | "memories";
 
+export interface LockedDevice {
+  machineId: string;
+  failedCount: number;
+  lastAttemptAt: string;
+  isLocked: boolean;
+  lockedAt?: string;
+  ip?: string;
+  userAgent?: string;
+  attemptedUsernames?: string[];
+}
+
 export interface AuthUser {
   id?: string;
   username: string;
@@ -32,6 +44,8 @@ export interface AuthUser {
   status: UserStatus;
   allowedModules: string[];
   pendingNameChange?: string;
+  provider?: "local" | "google";
+  googleEmail?: string;
 }
 
 export interface ManagedUser {
@@ -48,6 +62,8 @@ export interface ManagedUser {
   allowedModules: string[];
   createdAt: string;
   pendingNameChange?: string;
+  provider?: "local" | "google";
+  googleEmail?: string;
 }
 
 export interface AuditLogItem {
@@ -66,6 +82,7 @@ export interface AuthContextType {
   isAdmin: boolean;
   managedUsers: ManagedUser[];
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (googleProfile: { email: string; name: string; avatarUrl?: string }) => Promise<{ success: boolean; error?: string }>;
   register: (username: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateUserPermissions: (userId: string, allowedModules: string[], status: UserStatus) => void;
@@ -77,6 +94,11 @@ export interface AuthContextType {
   approveNameChange: (userId: string) => void;
   rejectNameChange: (userId: string) => void;
   adjustUserCoins: (userId: string, deltaCoins: number) => void;
+  // Device Lockout Tracking across system
+  lockedDevices: LockedDevice[];
+  recordDeviceAttempt: (machineId: string, username: string, isFailed: boolean) => { isLocked: boolean; failedCount: number };
+  unlockDevice: (machineId: string) => void;
+  clearAllDeviceLocks: () => void;
   // Admin Superpowers
   originalAdminUser: AuthUser | null;
   impersonateUser: (userId: string) => void;

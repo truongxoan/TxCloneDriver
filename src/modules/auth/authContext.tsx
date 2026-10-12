@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem } from "./types";
+import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem, LockedDevice } from "./types";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -10,6 +10,7 @@ const COOKIE_NAME = "txclonedriver_session";
 const STORAGE_USERS_KEY = "txclonedriver_managed_users";
 const STORAGE_AUDIT_KEY = "txclonedriver_security_audit_logs";
 const STORAGE_MAINTENANCE_KEY = "txclonedriver_maintenance_mode";
+const STORAGE_LOCKED_DEVICES_KEY = "txclonedriver_locked_devices_list";
 
 const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   {
@@ -79,6 +80,7 @@ const INITIAL_USERS: ManagedUser[] = [
       "qr",
       "downloader",
       "memories",
+      "image_studio",
     ],
     createdAt: "10/10/2026",
   },
@@ -155,8 +157,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [originalAdminUser, setOriginalAdminUser] = useState<AuthUser | null>(null);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(false);
   const [securityAuditLogs, setSecurityAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
+  const [lockedDevices, setLockedDevices] = useState<LockedDevice[]>([]);
 
-  // Load managed users and session
+  // Load managed users, session, and locked devices
   useEffect(() => {
     try {
       const savedUsers = localStorage.getItem(STORAGE_USERS_KEY);
@@ -164,6 +167,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setManagedUsers(JSON.parse(savedUsers));
       } else {
         localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      const savedDevices = localStorage.getItem(STORAGE_LOCKED_DEVICES_KEY);
+      if (savedDevices) {
+        setLockedDevices(JSON.parse(savedDevices));
       }
     } catch {
       // ignore
@@ -192,6 +204,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setInitialized(true);
   }, []);
+
+  const saveDevicesList = (updated: LockedDevice[]) => {
+    setLockedDevices(updated);
+    try {
+      localStorage.setItem(STORAGE_LOCKED_DEVICES_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const recordDeviceAttempt = (
+    machineId: string,
+    username: string,
+    isFailed: boolean
+  ): { isLocked: boolean; failedCount: number } => {
+    const list = [...lockedDevices];
+    const nowStr = new Date().toLocaleString("vi-VN");
+    let dev = list.find((d) => d.machineId === machineId);
+
+    if (!dev) {
+      dev = {
+        machineId,
+        failedCount: 0,
+        lastAttemptAt: nowStr,
+        isLocked: false,
+        attemptedUsernames: [],
+      };
+      list.push(dev);
+    }
+
+    if (!dev.attemptedUsernames) dev.attemptedUsernames = [];
+    if (username && !dev.attemptedUsernames.includes(username)) {
+      dev.attemptedUsernames.push(username);
+    }
+    dev.lastAttemptAt = nowStr;
+
+    if (isFailed) {
+      dev.failedCount = (dev.failedCount || 0) + 1;
+      if (dev.failedCount >= 3) {
+        dev.isLocked = true;
+        dev.lockedAt = nowStr;
+      }
+    } else {
+      // Successful login resets failure counter
+      dev.failedCount = 0;
+      dev.isLocked = false;
+    }
+
+    saveDevicesList(list);
+    return { isLocked: dev.isLocked, failedCount: dev.failedCount };
+  };
+
+  const unlockDevice = (machineId: string) => {
+    const list = lockedDevices.map((d) => {
+      if (d.machineId === machineId) {
+        return {
+          ...d,
+          failedCount: 0,
+          isLocked: false,
+          lockedAt: undefined,
+        };
+      }
+      return d;
+    });
+    saveDevicesList(list);
+
+    // If unlocking the current machine, also reset local storage
+    if (typeof window !== "undefined") {
+      const currentMid = localStorage.getItem("txclonedriver_machine_id");
+      if (currentMid === machineId) {
+        localStorage.removeItem("txclonedriver_failed_attempts");
+        localStorage.removeItem("txclonedriver_device_locked");
+        localStorage.removeItem("txclonedriver_lock_timestamp");
+      }
+    }
+
+    logSecurityAudit(
+      "Unlock Device",
+      `Admin đã mở khóa máy: ${machineId}`,
+      "success"
+    );
+  };
+
+  const clearAllDeviceLocks = () => {
+    saveDevicesList([]);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("txclonedriver_failed_attempts");
+      localStorage.removeItem("txclonedriver_device_locked");
+      localStorage.removeItem("txclonedriver_lock_timestamp");
+    }
+    logSecurityAudit("Reset All Device Locks", "Admin đã xóa toàn bộ danh sách khóa máy", "success");
+  };
 
   const saveUsersList = (updated: ManagedUser[]) => {
     setManagedUsers(updated);
@@ -286,14 +390,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: p,
       name: n,
       role: "user",
-      status: "pending", // Mặc định chờ admin phê duyệt
-      allowedModules: [], // Chưa được cấp quyền module nào
+      status: "pending", // Đăng ký lẻ: phải chờ Admin phê duyệt & cấp quyền
+      allowedModules: [], // Chưa được cấp quyền cho đến khi Admin duyệt
       createdAt: dateStr,
+      coins: 50000,
+      provider: "local",
     };
 
     const updated = [...managedUsers, newUser];
     saveUsersList(updated);
 
+    logSecurityAudit(
+      "User Registration Pending",
+      `Tài khoản đăng ký lẻ @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
+      "warning"
+    );
+
+    return { success: true };
+  };
+
+  const loginWithGoogle = async (googleProfile: {
+    email: string;
+    name: string;
+    avatarUrl?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    const email = googleProfile.email.trim().toLowerCase();
+    const name = googleProfile.name.trim() || email.split("@")[0];
+
+    // Check if user with this googleEmail or username exists
+    let foundUser = managedUsers.find(
+      (u) =>
+        (u.googleEmail && u.googleEmail.toLowerCase() === email) ||
+        u.username.toLowerCase() === email
+    );
+
+    const now = new Date();
+    const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+      now.getMonth() + 1
+    ).padStart(2, "0")}/${now.getFullYear()}`;
+
+    if (!foundUser) {
+      // Đăng nhập Google thay thế đăng ký: Lấy thông tin từ Google tạo tài khoản trực tiếp, cấp quyền Driver và vào dùng luôn
+      foundUser = {
+        id: `u-gg-${Date.now()}`,
+        username: email,
+        name: name,
+        avatarUrl: googleProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
+        role: "user",
+        status: "approved", // Vào sử dụng luôn không cần chờ duyệt
+        allowedModules: ["storage", "overview", "image_studio"], // Cấp sẵn toàn quyền Google Driver và các tiện ích liên quan
+        createdAt: dateStr,
+        coins: 50000,
+        provider: "google",
+        googleEmail: email,
+      };
+
+      const updated = [...managedUsers, foundUser];
+      saveUsersList(updated);
+      logSecurityAudit(
+        "Google Auto-Register & Login",
+        `Tài khoản Google @${email} (${name}) tự động tạo tài khoản, được cấp quyền Google Driver và vào sử dụng ngay.`,
+        "success"
+      );
+    } else {
+      // Update avatar if provided
+      if (googleProfile.avatarUrl && !foundUser.avatarUrl) {
+        foundUser.avatarUrl = googleProfile.avatarUrl;
+        saveUsersList([...managedUsers]);
+      }
+    }
+
+    if (foundUser.status === "rejected") {
+      return { success: false, error: "Tài khoản Google này đã bị khóa quyền truy cập." };
+    }
+
+    const initials =
+      foundUser.name
+        .split(" ")
+        .map((s) => s[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "GG";
+
+    const authUser: AuthUser = {
+      id: foundUser.id,
+      username: foundUser.username,
+      role: foundUser.role,
+      name: foundUser.name,
+      avatarInitials: initials,
+      avatarUrl: foundUser.avatarUrl,
+      status: foundUser.status,
+      allowedModules: foundUser.allowedModules,
+      provider: "google",
+      googleEmail: email,
+      coins: foundUser.coins,
+    };
+
+    setUser(authUser);
+    setSessionCookie(authUser);
+    logSecurityAudit("Google Login", `Tài khoản Google @${email} đăng nhập thành công`, "success");
     return { success: true };
   };
 
@@ -572,6 +767,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin: user?.role === "admin",
         managedUsers,
         login,
+        loginWithGoogle,
         register,
         logout,
         updateUserPermissions,
@@ -583,6 +779,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         approveNameChange,
         rejectNameChange,
         adjustUserCoins,
+        lockedDevices,
+        recordDeviceAttempt,
+        unlockDevice,
+        clearAllDeviceLocks,
         originalAdminUser,
         impersonateUser,
         stopImpersonating,

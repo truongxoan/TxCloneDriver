@@ -55,6 +55,7 @@ import { cn } from "@/lib/utils";
 const ALL_MODULES: { id: AppModuleId; label: string; icon: string; desc: string }[] = [
   { id: "overview", label: "Tổng quan", icon: "🏠", desc: "Xem trang thống kê trung tâm" },
   { id: "storage", label: "Google Drive", icon: "💾", desc: "Duyệt thư mục, xem phim & nghe nhạc" },
+  { id: "image_studio", label: "AI Image Studio", icon: "🎨", desc: "Xóa nền background, clone ảnh và tạo ảnh AI" },
   { id: "watch_together", label: "Xem & Nghe Chung", icon: "👥", desc: "Phòng nhạc YouTube & Drive đồng bộ, order bài" },
   { id: "vault", label: "Két Sắt & 2FA", icon: "🔐", desc: "Quản lý mật khẩu, mã 2FA TOTP và bảo mật web" },
   { id: "notes", label: "Ghi chú & Link", icon: "📝", desc: "Quản lý ghi chú cá nhân và liên kết" },
@@ -90,6 +91,9 @@ export default function SettingsPage() {
     toggleMaintenanceMode,
     securityAuditLogs,
     clearSecurityLogs,
+    lockedDevices,
+    unlockDevice,
+    clearAllDeviceLocks,
   } = useAuth();
   const { endpoints, activeEndpoint } = useDriveEndpoints();
   const { botToken, chatId, botInfo, isConnected: tgConnected } = useTelegram();
@@ -112,6 +116,11 @@ export default function SettingsPage() {
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [isLocked, setIsLocked] = useState<boolean>(false);
 
+  // MaxCheapAI Gateway State
+  const [maxCheapKey, setMaxCheapKey] = useState<string>("");
+  const [isCheckingAiKey, setIsCheckingAiKey] = useState(false);
+  const [maxCheapBalance, setMaxCheapBalance] = useState<string | null>(null);
+
   useEffect(() => {
     try {
       const mid = localStorage.getItem("txclonedriver_machine_id") || "TX-DEV-DEFAULT-NODE";
@@ -120,6 +129,11 @@ export default function SettingsPage() {
       setMachineId(mid);
       setFailedAttempts(fa);
       setIsLocked(lk);
+
+      const savedAiKey = localStorage.getItem("maxcheapai_api_key") || "";
+      setMaxCheapKey(savedAiKey);
+      const savedBalance = localStorage.getItem("maxcheapai_balance");
+      if (savedBalance) setMaxCheapBalance(savedBalance);
     } catch {
       // ignore
     }
@@ -788,6 +802,102 @@ export default function SettingsPage() {
                 </Link>
               </div>
             </Card>
+
+            {/* Section 3: MaxCheapAI Gateway & Studio Flow */}
+            <Card className="p-6 space-y-4 border-violet-500/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                    <span className="text-base">🎨</span>
+                    Cổng MaxCheapAI Studio & Flow Engine (https://maxcheapai.com/)
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Tích hợp API tạo ảnh Text-to-Image, Image-to-Image, Image-to-Video Kling/VEO không logo
+                  </p>
+                </div>
+                <Badge variant={maxCheapKey ? "success" : "warning"} size="sm">
+                  {maxCheapKey ? "Đã cấu hình" : "Chưa nhập Key"}
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">
+                    MaxCheapAI API Key (Bearer Token):
+                  </label>
+                  <input
+                    type="password"
+                    value={maxCheapKey}
+                    onChange={(e) => setMaxCheapKey(e.target.value)}
+                    placeholder="mcai_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-foreground font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Lấy API key tại bảng điều khiển MaxCheapAI Studio: <strong className="text-sky-400">maxcheapai.com</strong>
+                  </p>
+                </div>
+
+                {maxCheapBalance && (
+                  <div className="p-3 rounded-xl bg-violet-600/10 border border-violet-500/20 text-xs flex items-center justify-between">
+                    <span className="text-violet-300 font-medium">Số dư / HP khả dụng:</span>
+                    <span className="font-bold text-white font-mono">{maxCheapBalance}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!maxCheapKey || isCheckingAiKey}
+                    onClick={async () => {
+                      setIsCheckingAiKey(true);
+                      try {
+                        const res = await fetch("/api/ai/maxcheapai", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "balance", apiKey: maxCheapKey }),
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          const bal = JSON.stringify(data.data);
+                          setMaxCheapBalance(bal);
+                          localStorage.setItem("maxcheapai_balance", bal);
+                          triggerToast("Kết nối MaxCheapAI API thành công!");
+                        } else {
+                          triggerToast(data.error || "Không thể xác minh API Key.");
+                        }
+                      } catch {
+                        triggerToast("Lỗi kết nối máy chủ MaxCheapAI.");
+                      } finally {
+                        setIsCheckingAiKey(false);
+                      }
+                    }}
+                    className="text-xs border-violet-500/40 text-violet-300 hover:bg-violet-500/10"
+                  >
+                    {isCheckingAiKey ? "Đang kiểm tra..." : "Kiểm tra kết nối & HP"}
+                  </Button>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => {
+                        localStorage.setItem("maxcheapai_api_key", maxCheapKey.trim());
+                        triggerToast("Đã lưu MaxCheapAI API Key thành công!");
+                      }}
+                      className="text-xs bg-violet-600 hover:bg-violet-500 text-white"
+                    >
+                      Lưu API Key
+                    </Button>
+                    <Link href="/image-studio">
+                      <Button variant="secondary" size="sm" className="text-xs">
+                        Mở AI Studio &rarr;
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </Card>
           </div>
         )}
 
@@ -842,9 +952,88 @@ export default function SettingsPage() {
                   className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs gap-1.5 shrink-0"
                 >
                   <Unlock className="h-3.5 w-3.5" />
-                  <span>Mở khóa / Reset thiết bị</span>
+                  <span>Mở khóa máy này</span>
                 </Button>
               </div>
+            </Card>
+
+            {/* Admin: Global Locked & Monitored Devices Inspector */}
+            <Card className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                    <ShieldAlert className="h-5 w-5 text-rose-400" />
+                    Danh Sách Thiết Bị Cố Đăng Nhập & Bị Khóa ({lockedDevices.length})
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Quản trị viên có thể theo dõi mã máy (Machine ID), số lần thử sai, tài khoản cố đăng nhập và mở khóa từ xa
+                  </p>
+                </div>
+
+                {lockedDevices.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      clearAllDeviceLocks();
+                      triggerToast("Đã giải phóng toàn bộ thiết bị bị khóa!");
+                    }}
+                    className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                  >
+                    Mở khóa tất cả
+                  </Button>
+                )}
+              </div>
+
+              {lockedDevices.length === 0 ? (
+                <div className="p-6 rounded-2xl bg-surface-elevated/30 border border-surface-border text-center text-xs text-muted-foreground">
+                  🎉 Chưa ghi nhận máy nào đăng nhập sai hoặc bị khóa. Hệ thống đang an toàn tuyệt đối.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {lockedDevices.map((dev) => (
+                    <div
+                      key={dev.machineId}
+                      className="p-3.5 rounded-2xl bg-surface-elevated/50 border border-surface-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-sky-400">{dev.machineId}</span>
+                          <Badge variant={dev.isLocked ? "danger" : dev.failedCount > 0 ? "warning" : "success"} size="sm">
+                            {dev.isLocked ? "ĐÃ BỊ KHÓA" : `${dev.failedCount}/3 lần sai`}
+                          </Badge>
+                          {dev.machineId === machineId && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">
+                              (Máy hiện tại)
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-3">
+                          <span>Lần thử cuối: <strong className="text-foreground">{dev.lastAttemptAt}</strong></span>
+                          {dev.attemptedUsernames && dev.attemptedUsernames.length > 0 && (
+                            <span>Tài khoản thử: <strong className="text-amber-300 font-mono">{dev.attemptedUsernames.join(", ")}</strong></span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            unlockDevice(dev.machineId);
+                            triggerToast(`Đã mở khóa thành công cho máy ${dev.machineId}!`);
+                          }}
+                          className="text-xs gap-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30"
+                        >
+                          <Unlock className="h-3.5 w-3.5" />
+                          <span>Mở khóa ID này</span>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             {/* Security Policy Card */}

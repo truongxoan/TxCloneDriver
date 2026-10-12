@@ -41,22 +41,22 @@ const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(und
 export const DEFAULT_STARTER_TRACKS: AudioTrack[] = [
   {
     id: "audio-demo-1",
-    title: "Lofi Chill Sunset (TxCloneDriver).mp3",
-    artist: "Google Drive Audio Nonstop",
+    title: "Lofi Chill Sunset (MêÂmĐạoSỹ).mp3",
+    artist: "Google Drive • MêÂmĐạoSỹ Audio Hub",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     duration: "06:12",
   },
   {
     id: "audio-demo-2",
     title: "Night Walk Acoustic Melodies.mp3",
-    artist: "Google Drive Audio Nonstop",
+    artist: "Google Drive • MêÂmĐạoSỹ Audio Hub",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
     duration: "07:05",
   },
   {
     id: "audio-demo-3",
     title: "Cyberpunk Ambient Wave.mp3",
-    artist: "Google Drive Audio Nonstop",
+    artist: "Google Drive • MêÂmĐạoSỹ Audio Hub",
     url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
     duration: "05:44",
   },

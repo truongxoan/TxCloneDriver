@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,9 +11,9 @@ import {
   GraduationCap,
   Download,
   Image as ImageIcon,
-  Zap,
   Palette,
   Settings,
+  Wand2,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -43,6 +43,13 @@ const DOCK_ITEMS: DockItem[] = [
     iconBg: "from-amber-500 to-orange-600",
   },
   {
+    id: "image-studio",
+    label: "AI Studio",
+    href: "/image-studio",
+    icon: Wand2,
+    iconBg: "from-violet-600 via-purple-600 to-pink-600",
+  },
+  {
     id: "watch-together",
     label: "Xem & Nghe Chung",
     href: "/watch-together",
@@ -51,7 +58,7 @@ const DOCK_ITEMS: DockItem[] = [
   },
   {
     id: "games",
-    label: "Sảnh Game PvP",
+    label: "Sảnh Game",
     href: "/games",
     icon: Gamepad2,
     iconBg: "from-purple-600 to-violet-600",
@@ -96,90 +103,145 @@ const DOCK_ITEMS: DockItem[] = [
 export function MacOsDock() {
   const pathname = usePathname();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isCinemaOpen, setIsCinemaOpen] = useState(false);
+  const [isHoveringDockArea, setIsHoveringDockArea] = useState(false);
+  const [isAutoHidden, setIsAutoHidden] = useState(false);
+  const autoHideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Monitor Cinema mode
   useEffect(() => {
+    const handleCinemaState = (e: any) => {
+      if (e.detail) {
+        setIsCinemaOpen(Boolean(e.detail.isOpen));
+      }
+    };
+    window.addEventListener("tx_cinema_state", handleCinemaState);
+
     const update = () => {
       setIsCinemaOpen(document.body.classList.contains("cinema-video-open"));
     };
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
+
+    return () => {
+      window.removeEventListener("tx_cinema_state", handleCinemaState);
+      observer.disconnect();
+    };
   }, []);
 
-  // If on login page or cinema mode is open, hide dock
+  // Smart Auto-Hide timer when idle for 4.5s
+  useEffect(() => {
+    const resetTimer = () => {
+      setIsAutoHidden(false);
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      autoHideTimerRef.current = setTimeout(() => {
+        // Auto hide if not hovering
+        setIsAutoHidden(true);
+      }, 5000);
+    };
+
+    window.addEventListener("mousemove", resetTimer);
+    window.addEventListener("scroll", resetTimer);
+    resetTimer();
+
+    return () => {
+      if (autoHideTimerRef.current) clearTimeout(autoHideTimerRef.current);
+      window.removeEventListener("mousemove", resetTimer);
+      window.removeEventListener("scroll", resetTimer);
+    };
+  }, []);
+
+  // If on login page or cinema mode is open, hide dock completely
   if (pathname === "/login" || isCinemaOpen) return null;
 
+  // Dock is visible if user hovers near bottom area or when active
+  const isDockVisible = isHoveringDockArea || !isAutoHidden;
+
   return (
-    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center select-none pointer-events-auto">
-      {/* Minimize / Expand Toggle Tab */}
-      <button
-        onClick={() => setIsMinimized(!isMinimized)}
-        className="mb-1 p-1 px-2.5 rounded-full bg-slate-950/80 hover:bg-slate-900 border border-white/10 text-slate-400 hover:text-white text-[10px] flex items-center gap-1 shadow-lg transition-all"
-        title={isMinimized ? "Hiện Dock" : "Thu gọn Dock"}
-      >
-        <span>Dock</span>
-        {isMinimized ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-      </button>
-
-      {!isMinimized && (
-        <div
-          onMouseLeave={() => setHoveredIdx(null)}
-          className="rounded-3xl p-2 px-3 bg-slate-950/85 backdrop-blur-3xl border border-white/15 shadow-2xl flex items-end gap-2.5 transition-all duration-300 ring-1 ring-white/10"
-        >
-          {DOCK_ITEMS.map((item, idx) => {
-            const Icon = item.icon;
-            const isActive = pathname.startsWith(item.href);
-
-            // Magnification calculation
-            let scaleClass = "scale-100";
-            if (hoveredIdx !== null) {
-              const diff = Math.abs(hoveredIdx - idx);
-              if (diff === 0) scaleClass = "scale-130 -translate-y-2";
-              else if (diff === 1) scaleClass = "scale-115 -translate-y-1";
-            }
-
-            return (
-              <div
-                key={item.id}
-                onMouseEnter={() => setHoveredIdx(idx)}
-                className="relative group flex flex-col items-center"
-              >
-                {/* Floating Tooltip Label */}
-                <div className="absolute -top-9 px-2.5 py-1 rounded-xl bg-slate-900/90 text-white font-bold text-[10px] border border-white/15 shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  {item.label}
-                </div>
-
-                {/* Dock Icon Button */}
-                <Link
-                  href={item.href}
-                  className={cn(
-                    "w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center transition-all duration-200 shadow-md",
-                    "bg-gradient-to-tr",
-                    item.iconBg,
-                    scaleClass,
-                    "hover:shadow-lg active:scale-95"
-                  )}
-                >
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white drop-shadow-sm" />
-                </Link>
-
-                {/* Active Indicator Dot */}
-                <span
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full mt-1 transition-all",
-                    isActive
-                      ? "bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] scale-100"
-                      : "bg-transparent scale-0"
-                  )}
-                />
-              </div>
-            );
-          })}
-        </div>
+    <div
+      onMouseEnter={() => {
+        setIsHoveringDockArea(true);
+        setIsAutoHidden(false);
+      }}
+      onMouseLeave={() => {
+        setIsHoveringDockArea(false);
+        setHoveredIdx(null);
+      }}
+      className={cn(
+        "fixed bottom-2 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center select-none pointer-events-auto transition-all duration-500 ease-out",
+        isDockVisible
+          ? "translate-y-0 opacity-100 scale-100"
+          : "translate-y-7 opacity-30 hover:opacity-100 scale-95"
       )}
+    >
+      {/* Smart Compact Indicator Strip / Trigger Bar */}
+      <div
+        onClick={() => setIsAutoHidden(!isAutoHidden)}
+        className="mb-1 p-0.5 px-3 rounded-full bg-slate-950/80 hover:bg-slate-900 border border-white/10 text-slate-400 hover:text-white text-[9px] flex items-center gap-1 shadow-lg transition-all cursor-pointer backdrop-blur-md"
+        title={isDockVisible ? "Ẩn thanh Dock" : "Hiện thanh Dock"}
+      >
+        <span className="font-semibold text-sky-400">Dock</span>
+        {isDockVisible ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronUp className="w-2.5 h-2.5" />}
+      </div>
+
+      {/* Main Streamlined Compact Dock Bar */}
+      <div
+        className={cn(
+          "rounded-2xl p-1.5 px-2.5 bg-slate-950/85 backdrop-blur-3xl border border-white/15 shadow-2xl flex items-end gap-1.5 sm:gap-2 transition-all duration-300 ring-1 ring-white/10",
+          !isDockVisible && "pointer-events-none"
+        )}
+      >
+        {DOCK_ITEMS.map((item, idx) => {
+          const Icon = item.icon;
+          const isActive = pathname.startsWith(item.href);
+
+          // Subtle magnification calculation
+          let scaleClass = "scale-100";
+          if (hoveredIdx !== null) {
+            const diff = Math.abs(hoveredIdx - idx);
+            if (diff === 0) scaleClass = "scale-120 -translate-y-1.5";
+            else if (diff === 1) scaleClass = "scale-110 -translate-y-0.5";
+          }
+
+          return (
+            <div
+              key={item.id}
+              onMouseEnter={() => setHoveredIdx(idx)}
+              className="relative group flex flex-col items-center"
+            >
+              {/* Floating Tooltip Label */}
+              <div className="absolute -top-8 px-2 py-0.5 rounded-lg bg-slate-900/95 text-white font-bold text-[9px] border border-white/15 shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                {item.label}
+              </div>
+
+              {/* Compact Dock Icon Button (36px -> 40px sm) */}
+              <Link
+                href={item.href}
+                className={cn(
+                  "w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200 shadow-sm",
+                  "bg-gradient-to-tr",
+                  item.iconBg,
+                  scaleClass,
+                  "hover:shadow-md active:scale-95"
+                )}
+              >
+                <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white drop-shadow-sm" />
+              </Link>
+
+              {/* Active Dot Indicator */}
+              <span
+                className={cn(
+                  "w-1 h-1 rounded-full mt-0.5 transition-all",
+                  isActive
+                    ? "bg-white shadow-[0_0_6px_rgba(255,255,255,0.9)] scale-100"
+                    : "bg-transparent scale-0"
+                )}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
