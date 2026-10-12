@@ -22,6 +22,7 @@ import {
   Download,
   Images,
   Wand2,
+  Workflow,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
 import { AppModuleId } from "@/modules/auth/types";
@@ -37,6 +38,7 @@ const MODULE_NAMES: Record<AppModuleId, { name: string; href: string; icon: Reac
   overview: { name: "Tổng quan", href: "/overview", icon: Home },
   storage: { name: "Google Drive", href: "/storage", icon: HardDrive },
   image_studio: { name: "AI Image Studio", href: "/image-studio", icon: Wand2 },
+  google_flow: { name: "Google Flow Studio", href: "/google-flow", icon: Workflow },
   watch_together: { name: "Xem & Nghe Chung", href: "/watch-together", icon: Users2 },
   vault: { name: "Két Sắt & 2FA", href: "/vault", icon: KeyRound },
   notes: { name: "Ghi chú & Link", href: "/notes", icon: Link2 },

@@ -27,6 +27,7 @@ import {
   Download,
   Images,
   Wand2,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -50,6 +51,7 @@ const SIDEBAR_LINKS: SidebarLinkItem[] = [
   { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
   { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
   { href: "/image-studio", label: "AI Image Studio", icon: Wand2, module: "image_studio" },
+  { href: "/google-flow", label: "Google Flow Tools", icon: Workflow, module: "google_flow" },
   { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
   { href: "/downloader", label: "Tải Video", icon: Download, module: "downloader" },
   { href: "/memories", label: "Kỷ Niệm Cá Nhân", icon: Images, module: "memories" },

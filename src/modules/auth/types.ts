@@ -19,7 +19,8 @@ export type AppModuleId =
   | "expenses"
   | "qr"
   | "downloader"
-  | "memories";
+  | "memories"
+  | "google_flow";
 
 export interface LockedDevice {
   machineId: string;

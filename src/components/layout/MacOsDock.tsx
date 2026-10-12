@@ -14,6 +14,7 @@ import {
   Palette,
   Settings,
   Wand2,
+  Workflow,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -48,6 +49,13 @@ const DOCK_ITEMS: DockItem[] = [
     href: "/image-studio",
     icon: Wand2,
     iconBg: "from-violet-600 via-purple-600 to-pink-600",
+  },
+  {
+    id: "google-flow",
+    label: "Google Flow",
+    href: "/google-flow",
+    icon: Workflow,
+    iconBg: "from-blue-500 via-teal-500 to-emerald-500",
   },
   {
     id: "watch-together",

@@ -81,6 +81,7 @@ const INITIAL_USERS: ManagedUser[] = [
       "downloader",
       "memories",
       "image_studio",
+      "google_flow",
     ],
     createdAt: "10/10/2026",
   },
@@ -438,7 +439,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         avatarUrl: googleProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
         role: "user",
         status: "approved", // Vào sử dụng luôn không cần chờ duyệt
-        allowedModules: ["storage", "overview", "image_studio"], // Cấp sẵn toàn quyền Google Driver và các tiện ích liên quan
+        allowedModules: ["storage", "overview", "image_studio", "google_flow"], // Cấp sẵn toàn quyền Google Driver và các tiện ích liên quan
         createdAt: dateStr,
         coins: 50000,
         provider: "google",
