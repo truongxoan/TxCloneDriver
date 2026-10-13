@@ -32,7 +32,9 @@ interface WatchPartyContextType {
     url: string,
     title?: string,
     isVideo?: boolean,
-    artistOrChannel?: string
+    artistOrChannel?: string,
+    forceQueue?: boolean,
+    playImmediate?: boolean
   ) => { success: boolean; error?: string };
   playNextInQueue: () => void;
   removeQueueItem: (itemId: string) => void;
@@ -367,7 +369,9 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     url: string,
     title?: string,
     isVideo = true,
-    artistOrChannel?: string
+    artistOrChannel?: string,
+    forceQueue = false,
+    playImmediate = false
   ): { success: boolean; error?: string } => {
     if (!currentRoom) {
       return { success: false, error: "Bạn chưa tham gia phòng nào." };
@@ -436,23 +440,39 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       likes: 1,
     };
 
-    // If room currently has nothing playing, play this immediately!
     let updatedCurrent = currentRoom.currentMedia;
     const updatedQueue = [...currentRoom.queue];
     let isPlaying = currentRoom.isPlaying;
 
-    if (!updatedCurrent) {
+    if (playImmediate) {
+      // Nếu chọn "Phát ngay": Thay bài đang phát hiện tại và giữ nguyên hàng đợi
       updatedCurrent = newMedia;
       isPlaying = true;
+    } else if (forceQueue) {
+      // Nếu chọn "Thêm vào hàng chờ": Bắt buộc đẩy vào hàng đợi
+      if (!updatedCurrent) {
+        updatedCurrent = newMedia;
+        isPlaying = true;
+      } else {
+        updatedQueue.push(newMedia);
+      }
     } else {
-      updatedQueue.push(newMedia);
+      // Mặc định: Nếu chưa có bài thì phát ngay, nếu có bài đang phát thì vào hàng đợi
+      if (!updatedCurrent) {
+        updatedCurrent = newMedia;
+        isPlaying = true;
+      } else {
+        updatedQueue.push(newMedia);
+      }
     }
 
     const orderMsg: RoomChatMessage = {
       id: `c-${Date.now()}`,
       username: "system",
       name: "Hệ thống",
-      text: `🎵 @${user?.username || "user"} vừa order: "${newMedia.title}" (${newMedia.source.toUpperCase()})`,
+      text: playImmediate
+        ? `⚡ @${user?.username || "user"} đã phát ngay: "${newMedia.title}"`
+        : `🎵 @${user?.username || "user"} đã thêm vào hàng chờ: "${newMedia.title}" (#${updatedQueue.length})`,
       timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       isSystem: true,
     };

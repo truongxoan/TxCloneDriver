@@ -102,7 +102,7 @@ export default function WatchTogetherPage() {
 
   // Order media modal
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [orderModalTab, setOrderModalTab] = useState<"url" | "drive" | "telegram">("url");
+  const [orderModalTab, setOrderModalTab] = useState<"url" | "drive" | "telegram" | "queue">("url");
   const [orderUrl, setOrderUrl] = useState("");
   const [orderTitle, setOrderTitle] = useState("");
   const [orderIsVideo, setOrderIsVideo] = useState(true);
@@ -184,12 +184,16 @@ export default function WatchTogetherPage() {
     }
   };
 
-  const handleOrderSubmit = (e: React.FormEvent) => {
+  const handleOrderSubmit = (e: React.FormEvent, playNow = false) => {
     e.preventDefault();
     if (!orderUrl.trim()) return;
-    const res = orderSong(orderUrl, orderTitle, orderIsVideo);
+    const res = orderSong(orderUrl, orderTitle, orderIsVideo, undefined, !playNow, playNow);
     if (res.success) {
-      triggerToast("Đã thêm bài hát vào hàng đợi phát lần lượt!");
+      triggerToast(
+        playNow
+          ? "⚡ Đang phát ngay bài hát vừa order!"
+          : "✓ Đã thêm bài hát vào hàng đợi phát lần lượt!"
+      );
       setOrderUrl("");
       setOrderTitle("");
       setShowOrderModal(false);
@@ -198,7 +202,7 @@ export default function WatchTogetherPage() {
     }
   };
 
-  const handleOrderDriveItem = (file: DriveFileItem) => {
+  const handleOrderDriveItem = (file: DriveFileItem, playNow = false) => {
     const isVideo =
       file.mimeType?.includes("video") ||
       file.name.endsWith(".mp4") ||
@@ -208,9 +212,20 @@ export default function WatchTogetherPage() {
     const streamUrl = `/api/drive/stream?id=${file.id}`;
     const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
 
-    const res = orderSong(streamUrl, cleanTitle, isVideo, "Google Drive");
+    const res = orderSong(
+      streamUrl,
+      cleanTitle,
+      isVideo,
+      "Google Drive",
+      !playNow, // forceQueue
+      playNow   // playImmediate
+    );
     if (res.success) {
-      triggerToast(`Đã thêm tệp "${cleanTitle}" từ Google Drive vào phòng!`);
+      triggerToast(
+        playNow
+          ? `⚡ Đang phát ngay: "${cleanTitle}"!`
+          : `✓ Đã thêm "${cleanTitle}" vào hàng đợi!`
+      );
       setShowOrderModal(false);
     } else {
       triggerToast(res.error || "Không thể mở tệp từ Google Drive.");
@@ -1232,8 +1247,8 @@ export default function WatchTogetherPage() {
                 </div>
               </div>
 
-              {/* Sub-tabs: Link ngoài vs Google Drive vs Telegram @HiFiAudiobot */}
-              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-900 border border-white/10 text-[11px] font-semibold">
+              {/* Sub-tabs: Link ngoài vs Google Drive vs Telegram @HiFiAudiobot vs Hàng Đợi */}
+              <div className="grid grid-cols-4 gap-1.5 p-1 rounded-2xl bg-slate-900 border border-white/10 text-[11px] font-semibold">
                 <button
                   type="button"
                   onClick={() => setOrderModalTab("url")}
@@ -1268,7 +1283,19 @@ export default function WatchTogetherPage() {
                   }`}
                 >
                   <Bot className="w-3.5 h-3.5" />
-                  <span className="truncate">@HiFiAudiobot</span>
+                  <span className="truncate">@HiFiAudio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderModalTab("queue")}
+                  className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    orderModalTab === "queue"
+                      ? "bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="truncate">Hàng Đợi ({currentRoom?.queue?.length || 0})</span>
                 </button>
               </div>
 
@@ -1332,8 +1359,17 @@ export default function WatchTogetherPage() {
                     >
                       Hủy
                     </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={(e) => handleOrderSubmit(e, true)}
+                      className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30"
+                    >
+                      ⚡ Phát ngay
+                    </Button>
                     <Button type="submit" variant="primary" size="sm">
-                      Gửi Order Vào Hàng Đợi
+                      + Thêm vào hàng đợi
                     </Button>
                   </div>
                 </form>
@@ -1390,14 +1426,26 @@ export default function WatchTogetherPage() {
                               </div>
                             </div>
 
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handleOrderDriveItem(f)}
-                              className="h-7 text-xs px-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 shrink-0"
-                            >
-                              Phát bài này
-                            </Button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleOrderDriveItem(f, false)}
+                                className="h-7 text-[11px] px-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 shrink-0"
+                                title="Thêm bài này vào danh sách hàng đợi"
+                              >
+                                + Hàng chờ
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleOrderDriveItem(f, true)}
+                                className="h-7 text-[11px] px-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 shrink-0 font-semibold"
+                                title="Phát bài này ngay lập tức"
+                              >
+                                Phát ngay
+                              </Button>
+                            </div>
                           </div>
                         );
                       })
@@ -1532,12 +1580,128 @@ export default function WatchTogetherPage() {
                         >
                           Hủy
                         </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => handleOrderSubmit(e, true)}
+                          className="bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30"
+                        >
+                          ⚡ Phát ngay
+                        </Button>
                         <Button type="submit" variant="primary" size="sm" className="bg-sky-600 hover:bg-sky-500">
-                          Order vào phòng
+                          + Hàng chờ
                         </Button>
                       </div>
                     </div>
                   </form>
+                </div>
+              )}
+
+              {/* TAB D: HIỂN THỊ DANH SÁCH HÀNG ĐỢI & ĐIỀU KHIỂN PHÁT */}
+              {orderModalTab === "queue" && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center">
+                        <Layers className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Danh Sách Hàng Chờ Phát</h4>
+                        <p className="text-[10px] text-slate-400">
+                          Tổng cộng {currentRoom?.queue?.length || 0} bài đang chờ được phát theo thứ tự
+                        </p>
+                      </div>
+                    </div>
+
+                    {isCurrentHost && (currentRoom?.queue?.length || 0) > 0 && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={playNextInQueue}
+                        className="h-7 text-xs px-2.5 bg-gradient-to-r from-pink-600 to-rose-600 text-white font-semibold"
+                      >
+                        <SkipForward className="h-3 w-3 mr-1" />
+                        Phát bài kế tiếp
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Bài đang phát hiện tại */}
+                  {currentRoom?.currentMedia && (
+                    <div className="p-2.5 rounded-xl bg-gradient-to-r from-blue-950/40 via-indigo-950/30 to-slate-900 border border-blue-500/30 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-500 text-white uppercase tracking-wider shrink-0 animate-pulse">
+                          ĐANG PHÁT
+                        </span>
+                        <p className="text-xs font-semibold text-white truncate">
+                          {currentRoom.currentMedia.title}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-sky-400 font-mono shrink-0">
+                        @{currentRoom.currentMedia.addedBy.username}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Danh sách bài trong hàng chờ */}
+                  <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                    {(!currentRoom?.queue || currentRoom.queue.length === 0) ? (
+                      <div className="p-8 text-center text-xs text-slate-400 bg-slate-900/40 rounded-2xl border border-white/5 space-y-1">
+                        <p className="font-semibold text-slate-300">Hàng chờ đang trống</p>
+                        <p className="text-[11px] text-slate-500">
+                          Hãy chuyển qua tab <strong>Link Ngoài</strong> hoặc <strong>Google Drive</strong> để thêm bài hát vào hàng chờ!
+                        </p>
+                      </div>
+                    ) : (
+                      currentRoom.queue.map((item, idx) => (
+                        <div
+                          key={item.id}
+                          className="p-2.5 rounded-xl bg-slate-900/70 border border-white/5 hover:border-pink-500/30 flex items-center justify-between gap-2 transition-all group"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-5 h-5 rounded-lg bg-pink-500/20 text-pink-400 font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate" title={item.title}>
+                                {item.title}
+                              </p>
+                              <p className="text-[10px] text-slate-400 truncate uppercase">
+                                @{item.addedBy.username} &bull; {item.source}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {(isCurrentHost || item.addedBy.username === user?.username) && (
+                              <button
+                                onClick={() => removeQueueItem(item.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                title="Xóa khỏi hàng đợi"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                    <span className="text-[11px] text-slate-400">
+                      Tự động phát chuyển tiếp bài khi bài hiện tại kết thúc
+                    </span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowOrderModal(false)}
+                    >
+                      Đóng
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
