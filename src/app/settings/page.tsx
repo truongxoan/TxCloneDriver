@@ -121,6 +121,9 @@ export default function SettingsPage() {
   const [isCheckingAiKey, setIsCheckingAiKey] = useState(false);
   const [maxCheapBalance, setMaxCheapBalance] = useState<string | null>(null);
 
+  // Google OAuth Client ID state
+  const [googleClientId, setGoogleClientId] = useState<string>("");
+
   useEffect(() => {
     try {
       const mid = localStorage.getItem("txclonedriver_machine_id") || "TX-DEV-DEFAULT-NODE";
@@ -134,6 +137,9 @@ export default function SettingsPage() {
       setMaxCheapKey(savedAiKey);
       const savedBalance = localStorage.getItem("maxcheapai_balance");
       if (savedBalance) setMaxCheapBalance(savedBalance);
+
+      const savedGClientId = localStorage.getItem("google_oauth_client_id") || "";
+      setGoogleClientId(savedGClientId);
     } catch {
       // ignore
     }
@@ -895,6 +901,56 @@ export default function SettingsPage() {
                       </Button>
                     </Link>
                   </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Section 4: Google OAuth 2.0 Client ID (Đăng nhập tài khoản Google trên máy) */}
+            <Card className="p-6 space-y-4 border-blue-500/30">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-foreground text-sm flex items-center gap-2">
+                    <span className="text-base">🌐</span>
+                    Cổng Google OAuth 2.0 Client ID (Đăng nhập Google trực tiếp)
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Cho phép người dùng bấm nút Google để hiện popup chọn tài khoản Google đang có sẵn trong máy/trình duyệt
+                  </p>
+                </div>
+                <Badge variant={googleClientId ? "success" : "default"} size="sm">
+                  {googleClientId ? "Đã cấu hình" : "Mặc định hệ thống"}
+                </Badge>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-foreground block mb-1">
+                    Google OAuth Client ID (.apps.googleusercontent.com):
+                  </label>
+                  <input
+                    type="text"
+                    value={googleClientId}
+                    onChange={(e) => setGoogleClientId(e.target.value)}
+                    placeholder="ví dụ: 123456789-xxxxxxxx.apps.googleusercontent.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs text-foreground font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Tạo miễn phí tại Google Cloud Console (Credentials &rarr; OAuth 2.0 Client IDs &rarr; Web application). Thêm domain của bạn vào <i>Authorized JavaScript origins</i>.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      localStorage.setItem("google_oauth_client_id", googleClientId.trim());
+                      triggerToast("Đã lưu Google OAuth Client ID thành công!");
+                    }}
+                    className="text-xs bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    Lưu Google Client ID
+                  </Button>
                 </div>
               </div>
             </Card>
