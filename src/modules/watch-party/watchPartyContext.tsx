@@ -111,12 +111,33 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     refreshRoomsFromServer();
 
-    // Fast polling every 2s for live rooms and music sync
+    // Fast polling fallback
     const interval = setInterval(() => {
       refreshRoomsFromServer();
-    }, 2000);
+    }, 2500);
 
-    return () => clearInterval(interval);
+    // Zero-Latency Real-Time WebSocket Push (< 50ms)
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket("wss://ntfy.sh/txclonedriver_hub_events/ws");
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.event === "message") {
+            refreshRoomsFromServer();
+          }
+        } catch {}
+      };
+    } catch {}
+
+    return () => {
+      clearInterval(interval);
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
+    };
   }, []);
 
   // Load user-specific bookmarks

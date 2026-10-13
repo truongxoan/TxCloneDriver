@@ -227,12 +227,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. Fetch fresh users immediately
     refreshUsersFromServer();
 
-    // 3. Fast polling every 1.5s so Admin sees new registrations and approvals instantly!
+    // 3. Fast polling fallback
     const pollInterval = setInterval(() => {
       refreshUsersFromServer();
-    }, 1500);
+    }, 2000);
 
-    return () => clearInterval(pollInterval);
+    // 4. Zero-Latency Real-Time WebSocket Push (Phản hồi tức thì < 50ms khi có bất kỳ thay đổi nào)
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket("wss://ntfy.sh/txclonedriver_hub_events/ws");
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed.event === "message") {
+            // Nhận tín hiệu có thay đổi từ máy khác -> fetch ngay lập tức 0ms trễ
+            refreshUsersFromServer();
+          }
+        } catch {}
+      };
+    } catch {}
+
+    return () => {
+      clearInterval(pollInterval);
+      if (ws) {
+        try {
+          ws.close();
+        } catch {}
+      }
+    };
   }, []);
 
   const saveDevicesList = (updated: LockedDevice[]) => {

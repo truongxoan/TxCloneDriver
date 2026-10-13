@@ -289,6 +289,12 @@ async function saveToCloudStore(payload: {
       signal: controller.signal,
     });
     clearTimeout(timeout);
+
+    // Kích hoạt WebSocket Event Broadcast tức thì (0ms latency push tới toàn bộ trình duyệt đang mở)
+    fetch("https://ntfy.sh/txclonedriver_hub_events", {
+      method: "POST",
+      body: JSON.stringify({ event: "sync_update", timestamp: Date.now() }),
+    }).catch(() => {});
   } catch {
     // ignore cloud failure
   }
