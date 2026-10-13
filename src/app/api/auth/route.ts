@@ -14,6 +14,10 @@ const USERS_FILE = path.join(DATA_DIR, "users.json");
 const DEVICES_FILE = path.join(DATA_DIR, "locked_devices.json");
 const AUDIT_FILE = path.join(DATA_DIR, "audit_logs.json");
 
+// Dedicated Cloud Storage ID on restful-api.dev to ensure seamless cross-device synchronization on Vercel
+const CLOUD_STORE_ID = "ff808181a09d98f701a135d01243556c";
+const CLOUD_API_URL = `https://api.restful-api.dev/objects/${CLOUD_STORE_ID}`;
+
 const INITIAL_USERS: ManagedUser[] = [
   {
     id: "u-admin",
@@ -46,6 +50,7 @@ const INITIAL_USERS: ManagedUser[] = [
       "google_flow",
     ],
     createdAt: "10/10/2026",
+    provider: "local",
   },
   {
     id: "u-member-a",
@@ -58,6 +63,7 @@ const INITIAL_USERS: ManagedUser[] = [
     status: "approved",
     allowedModules: ["storage"],
     createdAt: "10/10/2026",
+    provider: "local",
   },
   {
     id: "u-member-b",
@@ -70,6 +76,7 @@ const INITIAL_USERS: ManagedUser[] = [
     status: "approved",
     allowedModules: ["storage", "projects"],
     createdAt: "10/10/2026",
+    provider: "local",
   },
   {
     id: "u-member-pending",
@@ -82,10 +89,11 @@ const INITIAL_USERS: ManagedUser[] = [
     status: "pending",
     allowedModules: [],
     createdAt: "10/10/2026",
+    provider: "local",
   },
 ];
 
-// Bộ nhớ đệm Memory Fallback an toàn tuyệt đối nếu hệ thống cấm thao tác file
+// Bộ nhớ đệm Memory Fallback an toàn tuyệt đối
 let memoryUsers: ManagedUser[] = [...INITIAL_USERS];
 let memoryDevices: LockedDevice[] = [];
 let memoryAuditLogs: AuditLogItem[] = [];
@@ -97,12 +105,11 @@ function ensureDataDir() {
     }
     return true;
   } catch (err) {
-    console.warn("Unable to create DATA_DIR, fallback to in-memory store:", err);
     return false;
   }
 }
 
-function readUsers(): ManagedUser[] {
+function readUsersLocal(): ManagedUser[] {
   if (!ensureDataDir()) {
     return memoryUsers;
   }
@@ -121,17 +128,17 @@ function readUsers(): ManagedUser[] {
   }
 }
 
-function writeUsers(users: ManagedUser[]) {
+function writeUsersLocal(users: ManagedUser[]) {
   memoryUsers = users;
   if (!ensureDataDir()) return;
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
   } catch (err) {
-    console.warn("Unable to write users file, preserved in memory:", err);
+    // ignore
   }
 }
 
-function readDevices(): LockedDevice[] {
+function readDevicesLocal(): LockedDevice[] {
   if (!ensureDataDir()) {
     return memoryDevices;
   }
@@ -148,17 +155,17 @@ function readDevices(): LockedDevice[] {
   }
 }
 
-function writeDevices(devices: LockedDevice[]) {
+function writeDevicesLocal(devices: LockedDevice[]) {
   memoryDevices = devices;
   if (!ensureDataDir()) return;
   try {
     fs.writeFileSync(DEVICES_FILE, JSON.stringify(devices, null, 2), "utf8");
-  } catch (err) {
-    console.warn("Unable to write devices file, preserved in memory:", err);
+  } catch {
+    // ignore
   }
 }
 
-function readAuditLogs(): AuditLogItem[] {
+function readAuditLogsLocal(): AuditLogItem[] {
   if (!ensureDataDir()) {
     return memoryAuditLogs;
   }
@@ -175,13 +182,75 @@ function readAuditLogs(): AuditLogItem[] {
   }
 }
 
-function writeAuditLogs(logs: AuditLogItem[]) {
+function writeAuditLogsLocal(logs: AuditLogItem[]) {
   memoryAuditLogs = logs;
   if (!ensureDataDir()) return;
   try {
     fs.writeFileSync(AUDIT_FILE, JSON.stringify(logs, null, 2), "utf8");
-  } catch (err) {
-    console.warn("Unable to write audit file, preserved in memory:", err);
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cloud Sync Store Helpers (Chia sẻ dữ liệu thời gian thực giữa mọi máy và serverless instance)
+// ---------------------------------------------------------------------------
+
+async function fetchFromCloudStore(): Promise<{
+  users?: ManagedUser[];
+  devices?: LockedDevice[];
+  logs?: AuditLogItem[];
+} | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(CLOUD_API_URL, {
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data) {
+        return data.data;
+      }
+    }
+  } catch {
+    // fallback to local
+  }
+  return null;
+}
+
+async function saveToCloudStore(payload: {
+  users?: ManagedUser[];
+  devices?: LockedDevice[];
+  logs?: AuditLogItem[];
+}) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+
+    // Merge với dữ liệu hiện tại
+    const currentUsers = payload.users || memoryUsers;
+    const currentDevices = payload.devices || memoryDevices;
+    const currentLogs = payload.logs || memoryAuditLogs;
+
+    await fetch(CLOUD_API_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "txclonedriver_global_store_v1",
+        data: {
+          users: currentUsers,
+          devices: currentDevices,
+          logs: currentLogs.slice(0, 50),
+        },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch {
+    // ignore cloud failure, local/memory was already saved
   }
 }
 
@@ -191,110 +260,49 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
+    // Đồng bộ từ Cloud Store để mọi máy thấy tài khoản người khác vừa tạo
+    const cloudData = await fetchFromCloudStore();
+
     if (type === "devices") {
-      const devices = readDevices();
+      let devices = readDevicesLocal();
+      if (cloudData?.devices && Array.isArray(cloudData.devices)) {
+        devices = cloudData.devices;
+        writeDevicesLocal(devices);
+      }
       return NextResponse.json({ success: true, devices });
     }
 
     if (type === "audit") {
-      const logs = readAuditLogs();
+      let logs = readAuditLogsLocal();
+      if (cloudData?.logs && Array.isArray(cloudData.logs)) {
+        logs = cloudData.logs;
+        writeAuditLogsLocal(logs);
+      }
       return NextResponse.json({ success: true, logs });
     }
 
-    const users = readUsers();
+    let users = readUsersLocal();
+    if (cloudData?.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+      // Merge users: đảm bảo giữ lại admin và các user mới
+      const userMap = new Map<string, ManagedUser>();
+      users.forEach((u) => userMap.set(u.username.toLowerCase(), u));
+      cloudData.users.forEach((u) => userMap.set(u.username.toLowerCase(), u));
+      users = Array.from(userMap.values());
+      writeUsersLocal(users);
+    }
     return NextResponse.json({ success: true, users });
   } catch (err: unknown) {
-    // Luôn trả về danh sách người dùng thay vì quăng lỗi 500
     return NextResponse.json({ success: true, users: memoryUsers });
   }
 }
 
-// POST: Actions (register, google_login, sync_users, sync_devices, sync_audit)
+// POST: Actions (register, sync_users, sync_devices, sync_audit)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action } = body;
 
-    // 1. Google Account Login / Registration
-    if (action === "google_login") {
-      const { email, name, avatarUrl } = body;
-      const cleanEmail = (email || "").trim().toLowerCase();
-      const cleanName = (name || "").trim() || cleanEmail.split("@")[0];
-
-      if (!cleanEmail) {
-        return NextResponse.json(
-          { success: false, error: "Email Google không hợp lệ." },
-          { status: 400 }
-        );
-      }
-
-      const users = readUsers();
-      let foundUser = users.find(
-        (u) =>
-          (u.googleEmail && u.googleEmail.toLowerCase() === cleanEmail) ||
-          u.username.toLowerCase() === cleanEmail
-      );
-
-      const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}/${now.getFullYear()}`;
-
-      if (!foundUser) {
-        // Tự động tạo tài khoản Google, cấp quyền Drive và vào dùng ngay lập tức
-        foundUser = {
-          id: `u-gg-${Date.now()}`,
-          username: cleanEmail,
-          name: cleanName,
-          avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(cleanEmail)}`,
-          role: "user",
-          status: "approved",
-          allowedModules: ["storage", "overview", "image_studio", "google_flow", "vault", "notes", "projects"],
-          createdAt: dateStr,
-          coins: 50000,
-          provider: "google",
-          googleEmail: cleanEmail,
-        };
-
-        const updated = [...users, foundUser];
-        writeUsers(updated);
-
-        // Nhật ký an ninh
-        const logs = readAuditLogs();
-        const ts = `${dateStr} ${String(now.getHours()).padStart(2, "0")}:${String(
-          now.getMinutes()
-        ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-        const newLog: AuditLogItem = {
-          id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-          timestamp: ts,
-          username: cleanEmail,
-          action: "Google Auto-Register & Login",
-          details: `Tài khoản Google @${cleanEmail} (${cleanName}) tự động tạo tài khoản và đăng nhập thành công.`,
-          ip: "Google Auth",
-          status: "success",
-        };
-        writeAuditLogs([newLog, ...logs].slice(0, 100));
-
-        return NextResponse.json({ success: true, user: foundUser, users: updated });
-      } else {
-        // Cập nhật avatar nếu có
-        if (avatarUrl && !foundUser.avatarUrl) {
-          foundUser.avatarUrl = avatarUrl;
-          writeUsers(users);
-        }
-
-        if (foundUser.status === "rejected") {
-          return NextResponse.json(
-            { success: false, error: "Tài khoản Google này đã bị khóa quyền truy cập." },
-            { status: 403 }
-          );
-        }
-
-        return NextResponse.json({ success: true, user: foundUser, users });
-      }
-    }
-
-    // 2. Regular Register
+    // Đăng ký tài khoản người dùng thông thường
     if (action === "register") {
       const { username, password, name } = body;
       const u = (username || "").trim();
@@ -308,7 +316,17 @@ export async function POST(request: Request) {
         );
       }
 
-      const users = readUsers();
+      // 1. Lấy dữ liệu người dùng mới nhất từ Cloud & Local
+      const cloudData = await fetchFromCloudStore();
+      let users = readUsersLocal();
+      if (cloudData?.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+        const userMap = new Map<string, ManagedUser>();
+        users.forEach((item) => userMap.set(item.username.toLowerCase(), item));
+        cloudData.users.forEach((item) => userMap.set(item.username.toLowerCase(), item));
+        users = Array.from(userMap.values());
+      }
+
+      // 2. Kiểm tra xem username đã tồn tại chưa
       if (users.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
         return NextResponse.json(
           { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." },
@@ -321,8 +339,9 @@ export async function POST(request: Request) {
         now.getMonth() + 1
       ).padStart(2, "0")}/${now.getFullYear()}`;
 
+      // 3. Tạo tài khoản mới ở trạng thái chờ duyệt ("pending")
       const newUser: ManagedUser = {
-        id: `u-${Date.now()}`,
+        id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         username: u,
         password: p,
         name: n,
@@ -335,10 +354,10 @@ export async function POST(request: Request) {
       };
 
       const updated = [...users, newUser];
-      writeUsers(updated);
+      writeUsersLocal(updated);
 
-      // Audit log
-      const logs = readAuditLogs();
+      // 4. Ghi nhật ký an ninh
+      const logs = readAuditLogsLocal();
       const ts = `${dateStr} ${String(now.getHours()).padStart(2, "0")}:${String(
         now.getMinutes()
       ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
@@ -347,37 +366,47 @@ export async function POST(request: Request) {
         timestamp: ts,
         username: u,
         action: "User Registration Pending",
-        details: `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu từ máy người dùng, đang chờ Admin phê duyệt cấp quyền.`,
+        details: `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin duyệt.`,
         ip: "Client Machine",
         status: "warning",
       };
-      writeAuditLogs([newLog, ...logs].slice(0, 100));
+      const updatedLogs = [newLog, ...logs].slice(0, 100);
+      writeAuditLogsLocal(updatedLogs);
+
+      // 5. Lưu đồng bộ lên Cloud Store để máy chủ Admin thấy ngay tức thì
+      await saveToCloudStore({ users: updated, logs: updatedLogs });
 
       return NextResponse.json({ success: true, user: newUser, users: updated });
     }
 
+    // Admin hoặc Client sync danh sách người dùng (duyệt, cấp quyền, xóa, cập nhật xu)
     if (action === "sync_users") {
       const { users } = body;
       if (Array.isArray(users)) {
-        writeUsers(users);
+        writeUsersLocal(users);
+        await saveToCloudStore({ users });
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ success: false, error: "Dữ liệu users không hợp lệ" }, { status: 400 });
     }
 
+    // Sync danh sách máy bị khóa / theo dõi
     if (action === "sync_devices") {
       const { devices } = body;
       if (Array.isArray(devices)) {
-        writeDevices(devices);
+        writeDevicesLocal(devices);
+        await saveToCloudStore({ devices });
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ success: false, error: "Dữ liệu devices không hợp lệ" }, { status: 400 });
     }
 
+    // Sync nhật ký an ninh
     if (action === "sync_audit") {
       const { logs } = body;
       if (Array.isArray(logs)) {
-        writeAuditLogs(logs);
+        writeAuditLogsLocal(logs);
+        await saveToCloudStore({ logs });
         return NextResponse.json({ success: true });
       }
       return NextResponse.json({ success: false, error: "Dữ liệu logs không hợp lệ" }, { status: 400 });

@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Cloud,
   Lock,
   User,
   Eye,
@@ -16,7 +15,6 @@ import {
   UserPlus,
   KeyRound,
   CheckCircle2,
-  Cpu,
   Unlock,
   ShieldX,
 } from "lucide-react";
@@ -30,24 +28,13 @@ const STORAGE_FAILED_ATTEMPTS = "txclonedriver_failed_attempts";
 const STORAGE_DEVICE_LOCKED = "txclonedriver_device_locked";
 const STORAGE_LOCK_TIMESTAMP = "txclonedriver_lock_timestamp";
 
-declare global {
-  interface Window {
-    google?: any;
-    handleGoogleCredentialResponse?: (response: any) => void;
-  }
-}
-
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginWithGoogle, register, managedUsers, recordDeviceAttempt, lockedDevices } = useAuth();
+  const { login, register, managedUsers, recordDeviceAttempt } = useAuth();
   const { currentTheme } = useTheme();
 
-  // Mode: "login" | "register" | "google_modal"
+  // Mode: "login" | "register"
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleEmailInput, setGoogleEmailInput] = useState("");
-  const [googleNameInput, setGoogleNameInput] = useState("");
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   // Login form state
   const [username, setUsername] = useState("");
@@ -77,29 +64,11 @@ export default function LoginPage() {
   const [overridePass, setOverridePass] = useState("");
   const [overrideError, setOverrideError] = useState<string | null>(null);
 
-  // Decode Google JWT Identity Token payload
-  const decodeGoogleJwt = (token: string) => {
-    try {
-      const base64Url = token.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join("")
-      );
-      return JSON.parse(jsonPayload);
-    } catch {
-      return null;
-    }
-  };
-
-  // Generate / retrieve persistent Machine ID and lockout state, load Google Identity Services
+  // Generate / retrieve persistent Machine ID and lockout state
   useEffect(() => {
     try {
       let mid = localStorage.getItem(STORAGE_MACHINE_ID);
       if (!mid) {
-        // Generate pseudo-random hardware fingerprint
         const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
         const timeHex = Date.now().toString(36).slice(-4).toUpperCase();
         mid = `TX-DEV-${randomHex}-${timeHex}`;
@@ -117,62 +86,6 @@ export default function LoginPage() {
       }
     } catch {
       // fallback
-    }
-
-    // Load Google Identity Services (GSI) Client Script and initialize
-    const initGsi = () => {
-      if (typeof window !== "undefined" && window.google?.accounts?.id) {
-        const customClientId = localStorage.getItem("google_oauth_client_id");
-        if (!customClientId) return; // Nếu chưa cài Client ID riêng thì không gọi prompt để tránh lỗi 401 invalid_client
-
-        window.google.accounts.id.initialize({
-          client_id: customClientId,
-          callback: (response: any) => {
-            if (response?.credential) {
-              const payload = decodeGoogleJwt(response.credential);
-              if (payload?.email) {
-                handleProcessGoogleUser(
-                  payload.email,
-                  payload.name || payload.given_name || payload.email.split("@")[0],
-                  payload.picture
-                );
-              }
-            }
-          },
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-
-        // Tự động render nút Google chính thức nếu container tồn tại
-        const container = document.getElementById("google-signin-btn-container");
-        if (container) {
-          container.innerHTML = "";
-          window.google.accounts.id.renderButton(container, {
-            theme: "outline",
-            size: "large",
-            width: 320,
-            text: "continue_with",
-            shape: "pill",
-            logo_alignment: "left",
-          });
-        }
-      }
-    };
-
-    const scriptId = "google-gsi-client-script";
-    let script = document.getElementById(scriptId) as HTMLScriptElement;
-    if (!script) {
-      script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        setTimeout(initGsi, 100);
-      };
-      document.body.appendChild(script);
-    } else {
-      setTimeout(initGsi, 100);
     }
   }, []);
 
@@ -198,31 +111,32 @@ export default function LoginPage() {
       const result = await login(username, password);
 
       if (result.success) {
-        // Reset failed counter locally and in system registry
         recordDeviceAttempt(machineId, username.trim(), false);
         localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
         localStorage.removeItem(STORAGE_DEVICE_LOCKED);
         setFailedAttempts(0);
 
-        // Find user to check allowed modules for smart landing
         const matched = managedUsers.find(
           (u) => u.username.toLowerCase() === username.trim().toLowerCase()
         );
-        if (matched && matched.role !== "admin" && Array.isArray(matched.allowedModules) && !matched.allowedModules.includes("overview")) {
+        if (
+          matched &&
+          matched.role !== "admin" &&
+          Array.isArray(matched.allowedModules) &&
+          !matched.allowedModules.includes("overview")
+        ) {
           const firstMod = matched.allowedModules[0] || "storage";
           router.push(`/${firstMod}`);
         } else {
           router.push("/overview");
         }
       } else {
-        // Login failed: increment attempt counter & register in admin device registry
         const devStatus = recordDeviceAttempt(machineId, username.trim(), true);
         const newCount = devStatus.failedCount;
         setFailedAttempts(newCount);
         localStorage.setItem(STORAGE_FAILED_ATTEMPTS, newCount.toString());
 
         if (devStatus.isLocked || newCount >= 3) {
-          // Permanently lock device!
           const nowStr = new Date().toLocaleString("vi-VN");
           localStorage.setItem(STORAGE_DEVICE_LOCKED, "true");
           localStorage.setItem(STORAGE_LOCK_TIMESTAMP, nowStr);
@@ -231,7 +145,9 @@ export default function LoginPage() {
         } else {
           setErrorMessage(result.error || "Tài khoản hoặc mật khẩu không chính xác.");
           setWarningMessage(
-            `⚠️ CẢNH BÁO AN NINH: Bạn đã đăng nhập thất bại ${newCount}/3 lần! Còn ${3 - newCount} lần thử trước khi Thiết bị (Mã máy: ${machineId}) bị KHÓA VĨNH VIỄN.`
+            `⚠️ CẢNH BÁO AN NINH: Bạn đã đăng nhập thất bại ${newCount}/3 lần! Còn ${
+              3 - newCount
+            } lần thử trước khi Thiết bị (Mã máy: ${machineId}) bị KHÓA VĨNH VIỄN.`
           );
         }
       }
@@ -240,87 +156,6 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Xử lý đăng nhập từ token trả về bởi Google thật
-  const handleProcessGoogleUser = async (email: string, name: string, picture?: string) => {
-    setGoogleLoading(true);
-    setErrorMessage(null);
-    try {
-      const res = await loginWithGoogle({
-        email,
-        name: name || email.split("@")[0],
-        avatarUrl: picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
-      });
-
-      if (res.success) {
-        recordDeviceAttempt(machineId, email, false);
-        localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
-        localStorage.removeItem(STORAGE_DEVICE_LOCKED);
-        setShowGoogleModal(false);
-        router.push("/storage");
-      } else {
-        setErrorMessage(res.error || "Đăng nhập bằng Google không thành công.");
-      }
-    } catch {
-      setErrorMessage("Có lỗi xảy ra khi xác thực tài khoản Google.");
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
-  // Mở popup hoặc gọi Google One Tap trực tiếp từ trình duyệt để lấy tài khoản Google thật
-  const triggerGoogleRealLogin = () => {
-    try {
-      const customClientId = typeof window !== "undefined" ? localStorage.getItem("google_oauth_client_id") : null;
-
-      // Nếu người dùng đã cài đặt Google Client ID riêng trong Settings thì dùng popup Google OAuth2
-      if (customClientId && typeof window !== "undefined" && window.google?.accounts?.oauth2) {
-        const tokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: customClientId,
-          scope: "openid email profile",
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse?.access_token) {
-              try {
-                setGoogleLoading(true);
-                const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                });
-                const profile = await userRes.json();
-                if (profile?.email) {
-                  await handleProcessGoogleUser(profile.email, profile.name || profile.email.split("@")[0], profile.picture);
-                  return;
-                }
-              } catch {
-                setShowGoogleModal(true);
-              } finally {
-                setGoogleLoading(false);
-              }
-            }
-          },
-          error_callback: () => {
-            // Nếu Google báo lỗi ủy quyền invalid_client thì mở ngay modal đăng nhập
-            setShowGoogleModal(true);
-          },
-        });
-        tokenClient.requestAccessToken({ prompt: "select_account" });
-        return;
-      }
-
-      // Mặc định: Mở modal chọn đăng nhập tài khoản Google trên máy (dumegg11333@gmail.com)
-      setShowGoogleModal(true);
-    } catch {
-      setShowGoogleModal(true);
-    }
-  };
-
-  // Handle Google Login submission
-  const handleGoogleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleEmailInput.trim()) return;
-    const email = googleEmailInput.trim();
-    const name = googleNameInput.trim() || email.split("@")[0];
-    await handleProcessGoogleUser(email, name);
   };
 
   // Handle Registration submission
@@ -345,19 +180,17 @@ export default function LoginPage() {
       const res = await register(regUsername, regPassword, regName);
       if (res.success) {
         setRegSuccessMessage(
-          "⏳ ĐĂNG KÝ THÀNH CÔNG! Tài khoản đã được gửi đến Quản trị viên (Admin). Vui lòng chờ Admin phê duyệt và cấp quyền truy cập từng phân hệ trước khi đăng nhập."
+          "⏳ ĐĂNG KÝ THÀNH CÔNG! Tài khoản đã được chuyển lên Quản trị viên (Admin). Vui lòng chờ Admin phê duyệt và cấp quyền truy cập từng phân hệ trước khi đăng nhập."
         );
-        // Pre-fill username for easy login
         const savedU = regUsername.trim();
         setRegName("");
         setRegUsername("");
         setRegPassword("");
         setRegConfirmPassword("");
         setUsername(savedU);
-        // Switch back to login after short delay
         setTimeout(() => {
           setMode("login");
-        }, 3000);
+        }, 3500);
       } else {
         setErrorMessage(res.error || "Không thể đăng ký tài khoản.");
       }
@@ -373,7 +206,6 @@ export default function LoginPage() {
     e.preventDefault();
     setOverrideError(null);
 
-    // Master password check: admin's password or master rescue key
     if (overridePass === "kdkctrkn@123" || overridePass === "MASTER_TX_UNLOCK_2026") {
       localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
       localStorage.removeItem(STORAGE_DEVICE_LOCKED);
@@ -408,9 +240,7 @@ export default function LoginPage() {
       {/* Layer 2: Main Card Container */}
       <div className="relative z-10 w-full max-w-[460px] rounded-3xl glass-panel p-6 sm:p-8 border border-white/15 shadow-2xl shadow-black/90 animate-in fade-in zoom-in-95 duration-500 bg-slate-950/85 backdrop-blur-2xl my-6">
         
-        {/* ============================================================== */}
         {/* CASE A: DEVICE IS PERMANENTLY LOCKED (3 FAILED ATTEMPTS) */}
-        {/* ============================================================== */}
         {isLocked ? (
           <div className="space-y-5 text-center animate-in zoom-in-95 duration-300">
             <div className="h-16 w-16 mx-auto rounded-3xl bg-rose-600/20 border-2 border-rose-500/50 flex items-center justify-center shadow-lg shadow-rose-600/30">
@@ -473,9 +303,7 @@ export default function LoginPage() {
             </div>
           </div>
         ) : (
-          /* ============================================================== */
           /* CASE B: NORMAL LOGIN / REGISTER INTERFACE */
-          /* ============================================================== */
           <>
             {/* Brand Logo & Name */}
             <div className="flex flex-col items-center text-center space-y-2 mb-5">
@@ -483,12 +311,12 @@ export default function LoginPage() {
                 <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow">
                   <defs>
                     <linearGradient id="yinGradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="#38bdf8" />
-                      <stop offset="100%" stop-color="#c084fc" />
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#c084fc" />
                     </linearGradient>
                   </defs>
-                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.6" stroke-dasharray="6 4" />
-                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradLogin)" stroke-width="2.5" />
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" strokeWidth="2" strokeOpacity="0.6" strokeDasharray="6 4" />
+                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradLogin)" strokeWidth="2.5" />
                   <path d="M 50 12 A 38 38 0 0 1 50 88 A 19 19 0 0 1 50 50 A 19 19 0 0 0 50 12 Z" fill="url(#yinGradLogin)" />
                   <circle cx="50" cy="31" r="5" fill="#090d16" />
                   <circle cx="50" cy="31" r="2.5" fill="#fde047" />
@@ -510,7 +338,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* STRICT LEGAL & SECURITY WARNING BANNER (Requested by User) */}
+            {/* STRICT LEGAL & SECURITY WARNING BANNER */}
             <div className="mb-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-slate-200 text-left space-y-1.5 shadow-sm">
               <div className="flex items-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
@@ -592,9 +420,7 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* ============================================================== */}
             {/* SUB-TAB 1: LOGIN FORM */}
-            {/* ============================================================== */}
             {mode === "login" && (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 {/* Username */}
@@ -616,7 +442,7 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Password (No Hints) */}
+                {/* Password */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-200 block">
                     Mật khẩu truy cập
@@ -678,101 +504,12 @@ export default function LoginPage() {
                     </>
                   )}
                 </button>
-
-                {/* Divider */}
-                <div className="relative my-3 text-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10" />
-                  </div>
-                  <span className="relative px-3 bg-slate-950 text-[10px] text-slate-400 uppercase font-semibold">
-                    hoặc tiếp tục với
-                  </span>
-                </div>
-
-                {/* Google Official GSI Button Container (Rendered by Google script) */}
-                <div id="google-signin-btn-container" className="flex justify-center my-1 empty:hidden" />
-
-                {/* Google Sign-In Button (Trực tiếp mở chọn tài khoản Google của máy) */}
-                <button
-                  type="button"
-                  onClick={triggerGoogleRealLogin}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs shadow-md flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                  <span>Đăng nhập với Google Drive cá nhân</span>
-                </button>
               </form>
             )}
 
-            {/* ============================================================== */}
             {/* SUB-TAB 2: REGISTRATION FORM */}
-            {/* ============================================================== */}
             {mode === "register" && (
               <form onSubmit={handleRegisterSubmit} className="space-y-3.5 animate-in fade-in">
-                {/* Google Fast Track Banner */}
-                <div
-                  onClick={() => setShowGoogleModal(true)}
-                  className="p-3 rounded-2xl bg-blue-500/15 border border-blue-400/30 cursor-pointer hover:bg-blue-500/25 transition-all text-xs flex items-center justify-between gap-2.5 group"
-                >
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                      />
-                    </svg>
-                    <div className="text-left leading-tight">
-                      <span className="font-bold text-white text-[11px] block">
-                        Đăng nhập Google để vào dùng luôn &rarr;
-                      </span>
-                      <span className="text-[10px] text-blue-300">
-                        Tự động cấp quyền Google Driver, không cần chờ xét duyệt
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] px-2 py-1 rounded-lg bg-blue-600 text-white font-bold group-hover:bg-blue-500 shrink-0">
-                    Chọn
-                  </span>
-                </div>
-
-                <div className="relative my-1 text-center">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-white/10" />
-                  </div>
-                  <span className="relative px-3 bg-slate-950 text-[10px] text-slate-400 uppercase font-semibold">
-                    hoặc đăng ký tài khoản nội bộ (chờ duyệt)
-                  </span>
-                </div>
-
                 {/* Full Name */}
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-200 block">
@@ -835,7 +572,7 @@ export default function LoginPage() {
 
                 {/* Note about admin approval */}
                 <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-[11px] text-slate-400">
-                  ⚠️ <strong className="text-amber-300">Lưu ý phê duyệt:</strong> Mọi tài khoản sau khi gửi yêu cầu sẽ ở trạng thái <span className="text-white font-medium">Chờ Quản trị viên (Admin) xét duyệt</span> và cấp quyền từng phân hệ trước khi có thể đăng nhập.
+                  ⚠️ <strong className="text-amber-300">Lưu ý phê duyệt:</strong> Mọi tài khoản sau khi tạo sẽ được chuyển đến Admin ở trạng thái <span className="text-white font-medium">Chờ xét duyệt</span>. Admin sẽ cấp quyền các phân hệ tương ứng trước khi bạn đăng nhập được.
                 </div>
 
                 {/* Register Submit */}
@@ -847,12 +584,12 @@ export default function LoginPage() {
                   {regLoading ? (
                     <>
                       <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Đang gửi thông tin xét duyệt...</span>
+                      <span>Đang gửi thông tin đăng ký...</span>
                     </>
                   ) : (
                     <>
                       <UserPlus className="h-4 w-4" />
-                      <span>Gửi Yêu Cầu Đăng Ký Thành Viên</span>
+                      <span>Gửi Yêu Cầu Tạo Tài Khoản</span>
                     </>
                   )}
                 </button>
@@ -871,9 +608,7 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* ============================================================== */}
       {/* MODAL: MASTER ADMIN RESCUE / OVERRIDE DIALOG */}
-      {/* ============================================================== */}
       {showOverrideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
           <div className="w-full max-w-sm rounded-3xl glass-panel p-6 border border-amber-500/30 bg-slate-950/95 shadow-2xl text-left space-y-4">
@@ -925,113 +660,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-      {/* ============================================================== */}
-      {/* MODAL: GOOGLE ACCOUNT ONE-TAP LOGIN */}
-      {/* ============================================================== */}
-      {showGoogleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl glass-panel p-6 border border-white/20 bg-slate-950/95 shadow-2xl text-left space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-2xl bg-white flex items-center justify-center p-2 shrink-0 shadow-md">
-                <svg className="w-full h-full" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-bold text-white text-sm">Đăng nhập tài khoản Google</h3>
-                <p className="text-[11px] text-slate-400">Kết nối Google Drive & đồng bộ đám mây</p>
-              </div>
-            </div>
-
-            {/* Direct Google Account Login (One-click, uses account on device) */}
-            <div className="space-y-3 pt-1">
-              <p className="text-xs text-slate-300">
-                Nhập hoặc chọn địa chỉ Gmail thật của bạn trên máy để kết nối và tự động cấp quyền:
-              </p>
-
-              {/* Quick Preset: dumegg11333@gmail.com từ ảnh chụp của bạn */}
-              <button
-                type="button"
-                disabled={googleLoading}
-                onClick={() => {
-                  handleProcessGoogleUser("dumegg11333@gmail.com", "dumegg11333");
-                }}
-                className="w-full py-3 px-3.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30 border border-blue-500/40 active:scale-[0.98] text-white font-bold text-xs shadow-md flex items-center justify-between transition-all group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
-                    G
-                  </div>
-                  <div className="text-left">
-                    <span className="font-bold text-white text-xs block group-hover:text-sky-300">dumegg11333@gmail.com</span>
-                    <span className="text-[10px] text-slate-400">Tài khoản Google trên máy của bạn</span>
-                  </div>
-                </div>
-                <span className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-bold">
-                  Đăng nhập &rarr;
-                </span>
-              </button>
-
-              {/* Form nhập Gmail bất kỳ */}
-              <div className="space-y-2 pt-1 border-t border-white/10">
-                <label className="text-[11px] font-medium text-slate-300 block">
-                  Hoặc đăng nhập bằng tài khoản Google khác:
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="email"
-                    value={googleEmailInput}
-                    onChange={(e) => setGoogleEmailInput(e.target.value)}
-                    placeholder="Nhập email của bạn (ví dụ: abc@gmail.com)..."
-                    className="flex-1 px-3 py-2 rounded-xl glass-input text-xs text-white placeholder:text-slate-500"
-                  />
-                  <button
-                    type="button"
-                    disabled={googleLoading || !googleEmailInput.trim()}
-                    onClick={() => {
-                      const email = googleEmailInput.trim();
-                      if (email) handleProcessGoogleUser(email, email.split("@")[0]);
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0 disabled:opacity-50"
-                  >
-                    Vào
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
-                <span>Tài khoản Google sẽ tự động được cấp <b>50,000 Xu tín dụng AI</b> và mở toàn quyền Google Drive!</span>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowGoogleModal(false)}
-                  className="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs"
-                >
-                  Đóng
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}

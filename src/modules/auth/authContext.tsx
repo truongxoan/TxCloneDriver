@@ -475,133 +475,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Google login is deprecated per user requirement - keep minimal signature to avoid breaking callers
   const loginWithGoogle = async (googleProfile: {
     email: string;
     name: string;
     avatarUrl?: string;
   }): Promise<{ success: boolean; error?: string }> => {
-    const email = googleProfile.email.trim().toLowerCase();
-    const name = googleProfile.name.trim() || email.split("@")[0];
-
-    try {
-      // 1. Call server API to create/find account in central store
-      const res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "google_login",
-          email,
-          name,
-          avatarUrl: googleProfile.avatarUrl,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Server status ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (!data.success || !data.user) {
-        throw new Error(data.error || "Server registration error");
-      }
-
-      const foundUser: ManagedUser = data.user;
-      if (Array.isArray(data.users)) {
-        setManagedUsers(data.users);
-        try {
-          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
-        } catch {}
-      }
-
-      if (foundUser.status === "rejected") {
-        return { success: false, error: "Tài khoản Google này đã bị khóa quyền truy cập." };
-      }
-
-      const initials =
-        foundUser.name
-          .split(" ")
-          .map((s) => s[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase() || "GG";
-
-      const authUser: AuthUser = {
-        id: foundUser.id,
-        username: foundUser.username,
-        role: foundUser.role,
-        name: foundUser.name,
-        avatarInitials: initials,
-        avatarUrl: foundUser.avatarUrl,
-        status: foundUser.status,
-        allowedModules: foundUser.allowedModules || ["storage", "overview", "image_studio", "google_flow"],
-        provider: "google",
-        googleEmail: email,
-        coins: foundUser.coins,
-      };
-
-      setUser(authUser);
-      setSessionCookie(authUser);
-      logSecurityAudit("Google Login", `Tài khoản Google @${email} đăng nhập thành công`, "success");
-      return { success: true };
-    } catch {
-      // Fallback local logic
-      const currentUsers = (await refreshUsersFromServer()) || managedUsers;
-      let foundUser = currentUsers.find(
-        (u) =>
-          (u.googleEmail && u.googleEmail.toLowerCase() === email) ||
-          u.username.toLowerCase() === email
-      );
-
-      const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}/${now.getFullYear()}`;
-
-      if (!foundUser) {
-        foundUser = {
-          id: `u-gg-${Date.now()}`,
-          username: email,
-          name: name,
-          avatarUrl: googleProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
-          role: "user",
-          status: "approved",
-          allowedModules: ["storage", "overview", "image_studio", "google_flow", "vault", "notes", "projects"],
-          createdAt: dateStr,
-          coins: 50000,
-          provider: "google",
-          googleEmail: email,
-        };
-
-        const updated = [...currentUsers, foundUser];
-        saveUsersList(updated);
-      }
-
-      const initials =
-        foundUser.name
-          .split(" ")
-          .map((s) => s[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase() || "GG";
-
-      const authUser: AuthUser = {
-        id: foundUser.id,
-        username: foundUser.username,
-        role: foundUser.role,
-        name: foundUser.name,
-        avatarInitials: initials,
-        avatarUrl: foundUser.avatarUrl,
-        status: foundUser.status,
-        allowedModules: foundUser.allowedModules,
-        provider: "google",
-        googleEmail: email,
-        coins: foundUser.coins,
-      };
-
-      setUser(authUser);
-      setSessionCookie(authUser);
-      return { success: true };
-    }
+    return { success: false, error: "Đăng nhập Google đã được tắt. Vui lòng đăng ký tài khoản thông thường." };
   };
 
   const logout = () => {
