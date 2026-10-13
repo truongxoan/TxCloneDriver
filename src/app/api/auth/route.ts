@@ -296,6 +296,58 @@ async function fetchFromCloudStore(): Promise<{
   logs?: AuditLogItem[];
   rooms?: SyncRoom[];
 } | null> {
+  // 1. Thử kéo dữ liệu trực tiếp từ máy chủ online txlab.io.vn (Nguồn chính xác nhất)
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
+    const [uRes, rRes, dRes] = await Promise.all([
+      fetch("https://txlab.io.vn/api/auth?_t=" + Date.now(), {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      }).catch(() => null),
+      fetch("https://txlab.io.vn/api/auth?type=rooms&_t=" + Date.now(), {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      }).catch(() => null),
+      fetch("https://txlab.io.vn/api/auth?type=devices&_t=" + Date.now(), {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      }).catch(() => null),
+    ]);
+    clearTimeout(timeout);
+
+    let fetchedUsers: ManagedUser[] | undefined;
+    let fetchedRooms: SyncRoom[] | undefined;
+    let fetchedDevices: LockedDevice[] | undefined;
+
+    if (uRes && uRes.ok) {
+      const uData = await uRes.json().catch(() => null);
+      if (uData?.users && Array.isArray(uData.users)) fetchedUsers = uData.users;
+    }
+    if (rRes && rRes.ok) {
+      const rData = await rRes.json().catch(() => null);
+      if (rData?.rooms && Array.isArray(rData.rooms)) fetchedRooms = rData.rooms;
+    }
+    if (dRes && dRes.ok) {
+      const dData = await dRes.json().catch(() => null);
+      if (dData?.devices && Array.isArray(dData.devices)) fetchedDevices = dData.devices;
+    }
+
+    if (fetchedUsers || fetchedRooms || fetchedDevices) {
+      return {
+        users: fetchedUsers,
+        rooms: fetchedRooms,
+        devices: fetchedDevices,
+      };
+    }
+  } catch {
+    // fallback
+  }
+
+  // 2. Fallback sang Cloud Object Store (restful-api.dev)
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
@@ -387,6 +439,24 @@ async function saveToCloudStoreBackground(payload: {
       signal: controller.signal,
     });
     clearTimeout(timeout);
+
+    // Đẩy trực tiếp lên txlab.io.vn nếu đang chạy ở môi trường máy cục bộ (không phải trên Vercel)
+    if (!IS_VERCEL) {
+      if (payload.rooms) {
+        fetch("https://txlab.io.vn/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "sync_rooms", rooms: payload.rooms }),
+        }).catch(() => {});
+      }
+      if (payload.users) {
+        fetch("https://txlab.io.vn/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "sync_users", users: payload.users }),
+        }).catch(() => {});
+      }
+    }
 
     // Kích hoạt WebSocket Broadcast tức thì
     fetch("https://ntfy.sh/txclonedriver_hub_events", {
