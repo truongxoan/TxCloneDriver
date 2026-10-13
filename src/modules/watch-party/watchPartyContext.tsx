@@ -61,13 +61,41 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
   const [savedBookmarks, setSavedBookmarks] = useState<UserSavedBookmark[]>([]);
   const [reactions, setReactions] = useState<RoomReaction[]>([]);
 
-  // Load rooms and user bookmarks from localStorage
+  // Function to pull rooms from server API (ZERO-CACHE)
+  const refreshRoomsFromServer = async () => {
+    try {
+      const res = await fetch(`/api/auth?type=rooms&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.rooms)) {
+          const cleaned = data.rooms.filter(
+            (r: SyncRoom) => r.id !== "room-lofi" && r.id !== "room-cinema"
+          );
+          setRooms(cleaned);
+          try {
+            localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify(cleaned));
+          } catch {}
+          return cleaned;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
+  // Load rooms and user bookmarks from localStorage & fast server poll
   useEffect(() => {
     try {
       const savedRooms = localStorage.getItem(STORAGE_ROOMS_KEY);
       if (savedRooms) {
         const parsed = JSON.parse(savedRooms);
-        // Lọc bỏ 2 phòng ví dụ cũ ("room-lofi" và "room-cinema") nếu còn lưu trong cache
         const cleaned = Array.isArray(parsed)
           ? parsed.filter((r: SyncRoom) => r.id !== "room-lofi" && r.id !== "room-cinema")
           : [];
@@ -80,6 +108,15 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     } catch {
       setRooms([]);
     }
+
+    refreshRoomsFromServer();
+
+    // Fast polling every 2s for live rooms and music sync
+    const interval = setInterval(() => {
+      refreshRoomsFromServer();
+    }, 2000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Load user-specific bookmarks
@@ -108,6 +145,13 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     } catch {
       // ignore
     }
+
+    // Sync to Cloud Store immediately so other devices see rooms instantly!
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync_rooms", rooms: updated }),
+    }).catch(() => {});
   };
 
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || null;

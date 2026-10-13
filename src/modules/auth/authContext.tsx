@@ -160,10 +160,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [securityAuditLogs, setSecurityAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
   const [lockedDevices, setLockedDevices] = useState<LockedDevice[]>([]);
 
-  // Function to pull users from server API and update state & localStorage
+  // Function to pull users from server API and update state & localStorage (ZERO-CACHE)
   const refreshUsersFromServer = async () => {
     try {
-      const res = await fetch("/api/auth");
+      const res = await fetch(`/api/auth?_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.users) && data.users.length > 0) {
@@ -218,13 +224,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setInitialized(true);
 
-    // 2. Fetch fresh users & devices & audit from server
+    // 2. Fetch fresh users immediately
     refreshUsersFromServer();
 
-    // 3. Periodic polling every 3.5s so Admin sees new registrations from target machines in real time!
+    // 3. Fast polling every 1.5s so Admin sees new registrations and approvals instantly!
     const pollInterval = setInterval(() => {
       refreshUsersFromServer();
-    }, 3500);
+    }, 1500);
 
     return () => clearInterval(pollInterval);
   }, []);
