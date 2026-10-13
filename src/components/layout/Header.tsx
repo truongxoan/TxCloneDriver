@@ -29,7 +29,9 @@ import {
   HardDrive,
   Wallet,
   Smartphone,
+  MessageCircle,
 } from "lucide-react";
+import { useChat } from "@/modules/chat/chatContext";
 import { VoiceAssistantModal } from "@/components/voice/VoiceAssistantModal";
 import { AmbientSoundPlayer } from "@/components/audio/AmbientSoundPlayer";
 import { useTheme } from "@/modules/theme-engine/themeContext";
@@ -69,6 +71,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
 
   const { user, isAdmin, logout } = useAuth();
   const { reports } = useFeedback();
+  const { isChatWidgetVisible, toggleChatWidget } = useChat();
   const router = useRouter();
 
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -486,6 +489,43 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           <span>Cài App</span>
         </button>
 
+        {/* Chat Widget Toggle Button (Ẩn / Hiện khung chat) */}
+        <button
+          onClick={() => {
+            if (!isChatWidgetVisible) {
+              toggleChatWidget(true);
+            } else {
+              // Trigger open-floating-messenger event if visible
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("open-floating-messenger"));
+              }
+            }
+          }}
+          className={cn(
+            "flex h-9 px-2.5 items-center justify-center gap-1.5 rounded-2xl glass-pill transition-all relative cursor-pointer",
+            isChatWidgetVisible
+              ? "text-sky-400 hover:bg-sky-500/20 border border-sky-500/30 shadow-sm"
+              : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+          )}
+          title={
+            isChatWidgetVisible
+              ? "Khung chat đang BẬT (Bấm để mở chat, hoặc bấm chuột phải / menu để tắt)"
+              : "Khung chat đang TẮT/ẨN (Bấm để bật lại khung chat)"
+          }
+          onContextMenu={(e) => {
+            e.preventDefault();
+            toggleChatWidget(!isChatWidgetVisible);
+          }}
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span className="hidden md:inline text-xs font-semibold">
+            {isChatWidgetVisible ? "Chat" : "Mở Chat"}
+          </span>
+          {!isChatWidgetVisible && (
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+          )}
+        </button>
+
         {/* Notifications Button & Dropdown */}
         <div className="relative">
           <button
@@ -633,11 +673,34 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                 </div>
 
                 <div className="py-2 space-y-1 text-xs">
-                  <div className="px-2 py-1.5 text-[11px] text-slate-400">
+                  <div className="px-2 py-1 text-[11px] text-slate-400">
                     {isAdmin
                       ? "Bạn có toàn quyền thêm, sửa, xóa và cấu hình hệ thống."
                       : "Bạn có quyền xem và tải xuống tài liệu (Không được thêm/xóa)."}
                   </div>
+
+                  {/* Toggle Chat Widget item in Menu */}
+                  <button
+                    onClick={() => {
+                      toggleChatWidget(!isChatWidgetVisible);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-slate-200 hover:text-white hover:bg-white/10 transition-colors text-xs font-semibold cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-sky-400" />
+                      <span>Khung Chat (TxMessenger)</span>
+                    </div>
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 rounded-md text-[10px] font-bold border",
+                        isChatWidgetVisible
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                          : "bg-slate-700 text-slate-400 border-slate-600"
+                      )}
+                    >
+                      {isChatWidgetVisible ? "Đang Bật" : "Đã Tắt"}
+                    </span>
+                  </button>
 
                   <button
                     onClick={() => {

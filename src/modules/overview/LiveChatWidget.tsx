@@ -4,11 +4,12 @@
 import React, { useState } from "react";
 import { useChat } from "@/modules/chat/chatContext";
 import { useAuth } from "@/modules/auth/authContext";
-import { Send, MessageSquare, Trash2, Crown, Lock, Unlock, KeyRound, Sparkles, AlertTriangle, Maximize2 } from "lucide-react";
+import { Send, MessageSquare, Trash2, Crown, Lock, Unlock, KeyRound, Sparkles, AlertTriangle, Maximize2, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
 
 export function LiveChatWidget() {
-  const { messages, sendMessage, clearChat, decryptMessage } = useChat();
+  const { messages, sendMessage, clearChat, decryptMessage, toggleChatWidget } = useChat();
   const { user, isAdmin } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [inputText, setInputText] = useState("");
 
   // Encryption mode state
@@ -48,10 +49,22 @@ export function LiveChatWidget() {
   };
 
   return (
-    <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col h-[460px] sm:h-[480px]">
+    <div
+      className={`rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col transition-all duration-300 ${
+        isCollapsed ? "h-auto" : "h-[460px] sm:h-[480px]"
+      }`}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-2">
+      <div
+        className={`flex items-center justify-between shrink-0 ${
+          isCollapsed ? "pb-0 border-b-0" : "pb-3 border-b border-white/10"
+        }`}
+      >
+        <div
+          className="flex items-center gap-2 cursor-pointer select-none"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? "Bấm để mở rộng khung chat" : "Bấm để thu nhỏ/ẩn nội dung chat"}
+        >
           <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
             <MessageSquare className="w-4 h-4" />
           </div>
@@ -59,15 +72,30 @@ export function LiveChatWidget() {
             <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
               Kênh Chat & Mã Hóa Mật
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              {isCollapsed && (
+                <span className="text-[10px] text-slate-400 font-normal ml-1">
+                  (Đã thu gọn &bull; {messages.length} tin)
+                </span>
+              )}
             </h3>
             <p className="text-[10px] text-muted-foreground">Mã hóa đầu cuối bằng mật khẩu bí mật</p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
+          {/* Collapse/Expand Toggle Button */}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title={isCollapsed ? "Mở rộng khung chat" : "Thu gọn/Ẩn nội dung chat"}
+          >
+            {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+          </button>
+
           {/* Open Full Messenger Modal */}
           <button
             onClick={() => {
+              toggleChatWidget(true);
               if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("open-floating-messenger"));
               }
@@ -79,20 +107,22 @@ export function LiveChatWidget() {
           </button>
 
           {/* Toggle Encrypted Chat Mode */}
-          <button
-            onClick={() => setIsEncryptMode(!isEncryptMode)}
-            className={`px-2 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-              isEncryptMode
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
-                : "bg-white/5 text-slate-400 hover:text-white"
-            }`}
-            title="Bật/Tắt chế độ chat mật mã"
-          >
-            <Lock className="w-3 h-3 text-amber-400" />
-            <span>{isEncryptMode ? "Mã hóa BẬT" : "Mã hóa TẮT"}</span>
-          </button>
+          {!isCollapsed && (
+            <button
+              onClick={() => setIsEncryptMode(!isEncryptMode)}
+              className={`px-2 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                isEncryptMode
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                  : "bg-white/5 text-slate-400 hover:text-white"
+              }`}
+              title="Bật/Tắt chế độ chat mật mã"
+            >
+              <Lock className="w-3 h-3 text-amber-400" />
+              <span>{isEncryptMode ? "Mã hóa BẬT" : "Mã hóa TẮT"}</span>
+            </button>
+          )}
 
-          {isAdmin && messages.length > 0 && (
+          {isAdmin && messages.length > 0 && !isCollapsed && (
             <button
               onClick={() => clearChat()}
               className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1 cursor-pointer"
@@ -104,7 +134,9 @@ export function LiveChatWidget() {
         </div>
       </div>
 
-      {/* Message List */}
+      {!isCollapsed && (
+        <>
+          {/* Message List */}
       <div className="flex-1 overflow-y-auto py-3 space-y-3 pr-1">
         {messages.map((msg) => {
           const isMe = msg.sender === user?.username;
@@ -267,6 +299,8 @@ export function LiveChatWidget() {
           {isEncryptMode ? <Lock className="w-4 h-4" /> : <Send className="w-4 h-4" />}
         </button>
       </form>
+        </>
+      )}
     </div>
   );
 }

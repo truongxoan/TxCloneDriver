@@ -8,6 +8,7 @@ import { encryptChatMessage, decryptChatMessage } from "./cryptoHelper";
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 const CHAT_STORAGE_KEY = "txclonedriver_chat_messages";
+const CHAT_VISIBLE_STORAGE_KEY = "txclonedriver_chat_widget_visible";
 
 const INITIAL_MESSAGES: ChatMessage[] = [
   {
@@ -51,6 +52,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+  const [isChatWidgetVisible, setIsChatWidgetVisible] = useState<boolean>(true);
 
   useEffect(() => {
     try {
@@ -60,8 +62,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       } else {
         localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(INITIAL_MESSAGES));
       }
+      const savedVisibility = localStorage.getItem(CHAT_VISIBLE_STORAGE_KEY);
+      if (savedVisibility !== null) {
+        setIsChatWidgetVisible(savedVisibility === "true");
+      }
     } catch {}
   }, []);
+
+  const toggleChatWidget = (visible?: boolean) => {
+    setIsChatWidgetVisible((prev) => {
+      const next = typeof visible === "boolean" ? visible : !prev;
+      try {
+        localStorage.setItem(CHAT_VISIBLE_STORAGE_KEY, String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const saveMessages = (list: ChatMessage[]) => {
     setMessages(list);
@@ -132,6 +148,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     <ChatContext.Provider
       value={{
         messages,
+        isChatWidgetVisible,
+        toggleChatWidget,
         sendMessage,
         clearChat,
         decryptMessage: decryptChatMessage,

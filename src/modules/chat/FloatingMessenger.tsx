@@ -37,7 +37,7 @@ const UNBLUR_SESSION_MS = 60 * 1000; // 60 seconds unblur session expiry
 type SizeMode = "compact" | "expanded" | "fullscreen";
 
 export function FloatingMessenger() {
-  const { messages, sendMessage, clearChat, decryptMessage } = useChat();
+  const { messages, isChatWidgetVisible, toggleChatWidget, sendMessage, clearChat, decryptMessage } = useChat();
   const { user, isAdmin, managedUsers } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -297,9 +297,24 @@ export function FloatingMessenger() {
 
   return (
     <>
+      {/* If chat widget is disabled completely by user, don't render floating launcher */}
+      {!isChatWidgetVisible && null}
+
       {/* Floating Messenger Icon Button (Bottom Right) */}
-      {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-50">
+      {isChatWidgetVisible && !isOpen && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-1.5 group/launcher">
+          {/* Quick Hide Button when hovering launcher */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleChatWidget(false);
+            }}
+            className="opacity-0 group-hover/launcher:opacity-100 transition-opacity duration-200 h-8 w-8 rounded-full bg-slate-900/90 hover:bg-rose-600/90 text-slate-300 hover:text-white border border-white/20 shadow-lg flex items-center justify-center text-xs cursor-pointer"
+            title="Tắt/Ẩn biểu tượng chat hoàn toàn (Có thể bật lại ở thanh Header)"
+          >
+            <EyeOff className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => {
               setIsOpen(true);
@@ -415,11 +430,23 @@ export function FloatingMessenger() {
                 <Lock className="w-4 h-4" />
               </button>
 
-              {/* Close Messenger */}
+              {/* Turn Off / Hide Messenger completely */}
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  toggleChatWidget(false);
+                }}
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-muted-foreground hover:text-rose-300 transition-colors cursor-pointer"
+                title="Tắt khung chat hoàn toàn (Ẩn cả icon góc màn hình, bật lại ở Header)"
+              >
+                <EyeOff className="w-4 h-4" />
+              </button>
+
+              {/* Close Messenger (Collapse to icon) */}
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-colors cursor-pointer"
-                title="Đóng Messenger"
+                title="Thu nhỏ khung chat xuống góc màn hình"
               >
                 <X className="w-4 h-4" />
               </button>

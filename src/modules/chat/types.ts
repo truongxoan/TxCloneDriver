@@ -16,6 +16,8 @@ export interface ChatMessage {
 
 export interface ChatContextType {
   messages: ChatMessage[];
+  isChatWidgetVisible: boolean;
+  toggleChatWidget: (visible?: boolean) => void;
   sendMessage: (
     text: string,
     targetUser?: string,
