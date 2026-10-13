@@ -611,6 +611,141 @@ const svgVachKeDuong = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600
   <text x="300" y="378" text-anchor="middle" fill="#cbd5e1" font-size="12">Vạch MÀU TRẮNG: Phân chia các làn xe chạy cùng chiều</text>
 </svg>`;
 
+// 24. Biển P.123a Cấm rẽ trái
+const svgP123a = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <circle cx="200" cy="180" r="140" fill="#ffffff" stroke="#dc2626" stroke-width="26" />
+  <g fill="#1e293b">
+    <path d="M 235 240 L 235 170 Q 235 140 205 140 L 165 140 L 165 115 L 115 155 L 165 195 L 165 170 L 200 170 Q 205 170 205 185 L 205 240 Z" />
+  </g>
+  <line x1="95" y1="85" x2="295" y2="285" stroke="#dc2626" stroke-width="22" stroke-linecap="round" />
+  <rect x="50" y="340" width="300" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="15" font-weight="bold">Biển P.123a: Cấm rẽ trái</text>
+</svg>`;
+
+// 25. Biển P.130 Cấm dừng và đỗ xe
+const svgP130 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <circle cx="200" cy="180" r="140" fill="#2563eb" stroke="#dc2626" stroke-width="26" />
+  <!-- Red X crossing -->
+  <line x1="100" y1="80" x2="300" y2="280" stroke="#dc2626" stroke-width="24" stroke-linecap="round" />
+  <line x1="300" y1="80" x2="100" y2="280" stroke="#dc2626" stroke-width="24" stroke-linecap="round" />
+  <rect x="50" y="340" width="300" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="15" font-weight="bold">Biển P.130: Cấm dừng xe và đỗ xe</text>
+</svg>`;
+
+// 26. Biển P.131a Cấm đỗ xe
+const svgP131a = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <circle cx="200" cy="180" r="140" fill="#2563eb" stroke="#dc2626" stroke-width="26" />
+  <!-- Single diagonal slash -->
+  <line x1="300" y1="80" x2="100" y2="280" stroke="#dc2626" stroke-width="24" stroke-linecap="round" />
+  <rect x="50" y="340" width="300" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="15" font-weight="bold">Biển P.131a: Cấm đỗ xe</text>
+</svg>`;
+
+// 27. Biển P.115 Hạn chế tải trọng 10t
+const svgP115 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <circle cx="200" cy="180" r="140" fill="#ffffff" stroke="#dc2626" stroke-width="26" />
+  <text x="200" y="210" text-anchor="middle" fill="#1e293b" font-family="system-ui, sans-serif" font-size="90" font-weight="900">10t</text>
+  <rect x="40" y="340" width="320" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">Biển P.115: Hạn chế tải trọng xe (&gt;10 tấn)</text>
+</svg>`;
+
+// 28. Biển P.117 Hạn chế chiều cao 3.5m
+const svgP117 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <circle cx="200" cy="180" r="140" fill="#ffffff" stroke="#dc2626" stroke-width="26" />
+  <!-- Top and bottom limit arrows -->
+  <polygon points="200,90 185,115 215,115" fill="#1e293b" />
+  <polygon points="200,270 185,245 215,245" fill="#1e293b" />
+  <text x="200" y="200" text-anchor="middle" fill="#1e293b" font-family="system-ui, sans-serif" font-size="60" font-weight="900">3,5m</text>
+  <rect x="40" y="340" width="320" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">Biển P.117: Hạn chế chiều cao (&gt;3.5 mét)</text>
+</svg>`;
+
+// 29. Biển W.204 Đường hai chiều
+const svgW204 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <polygon points="200,45 345,305 55,305" fill="#facc15" stroke="#dc2626" stroke-width="24" stroke-linejoin="round" />
+  <g fill="#1e293b">
+    <!-- Arrow pointing up -->
+    <path d="M 165 260 L 165 175 L 145 175 L 165 135 L 185 175 L 175 175 L 175 260 Z" />
+    <!-- Arrow pointing down -->
+    <path d="M 235 150 L 235 235 L 255 235 L 235 275 L 215 235 L 225 235 L 225 150 Z" />
+  </g>
+  <rect x="50" y="340" width="300" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="15" font-weight="bold">Biển W.204: Đường hai chiều</text>
+</svg>`;
+
+// 30. Biển W.205a Giao nhau cùng mức (dấu cộng)
+const svgW205a = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <polygon points="200,45 345,305 55,305" fill="#facc15" stroke="#dc2626" stroke-width="24" stroke-linejoin="round" />
+  <g fill="#1e293b">
+    <rect x="188" y="145" width="24" height="130" rx="3" />
+    <rect x="135" y="198" width="130" height="24" rx="3" />
+  </g>
+  <rect x="40" y="340" width="320" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">Biển W.205a: Đường giao nhau cùng cấp</text>
+</svg>`;
+
+// 31. Biển W.219 Dốc nguy hiểm 10%
+const svgW219 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <polygon points="200,45 345,305 55,305" fill="#facc15" stroke="#dc2626" stroke-width="24" stroke-linejoin="round" />
+  <!-- Incline slope symbol -->
+  <polygon points="120,265 280,265 280,185" fill="#1e293b" />
+  <text x="220" y="245" fill="#ffffff" font-family="system-ui, sans-serif" font-size="22" font-weight="bold">10%</text>
+  <rect x="50" y="340" width="300" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">Biển W.219: Dốc xuống nguy hiểm</text>
+</svg>`;
+
+// 32. Biển R.412 Làn đường dành riêng cho từng loại xe
+const svgR412 = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <rect x="60" y="45" width="280" height="270" rx="18" fill="#2563eb" stroke="#ffffff" stroke-width="6" />
+  <!-- 3 vehicle lanes with arrows -->
+  <line x1="150" y1="50" x2="150" y2="310" stroke="#ffffff" stroke-width="3" stroke-dasharray="8,8" />
+  <line x1="250" y1="50" x2="250" y2="310" stroke="#ffffff" stroke-width="3" stroke-dasharray="8,8" />
+  <!-- Lane 1: Car -->
+  <text x="105" y="180" text-anchor="middle" font-size="34">🚗</text>
+  <path d="M 105 210 L 105 260 M 95 245 L 105 265 L 115 245" stroke="#ffffff" stroke-width="4" fill="none" />
+  <!-- Lane 2: Bus -->
+  <text x="200" y="180" text-anchor="middle" font-size="34">🚌</text>
+  <path d="M 200 210 L 200 260 M 190 245 L 200 265 L 210 245" stroke="#ffffff" stroke-width="4" fill="none" />
+  <!-- Lane 3: Motorbike -->
+  <text x="295" y="180" text-anchor="middle" font-size="34">🏍️</text>
+  <path d="M 295 210 L 295 260 M 285 245 L 295 265 L 305 245" stroke="#ffffff" stroke-width="4" fill="none" />
+  <rect x="40" y="340" width="320" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">Biển R.412: Làn đường theo phương tiện</text>
+</svg>`;
+
+// 33. Sa hình ngã 3 chữ T
+const svgSaHinhT = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+  <rect width="600" height="450" rx="20" fill="#0b1329" />
+  <!-- T-junction road -->
+  <rect x="0" y="160" width="600" height="130" fill="#1e293b" />
+  <rect x="235" y="160" width="130" height="290" fill="#1e293b" />
+  <line x1="0" y1="225" x2="600" y2="225" stroke="#facc15" stroke-dasharray="10,10" stroke-width="3" />
+  <line x1="300" y1="225" x2="300" y2="450" stroke="#ffffff" stroke-dasharray="10,10" stroke-width="3" />
+  <!-- Vehicle A on Main road -->
+  <g transform="translate(100, 180)">
+    <rect x="0" y="0" width="70" height="36" rx="6" fill="#10b981" />
+    <text x="35" y="22" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="bold">Xe A (Đường chính)</text>
+    <path d="M 80 18 L 120 18 M 110 10 L 122 18 L 110 26" stroke="#10b981" stroke-width="3" fill="none" />
+  </g>
+  <!-- Vehicle B from Branch road (South) -->
+  <g transform="translate(310, 340)">
+    <rect x="0" y="0" width="36" height="65" rx="6" fill="#ef4444" />
+    <text x="18" y="36" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="bold">Xe B</text>
+    <path d="M 18 -10 Q 18 -50 60 -50" stroke="#ef4444" stroke-width="3" fill="none" stroke-dasharray="4,4" />
+  </g>
+  <rect x="40" y="405" width="520" height="34" rx="8" fill="#1e293b" stroke="#334155" />
+  <text x="300" y="427" text-anchor="middle" fill="#38bdf8" font-size="13" font-weight="bold">Ngã ba chữ T: Xe trên đường nhánh (Xe B) phải nhường đường cho xe trên đường chính!</text>
+</svg>`;
+
 // Write all SVGs to files
 const files = {
   'bien-p104-cam-moto.svg': svgP104,
@@ -625,12 +760,22 @@ const files = {
   'bien-r303-vong-xuyen.svg': svgR303,
   'bien-i423-nguoi-di-bo.svg': svgI423,
   'bien-i401-bat-dau-uu-tien.svg': svgI401,
+  'bien-p123a-cam-re-trai.svg': svgP123a,
+  'bien-p130-cam-dung-do.svg': svgP130,
+  'bien-p131a-cam-do-xe.svg': svgP131a,
+  'bien-p115-han-che-tai-trong.svg': svgP115,
+  'bien-p117-han-che-chieu-cao.svg': svgP117,
+  'bien-w204-duong-hai-chieu.svg': svgW204,
+  'bien-w205a-giao-cung-cap.svg': svgW205a,
+  'bien-w219-doc-nguy-hiem.svg': svgW219,
+  'bien-r412-lan-duong-xe.svg': svgR412,
   'sahinh-uu-tien-nga-tu.svg': svgSaHinh1,
   'sahinh-nga-tu-ben-phai-trong.svg': svgSaHinh2,
   'sahinh-duong-uu-tien.svg': svgSaHinh3,
   'sahinh-vong-xuyen.svg': svgSaHinh4,
   'sahinh-doc-hep.svg': svgSaHinh5,
   'sahinh-vuot-xe-vach-lien.svg': svgSaHinh6,
+  'sahinh-nga-ba-chu-t.svg': svgSaHinhT,
   'minh-hoa-diem-liet-nong-do-con.svg': svgDiemLietCon,
   'minh-hoa-diem-liet-cao-toc-lui-xe.svg': svgDiemLietCaoToc,
   'minh-hoa-diem-liet-duong-sat.svg': svgDiemLietDuongSat,

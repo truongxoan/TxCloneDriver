@@ -31,11 +31,28 @@ import {
   X,
   Sparkles,
   Info,
+  Play,
+  Volume2,
+  VolumeX,
+  Printer,
+  Bookmark,
 } from "lucide-react";
+import { SaHinhSimulator } from "@/modules/driver-license/components/SaHinhSimulator";
+import { MistakeNotebookModal } from "@/modules/driver-license/components/MistakeNotebookModal";
+import { HolographicTiltCard } from "@/modules/interactions/HolographicTiltCard";
+import {
+  playClickSound,
+  playCorrectSound,
+  playWrongSound,
+  playCriticalFailSound,
+  playExamPassFanfare,
+  isSoundMuted,
+  toggleSoundMute,
+} from "@/lib/soundEffects";
 
 export default function DriverLicensePage() {
   const [selectedClass, setSelectedClass] = useState<LicenseClass>("B2");
-  const [tabMode, setTabMode] = useState<"exam" | "critical" | "topics" | "tips">("exam");
+  const [tabMode, setTabMode] = useState<"exam" | "critical" | "topics" | "simulator" | "tips">("exam");
 
   // Mock Exam State
   const [examQuestions, setExamQuestions] = useState<LicenseQuestion[]>(() =>
@@ -55,8 +72,10 @@ export default function DriverLicensePage() {
   // Practice & Study Options
   const [studyMode, setStudyMode] = useState<boolean>(false); // Show explanation immediately when option selected
   const [showHint, setShowHint] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
 
-  // Lightbox Modal for Image Zoom
+  // Modals
+  const [isNotebookOpen, setIsNotebookOpen] = useState<boolean>(false);
   const [lightboxImage, setLightboxImage] = useState<{
     url: string;
     title: string;
@@ -71,8 +90,14 @@ export default function DriverLicensePage() {
 
   const config = EXAM_CONFIGS[selectedClass];
 
+  // Initialize sound mute state
+  useEffect(() => {
+    setIsMuted(isSoundMuted());
+  }, []);
+
   // Start new exam when class changes or reset
   const handleStartExam = (newClass = selectedClass) => {
+    playClickSound();
     setSelectedClass(newClass);
     const newConfig = EXAM_CONFIGS[newClass];
     setExamQuestions(generateMockExam(newClass));
@@ -82,6 +107,20 @@ export default function DriverLicensePage() {
     setExamResult(null);
     setShowHint(false);
     setSecondsLeft(newConfig.durationMinutes * 60);
+  };
+
+  // Start custom practice test with mistake questions
+  const handlePracticeMistakes = (mistakes: LicenseQuestion[]) => {
+    playClickSound();
+    setExamQuestions(mistakes.map((q, i) => ({ ...q, questionNumber: i + 1 })));
+    setCurrentIndex(0);
+    setUserAnswers({});
+    setIsSubmitted(false);
+    setExamResult(null);
+    setShowHint(false);
+    setStudyMode(true); // Open in instant study mode for mistake revision
+    setTabMode("exam");
+    setSecondsLeft(mistakes.length * 60);
   };
 
   // Exam timer
@@ -102,10 +141,26 @@ export default function DriverLicensePage() {
 
   const handleSelectOption = (qIdx: number, optionIdx: number) => {
     if (isSubmitted) return;
+    playClickSound();
+
     setUserAnswers((prev) => ({
       ...prev,
       [qIdx]: optionIdx,
     }));
+
+    // Audio feedback in study mode
+    if (studyMode) {
+      const q = examQuestions[qIdx];
+      if (optionIdx === q.correctIndex) {
+        playCorrectSound();
+      } else {
+        if (q.isCritical) {
+          playCriticalFailSound();
+        } else {
+          playWrongSound();
+        }
+      }
+    }
   };
 
   const handleSubmitExam = () => {
@@ -114,6 +169,14 @@ export default function DriverLicensePage() {
 
     let score = 0;
     let failedByCritical = false;
+    const wrongAnswersToRecord: Record<string, number> = {};
+
+    try {
+      const existingWrongs: Record<string, number> = JSON.parse(
+        localStorage.getItem("tx_gplx_wrong_questions") || "{}"
+      );
+      Object.assign(wrongAnswersToRecord, existingWrongs);
+    } catch {}
 
     examQuestions.forEach((q, idx) => {
       const ans = userAnswers[idx];
@@ -123,6 +186,8 @@ export default function DriverLicensePage() {
         if (q.isCritical) {
           failedByCritical = true;
         }
+        // Record into wrong questions dictionary
+        wrongAnswersToRecord[q.id] = (wrongAnswersToRecord[q.id] || 0) + 1;
       }
     });
 
@@ -134,6 +199,38 @@ export default function DriverLicensePage() {
       failedByCritical,
     });
 
+    // Play fanfare or failure alarm
+    if (passed) {
+      playExamPassFanfare();
+    } else if (failedByCritical) {
+      playCriticalFailSound();
+    } else {
+      playWrongSound();
+    }
+
+    // Persist wrong questions & exam history into localStorage
+    try {
+      localStorage.setItem("tx_gplx_wrong_questions", JSON.stringify(wrongAnswersToRecord));
+
+      const existingHistory = JSON.parse(localStorage.getItem("tx_gplx_exam_history") || "[]");
+      const newHistoryItem = {
+        id: `exam-${Date.now()}`,
+        date: new Date().toLocaleDateString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          day: "2-digit",
+          month: "2-digit",
+        }),
+        classId: selectedClass,
+        score,
+        total: examQuestions.length,
+        passed,
+        failedByCritical,
+      };
+      existingHistory.unshift(newHistoryItem);
+      localStorage.setItem("tx_gplx_exam_history", JSON.stringify(existingHistory.slice(0, 30)));
+    } catch {}
+
     // Reward coins if passed!
     if (passed) {
       try {
@@ -141,6 +238,16 @@ export default function DriverLicensePage() {
         localStorage.setItem("txclonedriver_fun_coins", (c + 5000).toString());
       } catch {}
     }
+  };
+
+  const handleToggleSound = () => {
+    const s = toggleSoundMute();
+    setIsMuted(s);
+  };
+
+  const handlePrintExam = () => {
+    playClickSound();
+    window.print();
   };
 
   const currentQ = examQuestions[currentIndex] || examQuestions[0];
@@ -164,6 +271,7 @@ export default function DriverLicensePage() {
   });
 
   const toggleRevealAnswer = (id: string) => {
+    playClickSound();
     setRevealedAnswers((prev) => ({
       ...prev,
       [id]: !prev[id],
@@ -176,37 +284,76 @@ export default function DriverLicensePage() {
 
   return (
     <ModuleGuard moduleId="driver_license" moduleName="Ôn Thi GPLX">
-      <div className="space-y-6 max-w-6xl mx-auto pb-16">
+      <div className="space-y-6 max-w-6xl mx-auto pb-16 print:p-0 print:m-0 print:max-w-none">
         {/* Banner */}
-        <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 glass-panel border border-white/10 shadow-2xl overflow-hidden">
+        <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 glass-panel border border-white/10 shadow-2xl overflow-hidden print:hidden">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                <Car className="w-4 h-4" /> Bộ Câu Hỏi Sát Hạch GPLX Chuẩn Bộ GTVT 2026
+                <Car className="w-4 h-4" /> Bộ Câu Hỏi &amp; Sa Hình Sát Hạch GPLX Chuẩn Bộ GTVT 2026
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                 Ôn Thi Giấy Phép Lái Xe GPLX
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
-                Hình ảnh minh họa sắc nét, sa hình trực quan, câu hỏi điểm liệt và giải thích chi tiết từng câu theo luật mới nhất!
+                Tích hợp mô phỏng sa hình tương tác 2D, hình ảnh minh họa vector sắc nét, âm thanh phản hồi xúc giác và sổ tay câu sai thông minh!
               </p>
             </div>
 
-            {/* License Class Selector */}
-            <div className="flex flex-wrap items-center gap-2 bg-black/40 p-1.5 rounded-2xl border border-white/10">
-              {(["A1", "A2", "B1", "B2", "C"] as LicenseClass[]).map((cls) => (
+            {/* Quick Action Buttons & License Class Selector */}
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                {/* Mute Toggle */}
                 <button
-                  key={cls}
-                  onClick={() => handleStartExam(cls)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
-                    selectedClass === cls
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 scale-105"
-                      : "text-muted-foreground hover:text-white"
+                  onClick={handleToggleSound}
+                  className={`p-2.5 rounded-2xl border text-xs font-bold transition-all shadow-md ${
+                    isMuted
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                      : "bg-white/5 text-slate-300 hover:text-white border-white/10"
                   }`}
+                  title={isMuted ? "Bật âm thanh haptic" : "Tắt âm thanh"}
                 >
-                  {cls} ({EXAM_CONFIGS[cls].vehicleType})
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
-              ))}
+
+                {/* Print Sheet */}
+                <button
+                  onClick={handlePrintExam}
+                  className="p-2.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-bold transition-colors shadow-md"
+                  title="In đề thi / Xuất bản in A4"
+                >
+                  <Printer className="w-4 h-4" />
+                </button>
+
+                {/* Mistake Notebook Button */}
+                <button
+                  onClick={() => {
+                    playClickSound();
+                    setIsNotebookOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition-transform active:scale-95 shadow-md shadow-amber-500/10"
+                >
+                  <Bookmark className="w-4 h-4 text-amber-400" />
+                  <span>Sổ Tay Câu Sai</span>
+                </button>
+              </div>
+
+              {/* License Class Selector */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-black/40 p-1.5 rounded-2xl border border-white/10">
+                {(["A1", "A2", "B1", "B2", "C"] as LicenseClass[]).map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => handleStartExam(cls)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                      selectedClass === cls
+                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 scale-105"
+                        : "text-muted-foreground hover:text-white"
+                    }`}
+                  >
+                    {cls}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -218,9 +365,10 @@ export default function DriverLicensePage() {
         </div>
 
         {/* Tab Selector */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none print:hidden">
           {[
             { id: "exam", label: "Thi Thử Sát Hạch (Đếm Giờ)", icon: FileCheck },
+            { id: "simulator", label: "Mô Phỏng Sa Hình Động (Mới)", icon: Play },
             { id: "critical", label: `60 Câu Hỏi Điểm Liệt (${criticalList.length})`, icon: AlertTriangle },
             { id: "topics", label: "Biển Báo & Sa Hình (Có Hình)", icon: BookOpen },
             { id: "tips", label: "Mẹo Thi 600 Câu Bao Đậu", icon: Lightbulb },
@@ -229,7 +377,10 @@ export default function DriverLicensePage() {
             return (
               <button
                 key={item.id}
-                onClick={() => setTabMode(item.id as any)}
+                onClick={() => {
+                  playClickSound();
+                  setTabMode(item.id as any);
+                }}
                 className={`px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all flex items-center gap-2 ${
                   tabMode === item.id
                     ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-black shadow-lg shadow-blue-500/30 scale-105"
@@ -249,7 +400,7 @@ export default function DriverLicensePage() {
         {tabMode === "exam" && (
           <div className="space-y-6">
             {/* Exam Header, Timer & Mode Options */}
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl glass-card border border-white/10">
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl glass-card border border-white/10 print:hidden">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="px-3 py-1 rounded-xl bg-blue-500/20 text-blue-300 font-bold text-xs border border-blue-500/30">
                   Câu hỏi {currentIndex + 1} / {examQuestions.length}
@@ -261,7 +412,10 @@ export default function DriverLicensePage() {
                 )}
                 {/* Practice Mode Switch */}
                 <button
-                  onClick={() => setStudyMode((prev) => !prev)}
+                  onClick={() => {
+                    playClickSound();
+                    setStudyMode((prev) => !prev);
+                  }}
                   className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
                     studyMode
                       ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
@@ -308,10 +462,11 @@ export default function DriverLicensePage() {
               </div>
             </div>
 
-            {/* Exam Result Banner if submitted */}
+            {/* Exam Result Banner if submitted (Wrapped with 3D Holographic Tilt) */}
             {examResult && (
-              <div
-                className={`p-6 rounded-3xl border shadow-2xl animate-in zoom-in-95 ${
+              <HolographicTiltCard
+                maxTilt={4}
+                className={`p-6 sm:p-8 rounded-3xl border shadow-2xl animate-in zoom-in-95 ${
                   examResult.passed
                     ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-200"
                     : "bg-rose-950/60 border-rose-500/40 text-rose-200"
@@ -345,18 +500,32 @@ export default function DriverLicensePage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => handleStartExam()}
-                    className="px-6 py-2.5 rounded-xl font-black text-xs text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-500 shadow-lg hover:opacity-95"
-                  >
-                    Thi Đề Mới Ngay
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        playClickSound();
+                        setIsNotebookOpen(true);
+                      }}
+                      className="px-4 py-2.5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/20 text-white transition-colors"
+                    >
+                      Xem Sổ Câu Sai
+                    </button>
+                    <button
+                      onClick={() => handleStartExam()}
+                      className="px-6 py-2.5 rounded-xl font-black text-xs text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-500 shadow-lg hover:opacity-95 transition-transform active:scale-95"
+                    >
+                      Thi Đề Mới Ngay
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </HolographicTiltCard>
             )}
 
-            {/* Main Question Display */}
-            <div className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/10 shadow-2xl space-y-6">
+            {/* Main Question Display (Wrapped with 3D Holographic Tilt Card) */}
+            <HolographicTiltCard
+              maxTilt={5}
+              className="p-6 sm:p-8 rounded-3xl glass-panel border border-white/10 shadow-2xl space-y-6"
+            >
               <div className="flex items-start justify-between gap-4">
                 <h2 className="text-lg sm:text-xl font-bold text-white leading-relaxed">
                   <span className="text-blue-400 mr-2">Câu {currentIndex + 1}:</span>
@@ -365,8 +534,11 @@ export default function DriverLicensePage() {
 
                 {/* Hint Toggle Button */}
                 <button
-                  onClick={() => setShowHint((prev) => !prev)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 transition-all ${
+                  onClick={() => {
+                    playClickSound();
+                    setShowHint((prev) => !prev);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 transition-all print:hidden ${
                     shouldShowExplanation
                       ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                       : "bg-white/5 text-muted-foreground border border-white/10 hover:text-white"
@@ -398,7 +570,7 @@ export default function DriverLicensePage() {
                     />
                   </div>
 
-                  <div className="mt-3 w-full flex items-center justify-between text-xs text-muted-foreground border-t border-white/10 pt-2.5">
+                  <div className="mt-3 w-full flex items-center justify-between text-xs text-muted-foreground border-t border-white/10 pt-2.5 print:hidden">
                     <span className="inline-flex items-center gap-1.5 text-sky-400 font-bold text-[11px]">
                       <Info className="w-3.5 h-3.5" /> Hình ảnh minh họa / Sa hình trực quan
                     </span>
@@ -466,7 +638,7 @@ export default function DriverLicensePage() {
                 <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900/90 to-blue-950/40 border border-emerald-500/30 space-y-3 text-xs shadow-xl animate-in fade-in-50 duration-300">
                   <div className="flex items-center justify-between pb-2 border-b border-white/10">
                     <span className="font-black text-emerald-400 flex items-center gap-1.5 text-sm">
-                      <Lightbulb className="w-4 h-4 text-amber-400" /> Giải thích chi tiết & Căn cứ quy chuẩn
+                      <Lightbulb className="w-4 h-4 text-amber-400" /> Giải thích chi tiết &amp; Căn cứ quy chuẩn
                     </span>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                       Đáp án đúng: #{currentQ.correctIndex + 1}
@@ -487,9 +659,10 @@ export default function DriverLicensePage() {
               )}
 
               {/* Navigation Arrows */}
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
+              <div className="flex items-center justify-between pt-4 border-t border-white/10 print:hidden">
                 <button
                   onClick={() => {
+                    playClickSound();
                     setCurrentIndex((prev) => Math.max(0, prev - 1));
                     setShowHint(false);
                   }}
@@ -500,6 +673,7 @@ export default function DriverLicensePage() {
                 </button>
                 <button
                   onClick={() => {
+                    playClickSound();
                     setCurrentIndex((prev) => Math.min(examQuestions.length - 1, prev + 1));
                     setShowHint(false);
                   }}
@@ -509,10 +683,10 @@ export default function DriverLicensePage() {
                   Câu Tiếp Theo <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
-            </div>
+            </HolographicTiltCard>
 
             {/* Quick Question Navigation Grid 1..N */}
-            <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-2">
+            <div className="p-4 rounded-2xl glass-panel border border-white/10 space-y-2 print:hidden">
               <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase">
                 <span>Bảng danh sách câu hỏi:</span>
                 <span className="text-[11px] lowercase font-normal">
@@ -542,6 +716,7 @@ export default function DriverLicensePage() {
                     <button
                       key={idx}
                       onClick={() => {
+                        playClickSound();
                         setCurrentIndex(idx);
                         setShowHint(false);
                       }}
@@ -560,7 +735,12 @@ export default function DriverLicensePage() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 2: 60 CÂU HỎI ĐIỂM LIỆT (CẤM SAI) */}
+        {/* TAB 2: MÔ PHỎNG SA HÌNH ĐỘNG 2D/3D (MỚI) */}
+        {/* ========================================================= */}
+        {tabMode === "simulator" && <SaHinhSimulator />}
+
+        {/* ========================================================= */}
+        {/* TAB 3: 60 CÂU HỎI ĐIỂM LIỆT (CẤM SAI) */}
         {/* ========================================================= */}
         {tabMode === "critical" && (
           <div className="space-y-4">
@@ -657,7 +837,7 @@ export default function DriverLicensePage() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 3: BIỂN BÁO & SA HÌNH (CÓ HÌNH ẢNH MINH HỌA) */}
+        {/* TAB 4: BIỂN BÁO & SA HÌNH (CÓ HÌNH ẢNH MINH HỌA) */}
         {/* ========================================================= */}
         {tabMode === "topics" && (
           <div className="space-y-6">
@@ -671,7 +851,10 @@ export default function DriverLicensePage() {
               ].map((f) => (
                 <button
                   key={f.id}
-                  onClick={() => setTopicFilter(f.id as any)}
+                  onClick={() => {
+                    playClickSound();
+                    setTopicFilter(f.id as any);
+                  }}
                   className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                     topicFilter === f.id
                       ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 scale-105"
@@ -812,11 +995,11 @@ export default function DriverLicensePage() {
                         >
                           {isRevealed ? (
                             <>
-                              <EyeOff className="w-3.5 h-3.5" /> Ẩn đáp án & Giải thích
+                              <EyeOff className="w-3.5 h-3.5" /> Ẩn đáp án &amp; Giải thích
                             </>
                           ) : (
                             <>
-                              <Eye className="w-3.5 h-3.5" /> Xem đáp án & Giải thích chi tiết
+                              <Eye className="w-3.5 h-3.5" /> Xem đáp án &amp; Giải thích chi tiết
                             </>
                           )}
                         </button>
@@ -839,7 +1022,7 @@ export default function DriverLicensePage() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB 4: MẸO THI 600 CÂU BAO ĐẬU */}
+        {/* TAB 5: MẸO THI 600 CÂU BAO ĐẬU */}
         {/* ========================================================= */}
         {tabMode === "tips" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -855,6 +1038,15 @@ export default function DriverLicensePage() {
           </div>
         )}
       </div>
+
+      {/* ========================================================= */}
+      {/* SỔ TAY CÂU SAI MODAL */}
+      {/* ========================================================= */}
+      <MistakeNotebookModal
+        isOpen={isNotebookOpen}
+        onClose={() => setIsNotebookOpen(false)}
+        onPracticeMistakes={handlePracticeMistakes}
+      />
 
       {/* ========================================================= */}
       {/* LIGHTBOX MODAL (ZOOM IMAGE PREVIEW) */}

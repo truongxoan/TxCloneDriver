@@ -134,6 +134,9 @@ body {
 .storm-shake {
   animation: storm-screen-shake 0.4s ease-out !important;
 }
+.storm-shake-intense {
+  animation: storm-screen-shake-intense 0.38s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+}
 
 /* Lightning crack SVG drawing animation */
 .storm-crack-animate {

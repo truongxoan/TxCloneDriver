@@ -81,20 +81,20 @@ export function SeasonalCanvas() {
         x: p?.x ?? Math.random() * width,
         y: p?.y ?? (isRise ? height + Math.random() * 50 : Math.random() * -50),
         size: isThunderstorm
-          ? Math.random() * 1.5 + 0.5  // thin rain drops
+          ? Math.random() * 2.2 + 0.8  // Varied droplet gauge
           : Math.random() * (effect === "snow" ? 3.5 : effect === "cyber" ? 2.5 : 8) + 2,
         speedX: isThunderstorm
-          ? 3 + Math.random() * 4  // wind pushes rain sideways
+          ? 5 + Math.random() * 6  // wind driving rain sideways ~22-26deg
           : (Math.random() - 0.5) * (effect === "autumn" ? 1.5 : 1),
         speedY: isThunderstorm
-          ? 12 + Math.random() * 10  // fast falling rain
+          ? 22 + Math.random() * 16  // fast realistic torrential velocity
           : isRise
             ? -(Math.random() * 1.2 + 0.6)
             : Math.random() * (effect === "snow" ? 1.2 : 1.8) + 0.5,
         rotation: Math.random() * 360,
         rotSpeed: (Math.random() - 0.5) * 2,
         opacity: isThunderstorm
-          ? Math.random() * 0.35 + 0.15
+          ? Math.random() * 0.45 + 0.2
           : Math.random() * 0.6 + 0.2,
         color: colors[Math.floor(Math.random() * colors.length)],
         wobble: Math.random() * Math.PI * 2,
@@ -103,8 +103,8 @@ export function SeasonalCanvas() {
     };
 
     // Initialize initial pool
-    // Thunderstorm needs more particles for dense rain
-    const stormMaxParticles = effect === "thunderstorm" ? maxParticles * 3 : maxParticles;
+    // Thunderstorm needs 4x particles for a genuine dense tropical storm
+    const stormMaxParticles = effect === "thunderstorm" ? maxParticles * 4 : maxParticles;
     for (let i = 0; i < stormMaxParticles; i++) {
       particles.push(initParticle({ y: Math.random() * height }));
     }
@@ -201,15 +201,23 @@ export function SeasonalCanvas() {
           ctx.arc(-p.size * 0.35, -p.size * 0.35, p.size * 0.2, 0, Math.PI * 2);
           ctx.fill();
         } else if (effect === "thunderstorm") {
-          // Diagonal rain streaks
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = p.size * 0.6;
-          ctx.globalAlpha = p.opacity * 0.7;
+          // Photorealistic torrential rain streak with velocity-scaled tail
+          const streakLen = 18 + p.speedY * 1.2;
+          const slantAngle = Math.atan2(p.speedY, p.speedX);
+          const endStreakX = Math.cos(slantAngle) * streakLen;
+          const endStreakY = Math.sin(slantAngle) * streakLen;
+
+          const grad = ctx.createLinearGradient(0, 0, endStreakX, endStreakY);
+          grad.addColorStop(0, "rgba(224, 231, 255, 0.95)");
+          grad.addColorStop(0.3, p.color);
+          grad.addColorStop(1, "rgba(147, 51, 234, 0)");
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = Math.max(0.7, p.size * 0.75);
+          ctx.lineCap = "round";
           ctx.beginPath();
-          // Rain streak: angled line ~20deg
-          const len = 12 + p.size * 6;
           ctx.moveTo(0, 0);
-          ctx.lineTo(len * 0.3, len);
+          ctx.lineTo(endStreakX, endStreakY);
           ctx.stroke();
         }
 
