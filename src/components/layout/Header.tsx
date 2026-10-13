@@ -489,42 +489,43 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           <span>Cài App</span>
         </button>
 
-        {/* Chat Widget Toggle Button (Ẩn / Hiện khung chat) */}
-        <button
-          onClick={() => {
-            if (!isChatWidgetVisible) {
-              toggleChatWidget(true);
-            } else {
-              // Trigger open-floating-messenger event if visible
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(new CustomEvent("open-floating-messenger"));
+        {/* Chat Widget Toggle Button (Bật / Tắt / Mở Khung Chat) */}
+        <div className="relative flex items-center">
+          <button
+            onClick={() => {
+              if (!isChatWidgetVisible) {
+                toggleChatWidget(true);
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("open-floating-messenger"));
+                }
+              } else {
+                toggleChatWidget(false);
               }
+            }}
+            className={cn(
+              "flex h-9 px-2.5 items-center justify-center gap-1.5 rounded-2xl glass-pill transition-all relative cursor-pointer",
+              isChatWidgetVisible
+                ? "text-sky-400 hover:bg-sky-500/20 border border-sky-500/30 shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/10"
+            )}
+            title={
+              isChatWidgetVisible
+                ? "Khung chat đang BẬT. Bấm để TẮT/ẨN hoàn toàn khung chat."
+                : "Khung chat đang TẮT. Bấm để BẬT lại khung chat."
             }
-          }}
-          className={cn(
-            "flex h-9 px-2.5 items-center justify-center gap-1.5 rounded-2xl glass-pill transition-all relative cursor-pointer",
-            isChatWidgetVisible
-              ? "text-sky-400 hover:bg-sky-500/20 border border-sky-500/30 shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-white/10"
-          )}
-          title={
-            isChatWidgetVisible
-              ? "Khung chat đang BẬT (Bấm để mở chat, hoặc bấm chuột phải / menu để tắt)"
-              : "Khung chat đang TẮT/ẨN (Bấm để bật lại khung chat)"
-          }
-          onContextMenu={(e) => {
-            e.preventDefault();
-            toggleChatWidget(!isChatWidgetVisible);
-          }}
-        >
-          <MessageCircle className="h-4 w-4" />
-          <span className="hidden md:inline text-xs font-semibold">
-            {isChatWidgetVisible ? "Chat" : "Mở Chat"}
-          </span>
-          {!isChatWidgetVisible && (
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-          )}
-        </button>
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span className="hidden md:inline text-xs font-semibold">
+              {isChatWidgetVisible ? "Ẩn Chat" : "Hiện Chat"}
+            </span>
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full ring-2 ring-slate-900",
+                isChatWidgetVisible ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+              )}
+            />
+          </button>
+        </div>
 
         {/* Notifications Button & Dropdown */}
         <div className="relative">

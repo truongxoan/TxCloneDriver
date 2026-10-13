@@ -75,6 +75,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem(CHAT_VISIBLE_STORAGE_KEY, String(next));
       } catch {}
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("txclonedriver-chat-visibility-change", { detail: next }));
+      }
       return next;
     });
   };
