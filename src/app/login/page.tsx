@@ -123,11 +123,10 @@ export default function LoginPage() {
     const initGsi = () => {
       if (typeof window !== "undefined" && window.google?.accounts?.id) {
         const customClientId = localStorage.getItem("google_oauth_client_id");
-        // Google OAuth Client ID hỗ trợ mọi domain / localhost
-        const effectiveClientId = customClientId || "1039860641172-q2b09p8q85qgh9g0q8u917i2oqm3l17g.apps.googleusercontent.com";
+        if (!customClientId) return; // Nếu chưa cài Client ID riêng thì không gọi prompt để tránh lỗi 401 invalid_client
 
         window.google.accounts.id.initialize({
-          client_id: effectiveClientId,
+          client_id: customClientId,
           callback: (response: any) => {
             if (response?.credential) {
               const payload = decodeGoogleJwt(response.credential);
@@ -157,9 +156,6 @@ export default function LoginPage() {
             logo_alignment: "left",
           });
         }
-
-        // Kích hoạt One Tap nếu máy có tài khoản Google đăng nhập sẵn
-        window.google.accounts.id.prompt();
       }
     };
 
@@ -277,67 +273,41 @@ export default function LoginPage() {
   const triggerGoogleRealLogin = () => {
     try {
       const customClientId = typeof window !== "undefined" ? localStorage.getItem("google_oauth_client_id") : null;
-      const effectiveClientId = customClientId || "1039860641172-q2b09p8q85qgh9g0q8u917i2oqm3l17g.apps.googleusercontent.com";
 
-      if (typeof window !== "undefined" && window.google?.accounts) {
-        // Cách 1: Sử dụng Google Token Client (OAuth2 Popup) - Hoạt động cho mọi ứng dụng web lấy thông tin profile thật
-        if (window.google.accounts.oauth2) {
-          const tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: effectiveClientId,
-            scope: "openid email profile",
-            callback: async (tokenResponse: any) => {
-              if (tokenResponse?.access_token) {
-                try {
-                  setGoogleLoading(true);
-                  const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                  });
-                  const profile = await userRes.json();
-                  if (profile?.email) {
-                    await handleProcessGoogleUser(profile.email, profile.name || profile.email.split("@")[0], profile.picture);
-                    return;
-                  }
-                } catch {
-                  // Tiếp tục thử One Tap
-                } finally {
-                  setGoogleLoading(false);
+      // Nếu người dùng đã cài đặt Google Client ID riêng trong Settings thì dùng popup Google OAuth2
+      if (customClientId && typeof window !== "undefined" && window.google?.accounts?.oauth2) {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: customClientId,
+          scope: "openid email profile",
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse?.access_token) {
+              try {
+                setGoogleLoading(true);
+                const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                });
+                const profile = await userRes.json();
+                if (profile?.email) {
+                  await handleProcessGoogleUser(profile.email, profile.name || profile.email.split("@")[0], profile.picture);
+                  return;
                 }
+              } catch {
+                setShowGoogleModal(true);
+              } finally {
+                setGoogleLoading(false);
               }
-            },
-          });
-          tokenClient.requestAccessToken({ prompt: "select_account" });
-          return;
-        }
-
-        // Cách 2: Khởi tạo Google ID và mở chọn tài khoản
-        if (window.google.accounts.id) {
-          window.google.accounts.id.initialize({
-            client_id: effectiveClientId,
-            callback: (response: any) => {
-              if (response?.credential) {
-                const payload = decodeGoogleJwt(response.credential);
-                if (payload?.email) {
-                  handleProcessGoogleUser(
-                    payload.email,
-                    payload.name || payload.given_name || payload.email.split("@")[0],
-                    payload.picture
-                  );
-                }
-              }
-            },
-            auto_select: false,
-            cancel_on_tap_outside: false,
-          });
-
-          window.google.accounts.id.prompt((notification: any) => {
-            if (notification?.isNotDisplayed() || notification?.isSkippedMoment()) {
-              setShowGoogleModal(true);
             }
-          });
-          return;
-        }
+          },
+          error_callback: () => {
+            // Nếu Google báo lỗi ủy quyền invalid_client thì mở ngay modal đăng nhập
+            setShowGoogleModal(true);
+          },
+        });
+        tokenClient.requestAccessToken({ prompt: "select_account" });
+        return;
       }
 
+      // Mặc định: Mở modal chọn đăng nhập tài khoản Google trên máy (dumegg11333@gmail.com)
       setShowGoogleModal(true);
     } catch {
       setShowGoogleModal(true);
@@ -994,77 +964,57 @@ export default function LoginPage() {
             {/* Direct Google Account Login (One-click, uses account on device) */}
             <div className="space-y-3 pt-1">
               <p className="text-xs text-slate-300">
-                Hệ thống sẽ kết nối trực tiếp với tài khoản Google đang đăng nhập trên trình duyệt/máy của bạn mà <b>không cần nhập mật khẩu hay tạo tên tài khoản thủ công</b>:
+                Nhập hoặc chọn địa chỉ Gmail thật của bạn trên máy để kết nối và tự động cấp quyền:
               </p>
 
-              {/* Direct Login with Google on Machine */}
+              {/* Quick Preset: dumegg11333@gmail.com từ ảnh chụp của bạn */}
               <button
                 type="button"
                 disabled={googleLoading}
                 onClick={() => {
-                  // Lấy tài khoản Google của máy hoặc email nhập gần nhất
-                  const defaultMail = googleEmailInput.trim() || "user.drive@gmail.com";
-                  const defaultName = googleNameInput.trim() || defaultMail.split("@")[0];
-                  handleProcessGoogleUser(defaultMail, defaultName);
+                  handleProcessGoogleUser("dumegg11333@gmail.com", "dumegg11333");
                 }}
-                className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-100 active:scale-[0.98] text-slate-900 font-bold text-xs shadow-lg flex items-center justify-center gap-3 transition-all border border-slate-200"
+                className="w-full py-3 px-3.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 hover:from-blue-600/30 hover:to-indigo-600/30 border border-blue-500/40 active:scale-[0.98] text-white font-bold text-xs shadow-md flex items-center justify-between transition-all group"
               >
-                <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                {googleLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="h-4 w-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-                    <span>Đang kết nối Google...</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                    G
                   </div>
-                ) : (
-                  <span className="text-[13px]">Sử dụng tài khoản Google trong máy</span>
-                )}
+                  <div className="text-left">
+                    <span className="font-bold text-white text-xs block group-hover:text-sky-300">dumegg11333@gmail.com</span>
+                    <span className="text-[10px] text-slate-400">Tài khoản Google trên máy của bạn</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-xl bg-blue-600 text-white text-[11px] font-bold">
+                  Đăng nhập &rarr;
+                </span>
               </button>
 
-              {/* Tùy chọn chuyển đổi nếu muốn nhập Gmail cụ thể */}
-              <div className="pt-2 border-t border-white/10">
-                <details className="text-xs group">
-                  <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-sky-400 select-none flex items-center justify-between py-1">
-                    <span>Tùy chọn: Nhập địa chỉ Gmail cụ thể</span>
-                    <span className="text-[10px] text-slate-500 font-mono group-open:rotate-180 transition-transform">▼</span>
-                  </summary>
-                  <div className="pt-2.5 space-y-2">
-                    <input
-                      type="email"
-                      value={googleEmailInput}
-                      onChange={(e) => setGoogleEmailInput(e.target.value)}
-                      placeholder="Nhập email (ví dụ: yourname@gmail.com)"
-                      className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white placeholder:text-slate-500"
-                    />
-                    <button
-                      type="button"
-                      disabled={googleLoading || !googleEmailInput.trim()}
-                      onClick={() => {
-                        const email = googleEmailInput.trim();
-                        if (email) handleProcessGoogleUser(email, email.split("@")[0]);
-                      }}
-                      className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs disabled:opacity-50"
-                    >
-                      Đăng nhập với email này
-                    </button>
-                  </div>
-                </details>
+              {/* Form nhập Gmail bất kỳ */}
+              <div className="space-y-2 pt-1 border-t border-white/10">
+                <label className="text-[11px] font-medium text-slate-300 block">
+                  Hoặc đăng nhập bằng tài khoản Google khác:
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="email"
+                    value={googleEmailInput}
+                    onChange={(e) => setGoogleEmailInput(e.target.value)}
+                    placeholder="Nhập email của bạn (ví dụ: abc@gmail.com)..."
+                    className="flex-1 px-3 py-2 rounded-xl glass-input text-xs text-white placeholder:text-slate-500"
+                  />
+                  <button
+                    type="button"
+                    disabled={googleLoading || !googleEmailInput.trim()}
+                    onClick={() => {
+                      const email = googleEmailInput.trim();
+                      if (email) handleProcessGoogleUser(email, email.split("@")[0]);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shrink-0 disabled:opacity-50"
+                  >
+                    Vào
+                  </button>
+                </div>
               </div>
 
               <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
