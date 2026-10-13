@@ -42,8 +42,8 @@ const CLAIM_DATE_KEY = "txclonedriver_last_daily_claim";
 const RESET_DATE_KEY = "txclonedriver_last_daily_reset";
 
 export function GamesProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const [coins, setCoins] = useState<number>(50000);
+  const { user, adjustUserCoins } = useAuth();
+  const [coins, setCoins] = useState<number>(user?.coins !== undefined ? user.coins : 50000);
   const [lastClaimDate, setLastClaimDate] = useState<string | null>(null);
   const [activeRoom, setActiveRoom] = useState<GameRoom | null>(null);
   const [activeGameId, setActiveGameId] = useState<GameId>("taixiu");
@@ -57,15 +57,25 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
   const [caroGodHint, setCaroGodHint] = useState<boolean>(false);
   const [coTuongGodHint, setCoTuongGodHint] = useState<boolean>(false);
 
+  // Synchronize with user's account coins from auth context
+  useEffect(() => {
+    if (user && user.coins !== undefined) {
+      setCoins(user.coins);
+      try {
+        localStorage.setItem(COINS_KEY, user.coins.toString());
+      } catch {}
+    }
+  }, [user?.coins]);
+
   // Load coins and perform daily 24h 50,000 reset if lower
   useEffect(() => {
     try {
       const todayStr = new Date().toISOString().split("T")[0];
       const lastReset = localStorage.getItem(RESET_DATE_KEY);
 
-      let currentCoins = 50000;
+      let currentCoins = user?.coins !== undefined ? user.coins : 50000;
       const savedCoins = localStorage.getItem(COINS_KEY);
-      if (savedCoins !== null) {
+      if (savedCoins !== null && !user?.coins) {
         currentCoins = parseInt(savedCoins, 10);
       }
 
@@ -74,6 +84,9 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
         if (currentCoins < 50000) {
           currentCoins = 50000;
           localStorage.setItem(COINS_KEY, "50000");
+          if (user?.id && adjustUserCoins) {
+            adjustUserCoins(user.id, 50000 - (user.coins || 0));
+          }
         }
         localStorage.setItem(RESET_DATE_KEY, todayStr);
       }
@@ -85,7 +98,7 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-  }, []);
+  }, [user?.id]);
 
   const addCoins = (amount: number, reason?: string) => {
     setCoins((prev) => {
@@ -95,6 +108,9 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       return next;
     });
+    if (user?.id && adjustUserCoins) {
+      adjustUserCoins(user.id, amount);
+    }
   };
 
   const deductCoins = (amount: number): boolean => {
@@ -106,6 +122,9 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       return next;
     });
+    if (user?.id && adjustUserCoins) {
+      adjustUserCoins(user.id, -amount);
+    }
     return true;
   };
 

@@ -161,6 +161,9 @@ export function TetrisGame() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying || gameOver) return;
+      if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", " "].includes(e.key)) {
+        e.preventDefault();
+      }
       if (e.key === "ArrowLeft") moveHoriz(-1);
       else if (e.key === "ArrowRight") moveHoriz(1);
       else if (e.key === "ArrowDown") moveDown();
@@ -169,7 +172,7 @@ export function TetrisGame() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  });
+  }, [isPlaying, gameOver, moveHoriz, moveDown, rotate, dropInstant]);
 
   const handleStart = () => {
     setGrid(Array(ROWS).fill(null).map(() => Array(COLS).fill(null)));

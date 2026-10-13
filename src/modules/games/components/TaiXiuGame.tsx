@@ -43,6 +43,9 @@ export function TaiXiuGame() {
 
   const totalBet = Object.values(bets).reduce((a, b) => a + b, 0);
 
+  const betsRef = React.useRef(bets);
+  betsRef.current = bets;
+
   const handlePlaceBet = (zone: BetZone) => {
     if (isRolling || countdown <= 3) return;
     if (coins < selectedChip) {
@@ -52,7 +55,6 @@ export function TaiXiuGame() {
     if (deductCoins(selectedChip)) {
       setBets((prev) => ({
         ...prev,
-        zone,
         [zone]: prev[zone] + selectedChip,
       }));
     }
@@ -68,6 +70,10 @@ export function TaiXiuGame() {
     setIsRolling(true);
     setIsBowlCovered(true);
     setLastWinMessage(null);
+
+    // Snapshot current bets to prevent race conditions
+    const currentBets = { ...betsRef.current };
+    const currentTotalBet = Object.values(currentBets).reduce((a, b) => a + b, 0);
 
     setTimeout(() => {
       let d1 = 3, d2 = 4, d3 = 4;
@@ -90,36 +96,36 @@ export function TaiXiuGame() {
       setDice([d1, d2, d3]);
       setIsRolling(false);
 
-      // Open bowl after 1s
+      // Open bowl after 800ms
       setTimeout(() => {
         setIsBowlCovered(false);
 
-        // Calculate payout if bet placed
+        // Calculate payout based on snapshotted active bets
         let totalWin = 0;
         let details: string[] = [];
 
-        if (isTai && bets.tai > 0) {
-          const win = bets.tai * 2;
+        if (isTai && currentBets.tai > 0) {
+          const win = currentBets.tai * 2;
           totalWin += win;
           details.push(`Tài (+${win.toLocaleString()})`);
-        } else if (!isTai && bets.xiu > 0) {
-          const win = bets.xiu * 2;
+        } else if (!isTai && currentBets.xiu > 0) {
+          const win = currentBets.xiu * 2;
           totalWin += win;
           details.push(`Xỉu (+${win.toLocaleString()})`);
         }
 
-        if (isEven && bets.chan > 0) {
-          const win = bets.chan * 1.95;
+        if (isEven && currentBets.chan > 0) {
+          const win = currentBets.chan * 1.95;
           totalWin += win;
           details.push(`Chẵn (+${Math.round(win).toLocaleString()})`);
-        } else if (!isEven && bets.le > 0) {
-          const win = bets.le * 1.95;
+        } else if (!isEven && currentBets.le > 0) {
+          const win = currentBets.le * 1.95;
           totalWin += win;
           details.push(`Lẻ (+${Math.round(win).toLocaleString()})`);
         }
 
-        if (isTriple && bets.bao > 0) {
-          const win = bets.bao * 30;
+        if (isTriple && currentBets.bao > 0) {
+          const win = currentBets.bao * 30;
           totalWin += win;
           details.push(`BÃO x30 (+${win.toLocaleString()})`);
         }
@@ -127,18 +133,21 @@ export function TaiXiuGame() {
         if (totalWin > 0) {
           addCoins(Math.round(totalWin), "Thắng Tài Xỉu");
           setLastWinMessage(`🎉 THẮNG LỚN: +${Math.round(totalWin).toLocaleString()} Xu! (${details.join(", ")})`);
-        } else if (totalBet > 0) {
+        } else if (currentTotalBet > 0) {
           setLastWinMessage(`Rất tiếc! Kết quả: ${sum} điểm (${isTai ? "TÀI" : "XỈU"}). Chúc bạn may mắn lần sau!`);
         } else {
           setLastWinMessage(`Phiên #${roundId} hoàn tất: ${sum} điểm (${isTai ? "TÀI" : "XỈU"}).`);
         }
 
         setHistory((prev) => [{ sum, isTai, dice: [d1, d2, d3] }, ...prev.slice(0, 19)]);
+
+        // Reset bets only AFTER payout has been settled
+        setBets({ tai: 0, xiu: 0, chan: 0, le: 0, bao: 0 });
       }, 800);
     }, 1200);
   };
 
-  // Continuous 10s auto-run loop
+  // Continuous 10s auto-run loop with stable interval
   useEffect(() => {
     if (!autoRun) return;
     const interval = setInterval(() => {
@@ -149,15 +158,13 @@ export function TaiXiuGame() {
         }
         if (prev <= 1) {
           setRoundId((r) => r + 1);
-          setBets({ tai: 0, xiu: 0, chan: 0, le: 0, bao: 0 });
           return 10;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, bets, coins, taiXiuRiggedOutcome, roundId]);
+  }, [autoRun]);
 
   const handleRoll = () => {
     if (isRolling) return;

@@ -72,10 +72,15 @@ export function BauCuaGame() {
     setBets({ nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 });
   };
 
+  const betsRef = React.useRef(bets);
+  betsRef.current = bets;
+
   const executeShake = () => {
     setIsShaking(true);
     setIsCovered(true);
     setResultMsg(null);
+
+    const activeBets = { ...betsRef.current };
 
     setTimeout(() => {
       let results: [AnimalDef, AnimalDef, AnimalDef];
@@ -112,8 +117,8 @@ export function BauCuaGame() {
         let totalWin = 0;
         let wonItems: string[] = [];
 
-        (Object.keys(bets) as AnimalId[]).forEach((id) => {
-          const betAmount = bets[id];
+        (Object.keys(activeBets) as AnimalId[]).forEach((id) => {
+          const betAmount = activeBets[id];
           const count = counts[id];
           if (betAmount > 0 && count > 0) {
             // Original bet returned + (betAmount * count)
@@ -124,10 +129,11 @@ export function BauCuaGame() {
           }
         });
 
+        const activeTotal = Object.values(activeBets).reduce((a, b) => a + b, 0);
         if (totalWin > 0) {
           addCoins(totalWin, "Thắng Bầu Cua");
           setResultMsg(`🎉 THẮNG: +${totalWin.toLocaleString()} Xu! Trúng: ${wonItems.join(", ")}`);
-        } else if (totalBet > 0) {
+        } else if (activeTotal > 0) {
           setResultMsg(
             `Kết quả: ${results.map((r) => r.name).join(" - ")}. Chúc bạn may mắn lượt sau!`
           );
@@ -136,6 +142,9 @@ export function BauCuaGame() {
             `Phiên #${roundId}: ${results.map((r) => r.name).join(" - ")}.`
           );
         }
+
+        // Reset bets after outcome is evaluated
+        setBets({ nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 });
       }, 800);
     }, 1200);
   };
@@ -151,7 +160,6 @@ export function BauCuaGame() {
         }
         if (prev <= 1) {
           setRoundId((r) => r + 1);
-          setBets({ nai: 0, bau: 0, ga: 0, ca: 0, cua: 0, tom: 0 });
           return 10;
         }
         return prev - 1;
@@ -159,7 +167,7 @@ export function BauCuaGame() {
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, bets, coins, bauCuaRiggedAnimals, roundId]);
+  }, [autoRun, bauCuaRiggedAnimals, roundId]);
 
   const handleShake = () => {
     if (isShaking) return;

@@ -59,10 +59,15 @@ export function XocDiaGame() {
     setBets({ chan: 0, le: 0, tu_do: 0, tu_trang: 0, ba_do: 0, ba_trang: 0 });
   };
 
+  const betsRef = React.useRef(bets);
+  betsRef.current = bets;
+
   const executeShake = () => {
     setIsShaking(true);
     setIsCovered(true);
     setResultMsg(null);
+
+    const activeBets = { ...betsRef.current };
 
     setTimeout(() => {
       let newCoins: [boolean, boolean, boolean, boolean];
@@ -95,53 +100,56 @@ export function XocDiaGame() {
         let wonItems: string[] = [];
 
         // Chẵn / Lẻ
-        if (isChan && bets.chan > 0) {
-          const w = bets.chan * 1.96;
+        if (isChan && activeBets.chan > 0) {
+          const w = activeBets.chan * 1.96;
           winAmount += w;
           wonItems.push(`Chẵn (+${Math.round(w).toLocaleString()})`);
-        } else if (!isChan && bets.le > 0) {
-          const w = bets.le * 1.96;
+        } else if (!isChan && activeBets.le > 0) {
+          const w = activeBets.le * 1.96;
           winAmount += w;
           wonItems.push(`Lẻ (+${Math.round(w).toLocaleString()})`);
         }
 
         // Tứ đỏ (4 Red)
-        if (redCount === 4 && bets.tu_do > 0) {
-          const w = bets.tu_do * 12;
+        if (redCount === 4 && activeBets.tu_do > 0) {
+          const w = activeBets.tu_do * 12;
           winAmount += w;
           wonItems.push(`Tứ Đỏ x12 (+${Math.round(w).toLocaleString()})`);
         }
 
         // Tứ trắng (4 White)
-        if (redCount === 0 && bets.tu_trang > 0) {
-          const w = bets.tu_trang * 12;
+        if (redCount === 0 && activeBets.tu_trang > 0) {
+          const w = activeBets.tu_trang * 12;
           winAmount += w;
           wonItems.push(`Tứ Trắng x12 (+${Math.round(w).toLocaleString()})`);
         }
 
         // 3 Đỏ 1 Trắng
-        if (redCount === 3 && bets.ba_do > 0) {
-          const w = bets.ba_do * 3.5;
+        if (redCount === 3 && activeBets.ba_do > 0) {
+          const w = activeBets.ba_do * 3.5;
           winAmount += w;
           wonItems.push(`3 Đỏ 1 Trắng (+${Math.round(w).toLocaleString()})`);
         }
 
         // 3 Trắng 1 Đỏ
-        if (redCount === 1 && bets.ba_trang > 0) {
-          const w = bets.ba_trang * 3.5;
+        if (redCount === 1 && activeBets.ba_trang > 0) {
+          const w = activeBets.ba_trang * 3.5;
           winAmount += w;
           wonItems.push(`3 Trắng 1 Đỏ (+${Math.round(w).toLocaleString()})`);
         }
 
+        const activeTotal = Object.values(activeBets).reduce((a, b) => a + b, 0);
         if (winAmount > 0) {
           addCoins(Math.round(winAmount), "Thắng Xóc Đĩa");
           setResultMsg(`🎉 THẮNG LỚN: +${Math.round(winAmount).toLocaleString()} Xu! (${wonItems.join(", ")})`);
-        } else if (totalBet > 0) {
+        } else if (activeTotal > 0) {
           setResultMsg(`Kết quả: ${redCount} Đỏ - ${4 - redCount} Trắng (${isChan ? "CHẴN" : "LẺ"}).`);
         } else {
           setResultMsg(`Phiên #${roundId} xong: ${redCount} Đỏ - ${4 - redCount} Trắng (${isChan ? "CHẴN" : "LẺ"}).`);
         }
 
+        // Reset bets after outcome is evaluated
+        setBets({ chan: 0, le: 0, tu_do: 0, tu_trang: 0, ba_do: 0, ba_trang: 0 });
         setHistory((prev) => [{ redCount, isChan }, ...prev.slice(0, 15)]);
       }, 800);
     }, 1200);
@@ -158,7 +166,6 @@ export function XocDiaGame() {
         }
         if (prev <= 1) {
           setRoundId((r) => r + 1);
-          setBets({ chan: 0, le: 0, tu_do: 0, tu_trang: 0, ba_do: 0, ba_trang: 0 });
           return 10;
         }
         return prev - 1;
@@ -166,7 +173,7 @@ export function XocDiaGame() {
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, bets, coins, xocDiaRiggedOutcome, roundId]);
+  }, [autoRun, xocDiaRiggedOutcome, roundId]);
 
   const handleShake = () => {
     if (isShaking) return;

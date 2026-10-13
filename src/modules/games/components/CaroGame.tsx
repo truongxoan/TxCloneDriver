@@ -122,12 +122,13 @@ export function CaroGame() {
     }
 
     if (bestMove[0] !== -1) {
-      applyMove(bestMove[0], bestMove[1], "O");
+      applyMove(bestMove[0], bestMove[1], "O", currentBoard);
     }
   };
 
-  const applyMove = (r: number, c: number, player: "X" | "O") => {
-    const nextBoard = board.map((row) => [...row]);
+  const applyMove = (r: number, c: number, player: "X" | "O", baseBoard?: CellVal[][]) => {
+    const srcBoard = baseBoard || board;
+    const nextBoard = srcBoard.map((row) => [...row]);
     nextBoard[r][c] = player;
     setBoard(nextBoard);
     setLastMove([r, c]);
