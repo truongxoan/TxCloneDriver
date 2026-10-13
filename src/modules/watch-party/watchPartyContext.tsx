@@ -124,10 +124,10 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     refreshRoomsFromServer();
 
-    // Fast polling fallback
+    // Ultra-Fast polling fallback (1s) for instant responsiveness
     const interval = setInterval(() => {
       refreshRoomsFromServer();
-    }, 2500);
+    }, 1000);
 
     // Zero-Latency Real-Time WebSocket Push (< 50ms)
     let ws: WebSocket | null = null;
@@ -136,7 +136,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       ws.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
-          if (parsed.event === "message") {
+          if (parsed.event === "message" || parsed.event === "sync_update") {
             refreshRoomsFromServer();
           }
         } catch {}
@@ -185,6 +185,12 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "sync_rooms", rooms: updated }),
+    }).catch(() => {});
+
+    // Broadcast instant update signal to all connected clients
+    fetch("https://ntfy.sh/txclonedriver_hub_events", {
+      method: "POST",
+      body: JSON.stringify({ event: "sync_update", timestamp: Date.now() }),
     }).catch(() => {});
   };
 

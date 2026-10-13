@@ -9,7 +9,8 @@
 
 param(
     [int]$Port = 3000,
-    [switch]$NoBrowser
+    [switch]$NoBrowser,
+    [switch]$OpenOnline
 )
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -105,13 +106,14 @@ Write-Host "    • Nhấn [Ctrl + C] bất cứ lúc nào để dừng máy ch�
 Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host ""
 
-# Tự động mở trình duyệt nếu không truyền cờ -NoBrowser
+# Tự động mở trình duyệt: Ưu tiên mở txlab.io.vn nếu có -OpenOnline, hoặc mở localhost
 if (-not $NoBrowser) {
+    $TargetBrowserUrl = if ($OpenOnline) { "https://txlab.io.vn" } else { $Url }
     Start-Job -ScriptBlock {
-        param($targetUrl)
+        param($target)
         Start-Sleep -Seconds 3
-        Start-Process $targetUrl
-    } -ArgumentList $Url | Out-Null
+        Start-Process $target
+    } -ArgumentList $TargetBrowserUrl | Out-Null
 }
 
 # 5. Khởi chạy Next.js Server
