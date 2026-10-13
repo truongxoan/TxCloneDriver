@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   HardDrive,
   Wallet,
+  Smartphone,
 } from "lucide-react";
 import { VoiceAssistantModal } from "@/components/voice/VoiceAssistantModal";
 import { AmbientSoundPlayer } from "@/components/audio/AmbientSoundPlayer";
@@ -83,6 +84,18 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60);
   const [pomodoroMode, setPomodoroMode] = useState<"work" | "break">("work");
   const [readNotifIds, setReadNotifIds] = useState<string[]>([]);
+
+  // PWA Install Prompt State
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+  }, []);
 
   // Pomodoro countdown timer
   useEffect(() => {
@@ -452,6 +465,26 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
             </>
           )}
         </div>
+
+        {/* PWA App Install Button */}
+        <button
+          onClick={async () => {
+            if (installPrompt) {
+              installPrompt.prompt();
+              const choice = await installPrompt.userChoice;
+              if (choice?.outcome === "accepted") setInstallPrompt(null);
+            } else {
+              alert(
+                "📲 HƯỚNG DẪN CÀI ĐẶT APP:\n\n• Trên iPhone/iPad (Safari): Bấm nút Chia sẻ (biểu tượng mũi tên lên) -> Chọn 'Thêm vào MH chính' (Add to Home Screen).\n• Trên Android (Chrome): Bấm dấu 3 chấm góc phải -> Chọn 'Cài đặt ứng dụng' hoặc 'Thêm vào màn hình chính'.\n• Trên Máy tính (Chrome/Edge): Bấm biểu tượng Cài đặt (Install) ở góc phải thanh địa chỉ URL!"
+              );
+            }
+          }}
+          className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-2xl glass-pill hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-all text-xs font-bold border border-emerald-500/30 shadow-sm"
+          title="Cài đặt TxCloneDriver thành App Native trên điện thoại hoặc máy tính"
+        >
+          <Smartphone className="h-4 w-4 text-emerald-400" />
+          <span>Cài App</span>
+        </button>
 
         {/* Notifications Button & Dropdown */}
         <div className="relative">

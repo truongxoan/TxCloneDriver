@@ -5,8 +5,8 @@ import os from "os";
 import { ManagedUser, LockedDevice, AuditLogItem } from "@/modules/auth/types";
 import { SyncRoom } from "@/modules/watch-party/types";
 
-// Hỗ trợ cả môi trường serverless (Vercel /var/task là read-only, thư mục ghi được là os.tmpdir()) và môi trường cục bộ
-const IS_VERCEL = !!process.env.VERCEL || process.env.NODE_ENV === "production";
+// Hỗ trợ cả môi trường serverless Vercel (/tmp) và máy chủ cục bộ / VPS (thư mục ./data)
+const IS_VERCEL = !!process.env.VERCEL;
 const DATA_DIR = IS_VERCEL
   ? path.join(os.tmpdir(), "txclonedriver_data")
   : path.join(process.cwd(), "data");
@@ -16,7 +16,7 @@ const DEVICES_FILE = path.join(DATA_DIR, "locked_devices.json");
 const AUDIT_FILE = path.join(DATA_DIR, "audit_logs.json");
 const ROOMS_FILE = path.join(DATA_DIR, "rooms.json");
 
-// Dedicated Cloud Storage ID on restful-api.dev to ensure seamless cross-device synchronization on Vercel
+// Dedicated Cloud Storage ID on restful-api.dev for cross-device sync
 const CLOUD_STORE_ID = "ff808181a09d98f701a135d01243556c";
 const CLOUD_API_URL = `https://api.restful-api.dev/objects/${CLOUD_STORE_ID}`;
 
@@ -53,6 +53,7 @@ const INITIAL_USERS: ManagedUser[] = [
     ],
     createdAt: "10/10/2026",
     provider: "local",
+    updatedAt: 1728500000000,
   },
   {
     id: "u-member-a",
@@ -66,6 +67,7 @@ const INITIAL_USERS: ManagedUser[] = [
     allowedModules: ["storage"],
     createdAt: "10/10/2026",
     provider: "local",
+    updatedAt: 1728500000000,
   },
   {
     id: "u-member-b",
@@ -79,6 +81,7 @@ const INITIAL_USERS: ManagedUser[] = [
     allowedModules: ["storage", "projects"],
     createdAt: "10/10/2026",
     provider: "local",
+    updatedAt: 1728500000000,
   },
   {
     id: "u-member-pending",
@@ -92,14 +95,17 @@ const INITIAL_USERS: ManagedUser[] = [
     allowedModules: [],
     createdAt: "10/10/2026",
     provider: "local",
+    updatedAt: 1728500000000,
   },
 ];
 
-// Bộ nhớ đệm Memory Fallback an toàn tuyệt đối
+// In-Memory Master Cache (Ultra-fast 0ms response)
 let memoryUsers: ManagedUser[] = [...INITIAL_USERS];
 let memoryDevices: LockedDevice[] = [];
 let memoryAuditLogs: AuditLogItem[] = [];
 let memoryRooms: SyncRoom[] = [];
+let lastCloudFetchTime = 0;
+let isCloudSyncInProgress = false;
 
 function ensureDataDir() {
   try {
@@ -107,7 +113,7 @@ function ensureDataDir() {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
@@ -124,8 +130,11 @@ function readUsersLocal(): ManagedUser[] {
     }
     const raw = fs.readFileSync(USERS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    memoryUsers = parsed;
-    return parsed;
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      memoryUsers = parsed;
+      return parsed;
+    }
+    return memoryUsers;
   } catch {
     return memoryUsers;
   }
@@ -142,17 +151,16 @@ function writeUsersLocal(users: ManagedUser[]) {
 }
 
 function readDevicesLocal(): LockedDevice[] {
-  if (!ensureDataDir()) {
-    return memoryDevices;
-  }
+  if (!ensureDataDir()) return memoryDevices;
   try {
-    if (!fs.existsSync(DEVICES_FILE)) {
-      return memoryDevices;
-    }
+    if (!fs.existsSync(DEVICES_FILE)) return memoryDevices;
     const raw = fs.readFileSync(DEVICES_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    memoryDevices = parsed;
-    return parsed;
+    if (Array.isArray(parsed)) {
+      memoryDevices = parsed;
+      return parsed;
+    }
+    return memoryDevices;
   } catch {
     return memoryDevices;
   }
@@ -169,17 +177,16 @@ function writeDevicesLocal(devices: LockedDevice[]) {
 }
 
 function readAuditLogsLocal(): AuditLogItem[] {
-  if (!ensureDataDir()) {
-    return memoryAuditLogs;
-  }
+  if (!ensureDataDir()) return memoryAuditLogs;
   try {
-    if (!fs.existsSync(AUDIT_FILE)) {
-      return memoryAuditLogs;
-    }
+    if (!fs.existsSync(AUDIT_FILE)) return memoryAuditLogs;
     const raw = fs.readFileSync(AUDIT_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    memoryAuditLogs = parsed;
-    return parsed;
+    if (Array.isArray(parsed)) {
+      memoryAuditLogs = parsed;
+      return parsed;
+    }
+    return memoryAuditLogs;
   } catch {
     return memoryAuditLogs;
   }
@@ -196,17 +203,16 @@ function writeAuditLogsLocal(logs: AuditLogItem[]) {
 }
 
 function readRoomsLocal(): SyncRoom[] {
-  if (!ensureDataDir()) {
-    return memoryRooms;
-  }
+  if (!ensureDataDir()) return memoryRooms;
   try {
-    if (!fs.existsSync(ROOMS_FILE)) {
-      return memoryRooms;
-    }
+    if (!fs.existsSync(ROOMS_FILE)) return memoryRooms;
     const raw = fs.readFileSync(ROOMS_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    memoryRooms = parsed;
-    return parsed;
+    if (Array.isArray(parsed)) {
+      memoryRooms = parsed;
+      return parsed;
+    }
+    return memoryRooms;
   } catch {
     return memoryRooms;
   }
@@ -222,10 +228,68 @@ function writeRoomsLocal(rooms: SyncRoom[]) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Cloud Sync Store Helpers (Chia sẻ dữ liệu thời gian thực giữa mọi máy và serverless instance)
-// ---------------------------------------------------------------------------
+// Khởi tạo đọc local ngay khi load module
+readUsersLocal();
+readDevicesLocal();
+readAuditLogsLocal();
+readRoomsLocal();
 
+// ---------------------------------------------------------------------------
+// Smart Merge Helper: Không bao giờ hạ cấp quyền hoặc làm mất user
+// ---------------------------------------------------------------------------
+function mergeUserLists(primary: ManagedUser[], secondary: ManagedUser[]): ManagedUser[] {
+  const map = new Map<string, ManagedUser>();
+
+  // Thêm danh sách ban đầu
+  for (const u of primary) {
+    map.set(u.username.toLowerCase(), { ...u });
+  }
+
+  // Hợp nhất thông minh với danh sách thứ 2
+  for (const s of secondary) {
+    const key = s.username.toLowerCase();
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...s });
+    } else {
+      // Nếu user đã tồn tại ở cả 2 nơi:
+      const merged: ManagedUser = { ...existing };
+
+      // 1. Nếu một bên đã approved, giữ nguyên approved (không bao giờ đảo ngược về pending)
+      if (existing.status === "approved" || s.status === "approved") {
+        merged.status = "approved";
+      } else if (existing.status === "rejected" || s.status === "rejected") {
+        merged.status = "rejected";
+      }
+
+      // 2. Bảo toàn allowedModules nếu một bên đã được cấu hình quyền
+      if (Array.isArray(s.allowedModules) && s.allowedModules.length > 0) {
+        if (!Array.isArray(existing.allowedModules) || existing.allowedModules.length === 0) {
+          merged.allowedModules = [...s.allowedModules];
+        } else if ((s.updatedAt || 0) > (existing.updatedAt || 0)) {
+          merged.allowedModules = [...s.allowedModules];
+        }
+      }
+
+      // 3. Sử dụng timestamp updatedAt nếu có
+      if ((s.updatedAt || 0) > (existing.updatedAt || 0)) {
+        merged.name = s.name || existing.name;
+        merged.coins = s.coins !== undefined ? s.coins : existing.coins;
+        merged.avatarUrl = s.avatarUrl || existing.avatarUrl;
+        merged.role = s.role || existing.role;
+        merged.updatedAt = s.updatedAt;
+      }
+
+      map.set(key, merged);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+// ---------------------------------------------------------------------------
+// Asynchronous Cloud Sync Helpers (Chạy ngầm, không block request của Client)
+// ---------------------------------------------------------------------------
 async function fetchFromCloudStore(): Promise<{
   users?: ManagedUser[];
   devices?: LockedDevice[];
@@ -234,7 +298,7 @@ async function fetchFromCloudStore(): Promise<{
 } | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
+    const timeout = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`${CLOUD_API_URL}?_t=${Date.now()}`, {
       signal: controller.signal,
       cache: "no-store",
@@ -251,12 +315,46 @@ async function fetchFromCloudStore(): Promise<{
       }
     }
   } catch {
-    // fallback to local
+    // ignore
   }
   return null;
 }
 
-async function saveToCloudStore(payload: {
+async function triggerBackgroundCloudFetch() {
+  const now = Date.now();
+  // Giới hạn tần suất kéo cloud ở chế độ nền (tối thiểu 15 giây/lần để tránh rate limit)
+  if (isCloudSyncInProgress || now - lastCloudFetchTime < 15000) {
+    return;
+  }
+  isCloudSyncInProgress = true;
+  lastCloudFetchTime = now;
+
+  try {
+    const cloudData = await fetchFromCloudStore();
+    if (cloudData) {
+      if (cloudData.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+        const local = readUsersLocal();
+        const merged = mergeUserLists(local, cloudData.users);
+        writeUsersLocal(merged);
+      }
+      if (cloudData.devices && Array.isArray(cloudData.devices)) {
+        writeDevicesLocal(cloudData.devices);
+      }
+      if (cloudData.logs && Array.isArray(cloudData.logs)) {
+        writeAuditLogsLocal(cloudData.logs);
+      }
+      if (cloudData.rooms && Array.isArray(cloudData.rooms)) {
+        writeRoomsLocal(cloudData.rooms);
+      }
+    }
+  } catch {
+    // ignore
+  } finally {
+    isCloudSyncInProgress = false;
+  }
+}
+
+async function saveToCloudStoreBackground(payload: {
   users?: ManagedUser[];
   devices?: LockedDevice[];
   logs?: AuditLogItem[];
@@ -264,7 +362,7 @@ async function saveToCloudStore(payload: {
 }) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 3500);
 
     const currentUsers = payload.users || memoryUsers;
     const currentDevices = payload.devices || memoryDevices;
@@ -290,13 +388,13 @@ async function saveToCloudStore(payload: {
     });
     clearTimeout(timeout);
 
-    // Kích hoạt WebSocket Event Broadcast tức thì (0ms latency push tới toàn bộ trình duyệt đang mở)
+    // Kích hoạt WebSocket Broadcast tức thì
     fetch("https://ntfy.sh/txclonedriver_hub_events", {
       method: "POST",
       body: JSON.stringify({ event: "sync_update", timestamp: Date.now() }),
     }).catch(() => {});
   } catch {
-    // ignore cloud failure
+    // ignore
   }
 }
 
@@ -306,62 +404,44 @@ const NO_CACHE_HEADERS = {
   Expires: "0",
 };
 
-// GET: Fetch users, devices, audit logs, rooms with ZERO CACHE
+// GET: Trả về kết quả tức thì từ In-Memory & Local Disk (0ms latency), kích hoạt sync nền
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
-    const cloudData = await fetchFromCloudStore();
+    // Kích hoạt đồng bộ ngầm không chặn kết quả
+    triggerBackgroundCloudFetch().catch(() => {});
 
     if (type === "rooms") {
-      let rooms = readRoomsLocal();
-      if (cloudData?.rooms && Array.isArray(cloudData.rooms)) {
-        rooms = cloudData.rooms;
-        writeRoomsLocal(rooms);
-      }
+      const rooms = readRoomsLocal();
       return NextResponse.json({ success: true, rooms }, { headers: NO_CACHE_HEADERS });
     }
 
     if (type === "devices") {
-      let devices = readDevicesLocal();
-      if (cloudData?.devices && Array.isArray(cloudData.devices)) {
-        devices = cloudData.devices;
-        writeDevicesLocal(devices);
-      }
+      const devices = readDevicesLocal();
       return NextResponse.json({ success: true, devices }, { headers: NO_CACHE_HEADERS });
     }
 
     if (type === "audit") {
-      let logs = readAuditLogsLocal();
-      if (cloudData?.logs && Array.isArray(cloudData.logs)) {
-        logs = cloudData.logs;
-        writeAuditLogsLocal(logs);
-      }
+      const logs = readAuditLogsLocal();
       return NextResponse.json({ success: true, logs }, { headers: NO_CACHE_HEADERS });
     }
 
-    let users = readUsersLocal();
-    if (cloudData?.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
-      const userMap = new Map<string, ManagedUser>();
-      users.forEach((u) => userMap.set(u.username.toLowerCase(), u));
-      cloudData.users.forEach((u) => userMap.set(u.username.toLowerCase(), u));
-      users = Array.from(userMap.values());
-      writeUsersLocal(users);
-    }
+    const users = readUsersLocal();
     return NextResponse.json({ success: true, users }, { headers: NO_CACHE_HEADERS });
   } catch {
     return NextResponse.json({ success: true, users: memoryUsers }, { headers: NO_CACHE_HEADERS });
   }
 }
 
-// POST: Actions (register, sync_users, sync_devices, sync_audit, sync_rooms)
+// POST: Xử lý thao tác với tốc độ phản hồi cực nhanh (< 5ms)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action } = body;
 
-    // 1. Đăng ký tài khoản
+    // 1. ĐĂNG KÝ TÀI KHOẢN MỚI
     if (action === "register") {
       const { username, password, name } = body;
       const u = (username || "").trim();
@@ -375,15 +455,9 @@ export async function POST(request: Request) {
         );
       }
 
-      const cloudData = await fetchFromCloudStore();
       let users = readUsersLocal();
-      if (cloudData?.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
-        const userMap = new Map<string, ManagedUser>();
-        users.forEach((item) => userMap.set(item.username.toLowerCase(), item));
-        cloudData.users.forEach((item) => userMap.set(item.username.toLowerCase(), item));
-        users = Array.from(userMap.values());
-      }
 
+      // Kiểm tra trùng username
       if (users.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
         return NextResponse.json(
           { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." },
@@ -407,6 +481,7 @@ export async function POST(request: Request) {
         createdAt: dateStr,
         coins: 50000,
         provider: "local",
+        updatedAt: Date.now(),
       };
 
       const updated = [...users, newUser];
@@ -421,65 +496,119 @@ export async function POST(request: Request) {
         timestamp: ts,
         username: u,
         action: "User Registration Pending",
-        details: `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin duyệt.`,
+        details: `Tài khoản mới @${u} (${n}) gửi yêu cầu, đang chờ Admin duyệt.`,
         ip: "Client Machine",
         status: "warning",
       };
       const updatedLogs = [newLog, ...logs].slice(0, 100);
       writeAuditLogsLocal(updatedLogs);
 
-      await saveToCloudStore({ users: updated, logs: updatedLogs });
+      // Lưu lên cloud trong background (không block UI phản hồi)
+      saveToCloudStoreBackground({ users: updated, logs: updatedLogs }).catch(() => {});
 
-      return NextResponse.json({ success: true, user: newUser, users: updated }, { headers: NO_CACHE_HEADERS });
+      return NextResponse.json(
+        { success: true, user: newUser, users: updated },
+        { headers: NO_CACHE_HEADERS }
+      );
     }
 
-    // 2. Admin hoặc Client sync danh sách người dùng (duyệt, cấp quyền, xóa, cập nhật xu)
+    // 2. CẬP NHẬT PHÂN QUYỀN / DUYỆT TỪNG THÀNH VIÊN TRỰC TIẾP
+    if (action === "update_user_permission" || action === "approve_user") {
+      const { userId, allowedModules, status } = body;
+      if (!userId) {
+        return NextResponse.json(
+          { success: false, error: "Thiếu mã định danh người dùng (userId)" },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+
+      let users = readUsersLocal();
+      const now = Date.now();
+      const updated = users.map((u) => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            allowedModules: Array.isArray(allowedModules) ? allowedModules : u.allowedModules,
+            status: status || u.status,
+            updatedAt: now,
+          };
+        }
+        return u;
+      });
+
+      writeUsersLocal(updated);
+      saveToCloudStoreBackground({ users: updated }).catch(() => {});
+
+      return NextResponse.json({ success: true, users: updated }, { headers: NO_CACHE_HEADERS });
+    }
+
+    // 3. ĐỒNG BỘ DANH SÁCH USERS
     if (action === "sync_users") {
       const { users } = body;
       if (Array.isArray(users)) {
-        writeUsersLocal(users);
-        await saveToCloudStore({ users });
-        return NextResponse.json({ success: true, users }, { headers: NO_CACHE_HEADERS });
+        const local = readUsersLocal();
+        const merged = mergeUserLists(local, users);
+        writeUsersLocal(merged);
+        saveToCloudStoreBackground({ users: merged }).catch(() => {});
+        return NextResponse.json({ success: true, users: merged }, { headers: NO_CACHE_HEADERS });
       }
-      return NextResponse.json({ success: false, error: "Dữ liệu users không hợp lệ" }, { status: 400, headers: NO_CACHE_HEADERS });
+      return NextResponse.json(
+        { success: false, error: "Dữ liệu users không hợp lệ" },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
     }
 
-    // 3. Sync phòng Xem & Nghe Chung giữa các máy
+    // 4. SYNC PHÒNG XEM & NGHE CHUNG
     if (action === "sync_rooms") {
       const { rooms } = body;
       if (Array.isArray(rooms)) {
         writeRoomsLocal(rooms);
-        await saveToCloudStore({ rooms });
+        saveToCloudStoreBackground({ rooms }).catch(() => {});
         return NextResponse.json({ success: true, rooms }, { headers: NO_CACHE_HEADERS });
       }
-      return NextResponse.json({ success: false, error: "Dữ liệu rooms không hợp lệ" }, { status: 400, headers: NO_CACHE_HEADERS });
+      return NextResponse.json(
+        { success: false, error: "Dữ liệu rooms không hợp lệ" },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
     }
 
-    // 4. Sync danh sách máy bị khóa / theo dõi
+    // 5. SYNC KHÓA MÁY
     if (action === "sync_devices") {
       const { devices } = body;
       if (Array.isArray(devices)) {
         writeDevicesLocal(devices);
-        await saveToCloudStore({ devices });
+        saveToCloudStoreBackground({ devices }).catch(() => {});
         return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
       }
-      return NextResponse.json({ success: false, error: "Dữ liệu devices không hợp lệ" }, { status: 400, headers: NO_CACHE_HEADERS });
+      return NextResponse.json(
+        { success: false, error: "Dữ liệu devices không hợp lệ" },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
     }
 
-    // 5. Sync nhật ký an ninh
+    // 6. SYNC NHẬT KÝ AN NINH
     if (action === "sync_audit") {
       const { logs } = body;
       if (Array.isArray(logs)) {
         writeAuditLogsLocal(logs);
-        await saveToCloudStore({ logs });
+        saveToCloudStoreBackground({ logs }).catch(() => {});
         return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
       }
-      return NextResponse.json({ success: false, error: "Dữ liệu logs không hợp lệ" }, { status: 400, headers: NO_CACHE_HEADERS });
+      return NextResponse.json(
+        { success: false, error: "Dữ liệu logs không hợp lệ" },
+        { status: 400, headers: NO_CACHE_HEADERS }
+      );
     }
 
-    return NextResponse.json({ success: false, error: "Hành động không hợp lệ" }, { status: 400, headers: NO_CACHE_HEADERS });
+    return NextResponse.json(
+      { success: false, error: "Hành động không hợp lệ" },
+      { status: 400, headers: NO_CACHE_HEADERS }
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error processing auth action";
-    return NextResponse.json({ success: false, error: message }, { status: 500, headers: NO_CACHE_HEADERS });
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500, headers: NO_CACHE_HEADERS }
+    );
   }
 }

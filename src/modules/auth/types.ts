@@ -47,6 +47,7 @@ export interface AuthUser {
   pendingNameChange?: string;
   provider?: "local" | "google";
   googleEmail?: string;
+  updatedAt?: number;
 }
 
 export interface ManagedUser {
@@ -65,6 +66,7 @@ export interface ManagedUser {
   pendingNameChange?: string;
   provider?: "local" | "google";
   googleEmail?: string;
+  updatedAt?: number;
 }
 
 export interface AuditLogItem {

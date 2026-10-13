@@ -335,18 +335,31 @@ export default function SettingsPage() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <Button
                           variant="primary"
                           size="sm"
-                          className="h-8 text-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5"
+                          className="h-8 text-xs bg-emerald-600 hover:bg-emerald-500 text-white gap-1.5 shadow-sm"
                           onClick={() => {
                             approveUser(pUser.id, ["storage"]);
-                            triggerToast(`Đã phê duyệt tài khoản @${pUser.username}!`);
+                            triggerToast(`Đã phê duyệt tài khoản @${pUser.username} và cấp quyền Google Drive!`);
                           }}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
-                          <span>Duyệt & Cấp quyền Drive</span>
+                          <span>Duyệt & Cấp Drive</span>
+                        </Button>
+
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="h-8 text-xs bg-indigo-600 hover:bg-indigo-500 text-white gap-1.5 shadow-sm"
+                          onClick={() => {
+                            approveUser(pUser.id, ALL_MODULES.map((m) => m.id));
+                            triggerToast(`Đã phê duyệt và cấp TOÀN BỘ QUYỀN cho @${pUser.username}!`);
+                          }}
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          <span>Duyệt & Toàn quyền</span>
                         </Button>
 
                         <Button

@@ -14,6 +14,7 @@ import { TetrisGame } from "@/modules/games/components/TetrisGame";
 import { WordChainGame } from "@/modules/games/components/WordChainGame";
 import { PvPArenaGame } from "@/modules/games/components/PvPArenaGame";
 import { LuckyWheelGame } from "@/modules/games/components/LuckyWheelGame";
+import { RewardShop } from "@/modules/games/components/RewardShop";
 import {
   Coins,
   Sparkles,
@@ -24,9 +25,11 @@ import {
   Copy,
   Check,
   Gamepad2,
+  ShoppingBag,
 } from "lucide-react";
 
 const GAME_TABS: Array<{ id: GameId; label: string; icon: string; category: string }> = [
+  { id: "reward_shop", label: "🛍️ Chợ Đổi Quà & Danh Hiệu", icon: "🛍️", category: "Kinh Tế & Xu" },
   { id: "pvp_arena", label: "⚔️ Đấu Trường PvP", icon: "⚔️", category: "Đối Kháng Cược Xu" },
   { id: "lucky_wheel", label: "🎰 Vòng Quay & Xổ Số", icon: "🎰", category: "May Mắn & Jackpot" },
   { id: "taixiu", label: "Tài Xỉu", icon: "🎲", category: "Dân Gian & Casino" },
@@ -187,6 +190,7 @@ function GamesContent() {
 
       {/* Active Game Component Area */}
       <div className="min-h-[500px]">
+        {activeGameId === "reward_shop" && <RewardShop />}
         {activeGameId === "pvp_arena" && <PvPArenaGame />}
         {activeGameId === "lucky_wheel" && <LuckyWheelGame />}
         {activeGameId === "taixiu" && <TaiXiuGame />}

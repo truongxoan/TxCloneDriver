@@ -15,6 +15,13 @@ export const metadata: Metadata = {
   title: "MêÂmĐạoSỹ — Hệ thống Quản trị & Đồng bộ Đám mây",
   description:
     "Nền tảng quản lý dữ liệu cá nhân cao cấp MêÂmĐạoSỹ tích hợp Google Drive, Telegram, Lịch âm dương Việt Nam và kiểm soát phân quyền thành viên.",
+  manifest: "/manifest.json",
+  themeColor: "#0f172a",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TxCloneDriver",
+  },
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg",
@@ -49,6 +56,19 @@ export default function RootLayout({
             </MusicPlayerProvider>
           </DriveEndpointsProvider>
         </AuthProvider>
+
+        {/* PWA Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

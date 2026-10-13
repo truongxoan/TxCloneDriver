@@ -1,0 +1,83 @@
+[
+  {
+    "id": "u-admin",
+    "username": "admin",
+    "password": "kdkctrkn@123",
+    "name": "Quản trị viên Tối cao",
+    "avatarInitials": "TX",
+    "coins": 50000,
+    "role": "admin",
+    "status": "approved",
+    "allowedModules": [
+      "overview",
+      "storage",
+      "notes",
+      "projects",
+      "events",
+      "weather",
+      "settings",
+      "telegram",
+      "watch_together",
+      "vault",
+      "games",
+      "study",
+      "driver_license",
+      "expenses",
+      "qr",
+      "downloader",
+      "memories",
+      "image_studio",
+      "google_flow"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000000
+  },
+  {
+    "id": "u-member-a",
+    "username": "11",
+    "password": "21",
+    "name": "Thành viên A (Chỉ Google Drive)",
+    "avatarInitials": "11",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000000
+  },
+  {
+    "id": "u-member-b",
+    "username": "userb",
+    "password": "21",
+    "name": "Thành viên B (Google Drive & Dự án)",
+    "avatarInitials": "UB",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "projects"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000000
+  },
+  {
+    "id": "u-member-pending",
+    "username": "hocvien_moi",
+    "password": "21",
+    "name": "Học viên Đăng ký mới (Chờ duyệt)",
+    "avatarInitials": "HV",
+    "coins": 50000,
+    "role": "user",
+    "status": "pending",
+    "allowedModules": [],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000000
+  }
+]

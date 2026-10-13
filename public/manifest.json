@@ -1,0 +1,18 @@
+{
+  "name": "TxCloneDriver Cloud Hub",
+  "short_name": "TxClone",
+  "description": "Hệ thống Quản trị & Đồng bộ Đám mây Đa Nền tảng TxCloneDriver",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

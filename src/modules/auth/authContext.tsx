@@ -160,6 +160,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [securityAuditLogs, setSecurityAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
   const [lockedDevices, setLockedDevices] = useState<LockedDevice[]>([]);
 
+  // Phát tín hiệu đồng bộ ngay lập tức tới mọi tab trình duyệt trên máy
+  const broadcastSync = (data: { type: string; users?: ManagedUser[]; devices?: LockedDevice[] }) => {
+    try {
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        const bc = new BroadcastChannel("txclonedriver_auth_sync");
+        bc.postMessage(data);
+        bc.close();
+      }
+    } catch {}
+  };
+
   // Function to pull users from server API and update state & localStorage (ZERO-CACHE)
   const refreshUsersFromServer = async () => {
     try {
@@ -173,10 +184,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.users) && data.users.length > 0) {
-          setManagedUsers(data.users);
-          try {
-            localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
-          } catch {}
+          setManagedUsers((prev) => {
+            const map = new Map<string, ManagedUser>();
+            prev.forEach((u) => map.set(u.username.toLowerCase(), u));
+            data.users.forEach((serverUser: ManagedUser) => {
+              const localUser = map.get(serverUser.username.toLowerCase());
+              if (!localUser) {
+                map.set(serverUser.username.toLowerCase(), serverUser);
+              } else {
+                // Bảo toàn quyền duyệt và cấu hình mới nhất, không bao giờ hạ cấp về pending
+                if (localUser.status === "approved" && serverUser.status === "pending") {
+                  map.set(serverUser.username.toLowerCase(), {
+                    ...serverUser,
+                    status: "approved",
+                    allowedModules:
+                      localUser.allowedModules.length > 0
+                        ? localUser.allowedModules
+                        : serverUser.allowedModules,
+                  });
+                } else if ((localUser.updatedAt || 0) > (serverUser.updatedAt || 0)) {
+                  map.set(serverUser.username.toLowerCase(), localUser);
+                } else {
+                  map.set(serverUser.username.toLowerCase(), serverUser);
+                }
+              }
+            });
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
           return data.users as ManagedUser[];
         }
       }
@@ -227,12 +265,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 2. Fetch fresh users immediately
     refreshUsersFromServer();
 
-    // 3. Fast polling fallback
+    // 3. Lắng nghe BroadcastChannel để đồng bộ 0ms giữa mọi tab đang mở cùng máy
+    let localBc: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        localBc = new BroadcastChannel("txclonedriver_auth_sync");
+        localBc.onmessage = (event) => {
+          if (event.data?.type === "users_updated" && Array.isArray(event.data.users)) {
+            setManagedUsers(event.data.users);
+          }
+        };
+      }
+    } catch {}
+
+    // 4. Polling định kỳ mượt mà
     const pollInterval = setInterval(() => {
       refreshUsersFromServer();
-    }, 2000);
+    }, 4000);
 
-    // 4. Zero-Latency Real-Time WebSocket Push (Phản hồi tức thì < 50ms khi có bất kỳ thay đổi nào)
+    // 5. Zero-Latency Real-Time WebSocket Push (< 50ms khi có thay đổi từ máy khác)
     let ws: WebSocket | null = null;
     try {
       ws = new WebSocket("wss://ntfy.sh/txclonedriver_hub_events/ws");
@@ -240,7 +291,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsed = JSON.parse(event.data);
           if (parsed.event === "message") {
-            // Nhận tín hiệu có thay đổi từ máy khác -> fetch ngay lập tức 0ms trễ
             refreshUsersFromServer();
           }
         } catch {}
@@ -249,6 +299,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       clearInterval(pollInterval);
+      if (localBc) {
+        try {
+          localBc.close();
+        } catch {}
+      }
       if (ws) {
         try {
           ws.close();
@@ -360,6 +415,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(updated));
     } catch {}
 
+    broadcastSync({ type: "users_updated", users: updated });
+
     // Sync to server so all devices see the changes immediately
     fetch("/api/auth", {
       method: "POST",
@@ -463,11 +520,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
         } catch {}
+        broadcastSync({ type: "users_updated", users: data.users });
       }
 
       logSecurityAudit(
         "User Registration Pending",
-        `Tài khoản đăng ký lẻ @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
+        `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
         "warning"
       );
 
@@ -494,6 +552,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: dateStr,
         coins: 50000,
         provider: "local",
+        updatedAt: Date.now(),
       };
 
       const updated = [...managedUsers, newUser];
@@ -520,10 +579,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Admin action: update permissions and status
   const updateUserPermissions = (userId: string, allowedModules: string[], status: UserStatus) => {
+    const now = Date.now();
     const updated = managedUsers.map((item) =>
-      item.id === userId ? { ...item, allowedModules, status } : item
+      item.id === userId ? { ...item, allowedModules, status, updatedAt: now } : item
     );
     saveUsersList(updated);
+
+    // Call direct endpoint for instant persistence
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "update_user_permission",
+        userId,
+        allowedModules,
+        status,
+      }),
+    }).catch(() => {});
 
     // If current logged in user was modified, update their active session
     if (user && user.id === userId) {
@@ -531,6 +603,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...user,
         allowedModules,
         status,
+        updatedAt: now,
       };
       setUser(updatedUser);
       setSessionCookie(updatedUser);
