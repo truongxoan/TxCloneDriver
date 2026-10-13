@@ -328,36 +328,40 @@ export function FloatingMessenger() {
         <div
           onMouseEnter={handleEdgeMouseEnter}
           onMouseLeave={handleEdgeMouseLeave}
-          className="fixed right-0 top-2/3 -translate-y-1/2 z-50 flex items-center justify-end select-none"
+          className="fixed right-0 top-2/3 -translate-y-1/2 z-[9999] flex items-center justify-end"
         >
           {/* Trạng thái 1: Thanh nhỏ dính sát cạnh phải màn hình (cực kỳ gọn gàng, tinh tế) */}
           {!isEdgeHovered ? (
-            <div
+            <button
+              type="button"
               onClick={() => {
                 setIsOpen(true);
                 setLastActivity(Date.now());
+                setIsEdgeHovered(false);
               }}
-              className="group flex items-center gap-1 py-3 px-1.5 rounded-l-2xl bg-slate-900/80 hover:bg-slate-800/95 backdrop-blur-md border-l border-y border-sky-400/30 text-sky-400 shadow-xl cursor-pointer transition-all duration-300 hover:translate-x-[-4px]"
-              title="Rê chuột giữ 1s hoặc nhấp để mở khung chat"
+              className="group flex items-center gap-1 py-3 px-2 rounded-l-2xl bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border-l border-y border-sky-400/40 text-sky-400 shadow-2xl cursor-pointer transition-all duration-200 hover:translate-x-[-4px] active:scale-95"
+              title="Nhấp để mở khung chat (hoặc giữ chuột 1s để xem bong bóng chat)"
             >
-              <div className="flex flex-col items-center gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5 text-sky-400 transition-transform group-hover:scale-110" />
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse" />
+              <div className="flex flex-col items-center gap-1.5 pointer-events-none">
+                <MessageCircle className="w-4 h-4 text-sky-400 transition-transform group-hover:scale-110" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse" />
                 {messages.length > 0 && (
-                  <span className="text-[9px] font-black text-rose-300 px-0.5 rounded-full bg-rose-500/20 font-mono">
+                  <span className="text-[9px] font-black text-rose-300 px-1 rounded-full bg-rose-500/20 font-mono">
                     {messages.length > 9 ? "9+" : messages.length}
                   </span>
                 )}
               </div>
-            </div>
+            </button>
           ) : (
             /* Trạng thái 2: Sau khi rê chuột đủ 1 giây, bung ra bóng chat đầy đủ với hiệu ứng mượt */
-            <div className="flex items-center gap-2 pr-4 pl-3 py-2 mr-0 rounded-l-3xl bg-slate-950/90 backdrop-blur-xl border-l border-y border-white/20 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-300">
+            <div className="flex items-center gap-2 pr-4 pl-3 py-2 mr-0 rounded-l-3xl bg-slate-950/95 backdrop-blur-xl border-l border-y border-white/20 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-200">
               {/* Nút Tắt/Ẩn hoàn toàn nhanh */}
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleChatWidget(false);
+                  setIsEdgeHovered(false);
                 }}
                 className="h-8 w-8 rounded-full bg-white/10 hover:bg-rose-600/90 text-slate-300 hover:text-white border border-white/10 shadow flex items-center justify-center transition-colors cursor-pointer"
                 title="Tắt/Ẩn biểu tượng chat hoàn toàn (Có thể bật lại ở thanh Header)"
@@ -367,9 +371,11 @@ export function FloatingMessenger() {
 
               {/* Nút Mở Khung Chat */}
               <button
+                type="button"
                 onClick={() => {
                   setIsOpen(true);
                   setLastActivity(Date.now());
+                  setIsEdgeHovered(false);
                 }}
                 className="relative flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
                 title="Mở TxMessenger Mở Rộng"

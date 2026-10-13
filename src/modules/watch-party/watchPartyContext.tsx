@@ -49,6 +49,7 @@ interface WatchPartyContextType {
 const WatchPartyContext = createContext<WatchPartyContextType | undefined>(undefined);
 
 const STORAGE_ROOMS_KEY = "txclonedriver_watch_rooms";
+const STORAGE_CURRENT_ROOM_KEY = "txclonedriver_watch_current_room_id";
 
 // Xóa bỏ tất cả phòng ví dụ mặc định theo yêu cầu của người dùng. Ban đầu là danh sách trống.
 const INITIAL_ROOMS: SyncRoom[] = [];
@@ -61,7 +62,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
   const [savedBookmarks, setSavedBookmarks] = useState<UserSavedBookmark[]>([]);
   const [reactions, setReactions] = useState<RoomReaction[]>([]);
 
-  // Function to pull rooms from server API (ZERO-CACHE)
+  // Function to pull rooms from server API (ZERO-CACHE) and merge smartly
   const refreshRoomsFromServer = async () => {
     try {
       const res = await fetch(`/api/auth?type=rooms&_t=${Date.now()}`, {
@@ -74,14 +75,26 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.rooms)) {
-          const cleaned = data.rooms.filter(
+          const serverRooms: SyncRoom[] = data.rooms.filter(
             (r: SyncRoom) => r.id !== "room-lofi" && r.id !== "room-cinema"
           );
-          setRooms(cleaned);
-          try {
-            localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify(cleaned));
-          } catch {}
-          return cleaned;
+
+          setRooms((prev) => {
+            // Smart merge: Preserve active local rooms that might not have landed on server yet
+            const map = new Map<string, SyncRoom>();
+            serverRooms.forEach((r) => map.set(r.id, r));
+            prev.forEach((r) => {
+              if (!map.has(r.id)) {
+                map.set(r.id, r);
+              }
+            });
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+          return serverRooms;
         }
       }
     } catch {
@@ -100,10 +113,10 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
           ? parsed.filter((r: SyncRoom) => r.id !== "room-lofi" && r.id !== "room-cinema")
           : [];
         setRooms(cleaned);
-        localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify(cleaned));
-      } else {
-        setRooms([]);
-        localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify([]));
+      }
+      const savedActiveRoom = localStorage.getItem(STORAGE_CURRENT_ROOM_KEY);
+      if (savedActiveRoom) {
+        setCurrentRoomId(savedActiveRoom);
       }
     } catch {
       setRooms([]);
@@ -175,6 +188,17 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     }).catch(() => {});
   };
 
+  const changeCurrentRoom = (id: string | null) => {
+    setCurrentRoomId(id);
+    try {
+      if (id) {
+        localStorage.setItem(STORAGE_CURRENT_ROOM_KEY, id);
+      } else {
+        localStorage.removeItem(STORAGE_CURRENT_ROOM_KEY);
+      }
+    } catch {}
+  };
+
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || null;
 
   // Create Room
@@ -225,7 +249,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     const updated = [newRoom, ...rooms];
     saveRoomsList(updated);
-    setCurrentRoomId(newRoom.id);
+    changeCurrentRoom(newRoom.id);
     return newRoom;
   };
 
@@ -241,7 +265,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     const updated = rooms.filter((r) => r.id !== roomId);
     saveRoomsList(updated);
     if (currentRoomId === roomId) {
-      setCurrentRoomId(null);
+      changeCurrentRoom(null);
     }
     return { success: true };
   };
@@ -249,7 +273,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
   // Clear all rooms
   const clearAllRooms = () => {
     saveRoomsList([]);
-    setCurrentRoomId(null);
+    changeCurrentRoom(null);
   };
 
   // Join Room
@@ -300,14 +324,14 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     const updatedRooms = rooms.map((r) => (r.id === target.id ? updatedRoom : r));
     saveRoomsList(updatedRooms);
-    setCurrentRoomId(target.id);
+    changeCurrentRoom(target.id);
     return { success: true };
   };
 
   // Leave Room
   const leaveRoom = () => {
     if (!currentRoom || !user) {
-      setCurrentRoomId(null);
+      changeCurrentRoom(null);
       return;
     }
 
@@ -329,7 +353,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     const updatedRooms = rooms.map((r) => (r.id === currentRoom.id ? updatedRoom : r));
     saveRoomsList(updatedRooms);
-    setCurrentRoomId(null);
+    changeCurrentRoom(null);
   };
 
   // Order Song / Video into Queue (Hỗ trợ YouTube, Spotify, ZingMP3, NhacCuaTui, Google Drive, Direct)

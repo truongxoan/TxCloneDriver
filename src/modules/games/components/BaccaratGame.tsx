@@ -92,9 +92,14 @@ export function BaccaratGame() {
     setBets({ player: 0, banker: 0, tie: 0 });
   };
 
+  const betsRef = React.useRef(bets);
+  betsRef.current = bets;
+
   const executeDeal = () => {
     setIsDealing(true);
     setResultMsg(null);
+
+    const activeBets = { ...betsRef.current };
 
     // Initial 2 cards for Player and Banker
     let pHand: Card[];
@@ -164,20 +169,22 @@ export function BaccaratGame() {
       else if (bScore > pScore) outcome = "banker";
 
       let winPayout = 0;
-      if (outcome === "player" && bets.player > 0) {
-        winPayout += bets.player * 2;
+      if (outcome === "player" && activeBets.player > 0) {
+        winPayout += activeBets.player * 2;
       }
-      if (outcome === "banker" && bets.banker > 0) {
-        winPayout += bets.banker * 1.95; // 5% commission
+      if (outcome === "banker" && activeBets.banker > 0) {
+        winPayout += activeBets.banker * 1.95; // 5% commission
       }
-      if (outcome === "tie" && bets.tie > 0) {
-        winPayout += bets.tie * 9; // 1:8 payout + return principal
+      if (outcome === "tie" && activeBets.tie > 0) {
+        winPayout += activeBets.tie * 9; // 1:8 payout + return principal
       }
 
       // If tie, return Player/Banker bets
       if (outcome === "tie") {
-        winPayout += bets.player + bets.banker;
+        winPayout += activeBets.player + activeBets.banker;
       }
+
+      const activeTotal = Object.values(activeBets).reduce((a, b) => a + b, 0);
 
       if (winPayout > 0) {
         addCoins(Math.round(winPayout), "Thắng Baccarat");
@@ -186,7 +193,7 @@ export function BaccaratGame() {
             outcome === "player" ? pScore : bScore
           } điểm)`
         );
-      } else if (totalBet > 0) {
+      } else if (activeTotal > 0) {
         setResultMsg(
           `Kết thúc ván: Player ${pScore} - Banker ${bScore} (${
             outcome === "tie" ? "HÒA (TIE)" : outcome === "player" ? "PLAYER THẮNG" : "BANKER THẮNG"
@@ -200,6 +207,7 @@ export function BaccaratGame() {
         );
       }
 
+      setBets({ player: 0, banker: 0, tie: 0 });
       setHistory((prev) => [outcome, ...prev.slice(0, 19)]);
     }, 1200);
   };
@@ -215,7 +223,6 @@ export function BaccaratGame() {
         }
         if (prev <= 1) {
           setRoundId((r) => r + 1);
-          setBets({ player: 0, banker: 0, tie: 0 });
           return 10;
         }
         return prev - 1;
@@ -223,7 +230,7 @@ export function BaccaratGame() {
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, bets, coins, baccaratRiggedOutcome, roundId]);
+  }, [autoRun, baccaratRiggedOutcome, roundId]);
 
   const handleDeal = () => {
     if (isDealing) return;
