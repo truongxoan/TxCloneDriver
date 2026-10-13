@@ -227,9 +227,12 @@ export default function LoginPage() {
   // Mở popup hoặc gọi Google One Tap trực tiếp từ trình duyệt
   const triggerGoogleRealLogin = () => {
     try {
-      if (typeof window !== "undefined" && window.google?.accounts?.id) {
+      const customClientId = typeof window !== "undefined" ? localStorage.getItem("google_oauth_client_id") : null;
+      const effectiveClientId = customClientId || "92183210432-demoappgoogleoauth2026.apps.googleusercontent.com";
+
+      if (typeof window !== "undefined" && window.google?.accounts?.id && customClientId) {
         window.google.accounts.id.initialize({
-          client_id: "92183210432-demoappgoogleoauth2026.apps.googleusercontent.com",
+          client_id: effectiveClientId,
           callback: (response: any) => {
             if (response?.credential) {
               const payload = decodeGoogleJwt(response.credential);
@@ -246,11 +249,11 @@ export default function LoginPage() {
         // Kích hoạt hiển thị Google One Tap / Chọn tài khoản Google của máy
         window.google.accounts.id.prompt((notification: any) => {
           if (notification?.isNotDisplayed() || notification?.isSkippedMoment()) {
-            // Nếu trình duyệt chặn One Tap không có Client ID thật thì hiển thị modal nhập email
             setShowGoogleModal(true);
           }
         });
       } else {
+        // Luôn hiển thị Google Login Modal tiện dụng với chọn nhanh hoặc nhập email/tên
         setShowGoogleModal(true);
       }
     } catch {
@@ -905,30 +908,32 @@ export default function LoginPage() {
             {/* Quick One Tap or Choose Account */}
             <div className="space-y-2 pt-1">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                Tài khoản Google trên máy này:
+                Đăng nhập nhanh:
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  // Lấy tài khoản người dùng đăng nhập trình duyệt hiện tại
-                  setGoogleEmailInput("user.drive@gmail.com");
-                  setGoogleNameInput("Tài khoản Google Cá nhân");
+                  const defaultMail = "user.drive@gmail.com";
+                  const defaultName = "Tài khoản Google Cá nhân";
+                  setGoogleEmailInput(defaultMail);
+                  setGoogleNameInput(defaultName);
+                  handleProcessGoogleUser(defaultMail, defaultName);
                 }}
                 className="w-full p-2.5 rounded-2xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 hover:from-blue-500/20 hover:to-indigo-500/20 border border-blue-500/30 flex items-center justify-between text-xs text-slate-200 transition-all group"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-blue-600/30 text-blue-300 font-bold text-xs flex items-center justify-center border border-blue-400/40">
+                  <div className="w-8 h-8 rounded-full bg-blue-600/30 text-blue-300 font-bold text-xs flex items-center justify-center border border-blue-400/40">
                     G
                   </div>
                   <div className="text-left">
                     <div className="font-semibold text-white text-[11px] group-hover:text-blue-300 transition-colors">
-                      Đăng nhập tài khoản Google mặc định
+                      Đăng nhập nhanh Google Drive Mặc định
                     </div>
                     <div className="text-[10px] text-slate-400">user.drive@gmail.com</div>
                   </div>
                 </div>
-                <span className="text-[10px] text-sky-400 font-bold px-2 py-0.5 rounded-lg bg-sky-500/10 border border-sky-500/20">
-                  Chọn &rarr;
+                <span className="text-[10px] text-sky-400 font-bold px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30">
+                  Vào ngay &rarr;
                 </span>
               </button>
             </div>
@@ -936,7 +941,7 @@ export default function LoginPage() {
             <form onSubmit={handleGoogleSubmit} className="space-y-3 pt-2">
               <div>
                 <label className="text-xs font-semibold text-slate-300 block mb-1">
-                  Hoặc nhập Email Google của bạn:
+                  Hoặc đăng nhập bằng địa chỉ Gmail của bạn:
                 </label>
                 <input
                   type="email"

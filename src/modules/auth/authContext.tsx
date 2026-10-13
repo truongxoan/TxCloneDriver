@@ -94,7 +94,7 @@ const INITIAL_USERS: ManagedUser[] = [
     coins: 50000,
     role: "user",
     status: "approved",
-    allowedModules: ["storage"], // Đúng như yêu cầu: Thành viên A chỉ được mở mục Google Driver
+    allowedModules: ["storage"],
     createdAt: "10/10/2026",
   },
   {
@@ -106,7 +106,7 @@ const INITIAL_USERS: ManagedUser[] = [
     coins: 50000,
     role: "user",
     status: "approved",
-    allowedModules: ["storage", "projects"], // Đúng như yêu cầu: Thành viên B chỉ được mở Google Driver và Dự án
+    allowedModules: ["storage", "projects"],
     createdAt: "10/10/2026",
   },
   {
@@ -160,27 +160,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [securityAuditLogs, setSecurityAuditLogs] = useState<AuditLogItem[]>(INITIAL_AUDIT_LOGS);
   const [lockedDevices, setLockedDevices] = useState<LockedDevice[]>([]);
 
-  // Load managed users, session, and locked devices
-  useEffect(() => {
+  // Function to pull users from server API and update state & localStorage
+  const refreshUsersFromServer = async () => {
     try {
-      const savedUsers = localStorage.getItem(STORAGE_USERS_KEY);
-      if (savedUsers) {
-        setManagedUsers(JSON.parse(savedUsers));
-      } else {
-        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(INITIAL_USERS));
+      const res = await fetch("/api/auth");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+          setManagedUsers(data.users);
+          try {
+            localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
+          } catch {}
+          return data.users as ManagedUser[];
+        }
       }
     } catch {
       // ignore
     }
+    return null;
+  };
+
+  // Load managed users, session, and locked devices
+  useEffect(() => {
+    // 1. Load initial cache from localStorage
+    try {
+      const savedUsers = localStorage.getItem(STORAGE_USERS_KEY);
+      if (savedUsers) {
+        setManagedUsers(JSON.parse(savedUsers));
+      }
+    } catch {}
 
     try {
       const savedDevices = localStorage.getItem(STORAGE_LOCKED_DEVICES_KEY);
       if (savedDevices) {
         setLockedDevices(JSON.parse(savedDevices));
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     try {
       const savedMaintenance = localStorage.getItem(STORAGE_MAINTENANCE_KEY);
@@ -195,24 +210,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (savedOriginalAdmin) {
         setOriginalAdminUser(JSON.parse(savedOriginalAdmin));
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
 
     const existingSession = getSessionCookie();
     if (existingSession) {
       setUser(existingSession);
     }
     setInitialized(true);
+
+    // 2. Fetch fresh users & devices & audit from server
+    refreshUsersFromServer();
+
+    // 3. Periodic polling every 3.5s so Admin sees new registrations from target machines in real time!
+    const pollInterval = setInterval(() => {
+      refreshUsersFromServer();
+    }, 3500);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const saveDevicesList = (updated: LockedDevice[]) => {
     setLockedDevices(updated);
     try {
       localStorage.setItem(STORAGE_LOCKED_DEVICES_KEY, JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
+    } catch {}
+
+    // Sync to server
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync_devices", devices: updated }),
+    }).catch(() => {});
   };
 
   const recordDeviceAttempt = (
@@ -302,9 +330,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setManagedUsers(updated);
     try {
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(updated));
-    } catch {
-      // ignore
-    }
+    } catch {}
+
+    // Sync to server so all devices see the changes immediately
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "sync_users", users: updated }),
+    }).catch(() => {});
   };
 
   const login = async (
@@ -314,8 +347,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = username.trim();
     const p = password.trim();
 
-    // Check in managedUsers list
-    const foundUser = managedUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
+    // Refresh users from server to get latest approvals / updates
+    const freshUsers = (await refreshUsersFromServer()) || managedUsers;
+
+    // Check in users list
+    const foundUser = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
 
     if (!foundUser || foundUser.password !== p) {
       return {
@@ -376,38 +412,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: "Vui lòng nhập đầy đủ thông tin đăng ký." };
     }
 
-    if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
-      return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
+    try {
+      // Send register request to server API so all clients/admin see it
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "register",
+          username: u,
+          password: p,
+          name: n,
+        }),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        return { success: false, error: data.error || "Không thể đăng ký tài khoản." };
+      }
+
+      if (Array.isArray(data.users)) {
+        setManagedUsers(data.users);
+        try {
+          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
+        } catch {}
+      }
+
+      logSecurityAudit(
+        "User Registration Pending",
+        `Tài khoản đăng ký lẻ @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
+        "warning"
+      );
+
+      return { success: true };
+    } catch {
+      // Fallback local if network fails
+      if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
+        return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
+      }
+
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}/${now.getFullYear()}`;
+
+      const newUser: ManagedUser = {
+        id: `u-${Date.now()}`,
+        username: u,
+        password: p,
+        name: n,
+        role: "user",
+        status: "pending",
+        allowedModules: [],
+        createdAt: dateStr,
+        coins: 50000,
+        provider: "local",
+      };
+
+      const updated = [...managedUsers, newUser];
+      saveUsersList(updated);
+
+      return { success: true };
     }
-
-    const now = new Date();
-    const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-      now.getMonth() + 1
-    ).padStart(2, "0")}/${now.getFullYear()}`;
-
-    const newUser: ManagedUser = {
-      id: `u-${Date.now()}`,
-      username: u,
-      password: p,
-      name: n,
-      role: "user",
-      status: "pending", // Đăng ký lẻ: phải chờ Admin phê duyệt & cấp quyền
-      allowedModules: [], // Chưa được cấp quyền cho đến khi Admin duyệt
-      createdAt: dateStr,
-      coins: 50000,
-      provider: "local",
-    };
-
-    const updated = [...managedUsers, newUser];
-    saveUsersList(updated);
-
-    logSecurityAudit(
-      "User Registration Pending",
-      `Tài khoản đăng ký lẻ @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
-      "warning"
-    );
-
-    return { success: true };
   };
 
   const loginWithGoogle = async (googleProfile: {
@@ -418,79 +483,121 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const email = googleProfile.email.trim().toLowerCase();
     const name = googleProfile.name.trim() || email.split("@")[0];
 
-    // Check if user with this googleEmail or username exists
-    let foundUser = managedUsers.find(
-      (u) =>
-        (u.googleEmail && u.googleEmail.toLowerCase() === email) ||
-        u.username.toLowerCase() === email
-    );
+    try {
+      // 1. Call server API to create/find account in central store
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "google_login",
+          email,
+          name,
+          avatarUrl: googleProfile.avatarUrl,
+        }),
+      });
 
-    const now = new Date();
-    const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-      now.getMonth() + 1
-    ).padStart(2, "0")}/${now.getFullYear()}`;
+      const data = await res.json();
+      if (!data.success) {
+        return { success: false, error: data.error || "Đăng nhập Google không thành công." };
+      }
 
-    if (!foundUser) {
-      // Đăng nhập Google thay thế đăng ký: Lấy thông tin từ Google tạo tài khoản trực tiếp, cấp quyền Driver và vào dùng luôn
-      foundUser = {
-        id: `u-gg-${Date.now()}`,
-        username: email,
-        name: name,
-        avatarUrl: googleProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
-        role: "user",
-        status: "approved", // Vào sử dụng luôn không cần chờ duyệt
-        allowedModules: ["storage", "overview", "image_studio", "google_flow"], // Cấp sẵn toàn quyền Google Driver và các tiện ích liên quan
-        createdAt: dateStr,
-        coins: 50000,
+      const foundUser: ManagedUser = data.user;
+      if (Array.isArray(data.users)) {
+        setManagedUsers(data.users);
+        try {
+          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
+        } catch {}
+      }
+
+      if (foundUser.status === "rejected") {
+        return { success: false, error: "Tài khoản Google này đã bị khóa quyền truy cập." };
+      }
+
+      const initials =
+        foundUser.name
+          .split(" ")
+          .map((s) => s[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase() || "GG";
+
+      const authUser: AuthUser = {
+        id: foundUser.id,
+        username: foundUser.username,
+        role: foundUser.role,
+        name: foundUser.name,
+        avatarInitials: initials,
+        avatarUrl: foundUser.avatarUrl,
+        status: foundUser.status,
+        allowedModules: foundUser.allowedModules || ["storage", "overview", "image_studio", "google_flow"],
         provider: "google",
         googleEmail: email,
+        coins: foundUser.coins,
       };
 
-      const updated = [...managedUsers, foundUser];
-      saveUsersList(updated);
-      logSecurityAudit(
-        "Google Auto-Register & Login",
-        `Tài khoản Google @${email} (${name}) tự động tạo tài khoản, được cấp quyền Google Driver và vào sử dụng ngay.`,
-        "success"
+      setUser(authUser);
+      setSessionCookie(authUser);
+      logSecurityAudit("Google Login", `Tài khoản Google @${email} đăng nhập thành công`, "success");
+      return { success: true };
+    } catch {
+      // Fallback local logic
+      const currentUsers = (await refreshUsersFromServer()) || managedUsers;
+      let foundUser = currentUsers.find(
+        (u) =>
+          (u.googleEmail && u.googleEmail.toLowerCase() === email) ||
+          u.username.toLowerCase() === email
       );
-    } else {
-      // Update avatar if provided
-      if (googleProfile.avatarUrl && !foundUser.avatarUrl) {
-        foundUser.avatarUrl = googleProfile.avatarUrl;
-        saveUsersList([...managedUsers]);
+
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1
+      ).padStart(2, "0")}/${now.getFullYear()}`;
+
+      if (!foundUser) {
+        foundUser = {
+          id: `u-gg-${Date.now()}`,
+          username: email,
+          name: name,
+          avatarUrl: googleProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(email)}`,
+          role: "user",
+          status: "approved",
+          allowedModules: ["storage", "overview", "image_studio", "google_flow", "vault", "notes", "projects"],
+          createdAt: dateStr,
+          coins: 50000,
+          provider: "google",
+          googleEmail: email,
+        };
+
+        const updated = [...currentUsers, foundUser];
+        saveUsersList(updated);
       }
+
+      const initials =
+        foundUser.name
+          .split(" ")
+          .map((s) => s[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase() || "GG";
+
+      const authUser: AuthUser = {
+        id: foundUser.id,
+        username: foundUser.username,
+        role: foundUser.role,
+        name: foundUser.name,
+        avatarInitials: initials,
+        avatarUrl: foundUser.avatarUrl,
+        status: foundUser.status,
+        allowedModules: foundUser.allowedModules,
+        provider: "google",
+        googleEmail: email,
+        coins: foundUser.coins,
+      };
+
+      setUser(authUser);
+      setSessionCookie(authUser);
+      return { success: true };
     }
-
-    if (foundUser.status === "rejected") {
-      return { success: false, error: "Tài khoản Google này đã bị khóa quyền truy cập." };
-    }
-
-    const initials =
-      foundUser.name
-        .split(" ")
-        .map((s) => s[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "GG";
-
-    const authUser: AuthUser = {
-      id: foundUser.id,
-      username: foundUser.username,
-      role: foundUser.role,
-      name: foundUser.name,
-      avatarInitials: initials,
-      avatarUrl: foundUser.avatarUrl,
-      status: foundUser.status,
-      allowedModules: foundUser.allowedModules,
-      provider: "google",
-      googleEmail: email,
-      coins: foundUser.coins,
-    };
-
-    setUser(authUser);
-    setSessionCookie(authUser);
-    logSecurityAudit("Google Login", `Tài khoản Google @${email} đăng nhập thành công`, "success");
-    return { success: true };
   };
 
   const logout = () => {
