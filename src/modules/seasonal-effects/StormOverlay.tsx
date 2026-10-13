@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useTheme } from "../theme-engine/themeContext";
+import { playThunderSound } from "@/lib/soundEffects";
 
 /**
  * Photorealistic Procedural Lightning & Storm Atmosphere Engine
@@ -264,6 +265,9 @@ export function StormOverlay() {
       setShakeClass("storm-shake-intense");
     }
 
+    // Realistic Web Audio Thunder Acoustic Shockwave
+    playThunderSound(!strike.isSheetOnly);
+
     // Dip at 45ms
     setTimeout(() => {
       if (flash) flash.style.opacity = "0.2";
@@ -519,11 +523,15 @@ export function StormOverlay() {
         style={{ mixBlendMode: "screen" }}
       />
 
-      {/* 2. Full-Screen Blinding Flash Overlay (Return Stroke) */}
+      {/* 2. Full-Screen Atmospheric Lightning Flash Overlay (Return Stroke) */}
       <div
         ref={flashOverlayRef}
-        className="fixed inset-0 z-[89] pointer-events-none transition-opacity duration-75 opacity-0 bg-white"
-        style={{ mixBlendMode: "color-dodge" }}
+        className="fixed inset-0 z-[89] pointer-events-none transition-opacity duration-75 opacity-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 110% 75% at 50% 15%, rgba(255, 255, 255, 0.85) 0%, rgba(224, 231, 255, 0.5) 40%, rgba(147, 51, 234, 0.2) 75%, transparent 100%)",
+          mixBlendMode: "screen",
+        }}
       />
 
       {/* 3. High-Performance Procedural Lightning Canvas */}

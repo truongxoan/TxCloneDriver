@@ -226,3 +226,57 @@ export function playEngineRevSound() {
     osc.stop(now + 0.75);
   } catch {}
 }
+
+/**
+ * Procedural synthesis of deep rolling thunder & electric snap
+ * Zero external audio files, 100% Web Audio API
+ */
+export function playThunderSound(isClose = true) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    const dur = isClose ? 2.6 : 3.5;
+    const bufferSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    // Generate brown/pink noise (integrated random values)
+    let lastOut = 0.0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      data[i] = (lastOut + (0.025 * white)) / 1.025;
+      lastOut = data[i];
+      data[i] *= 3.2;
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    // Lowpass filter simulating atmospheric acoustic attenuation
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(isClose ? 480 : 220, now);
+    filter.frequency.exponentialRampToValueAtTime(45, now + dur);
+
+    const gain = ctx.createGain();
+    if (isClose) {
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.25, now + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.12, now + 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    } else {
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.14, now + 0.35);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    }
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + dur);
+  } catch {}
+}
