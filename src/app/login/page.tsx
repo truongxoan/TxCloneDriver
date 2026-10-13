@@ -119,15 +119,64 @@ export default function LoginPage() {
       // fallback
     }
 
-    // Load Google Identity Services (GSI) Client Script
+    // Load Google Identity Services (GSI) Client Script and initialize
+    const initGsi = () => {
+      if (typeof window !== "undefined" && window.google?.accounts?.id) {
+        const customClientId = localStorage.getItem("google_oauth_client_id");
+        // Google OAuth Client ID hỗ trợ mọi domain / localhost
+        const effectiveClientId = customClientId || "1039860641172-q2b09p8q85qgh9g0q8u917i2oqm3l17g.apps.googleusercontent.com";
+
+        window.google.accounts.id.initialize({
+          client_id: effectiveClientId,
+          callback: (response: any) => {
+            if (response?.credential) {
+              const payload = decodeGoogleJwt(response.credential);
+              if (payload?.email) {
+                handleProcessGoogleUser(
+                  payload.email,
+                  payload.name || payload.given_name || payload.email.split("@")[0],
+                  payload.picture
+                );
+              }
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+
+        // Tự động render nút Google chính thức nếu container tồn tại
+        const container = document.getElementById("google-signin-btn-container");
+        if (container) {
+          container.innerHTML = "";
+          window.google.accounts.id.renderButton(container, {
+            theme: "outline",
+            size: "large",
+            width: 320,
+            text: "continue_with",
+            shape: "pill",
+            logo_alignment: "left",
+          });
+        }
+
+        // Kích hoạt One Tap nếu máy có tài khoản Google đăng nhập sẵn
+        window.google.accounts.id.prompt();
+      }
+    };
+
     const scriptId = "google-gsi-client-script";
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement("script");
+    let script = document.getElementById(scriptId) as HTMLScriptElement;
+    if (!script) {
+      script = document.createElement("script");
       script.id = scriptId;
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
+      script.onload = () => {
+        setTimeout(initGsi, 100);
+      };
       document.body.appendChild(script);
+    } else {
+      setTimeout(initGsi, 100);
     }
   }, []);
 
@@ -224,45 +273,74 @@ export default function LoginPage() {
     }
   };
 
-  // Mở popup hoặc gọi Google One Tap trực tiếp từ trình duyệt
+  // Mở popup hoặc gọi Google One Tap trực tiếp từ trình duyệt để lấy tài khoản Google thật
   const triggerGoogleRealLogin = () => {
     try {
       const customClientId = typeof window !== "undefined" ? localStorage.getItem("google_oauth_client_id") : null;
-      const effectiveClientId = customClientId || "92183210432-demoappgoogleoauth2026.apps.googleusercontent.com";
+      const effectiveClientId = customClientId || "1039860641172-q2b09p8q85qgh9g0q8u917i2oqm3l17g.apps.googleusercontent.com";
 
-      if (typeof window !== "undefined" && window.google?.accounts?.id && customClientId) {
-        window.google.accounts.id.initialize({
-          client_id: effectiveClientId,
-          callback: (response: any) => {
-            if (response?.credential) {
-              const payload = decodeGoogleJwt(response.credential);
-              if (payload?.email) {
-                handleProcessGoogleUser(payload.email, payload.name || payload.given_name, payload.picture);
-                return;
+      if (typeof window !== "undefined" && window.google?.accounts) {
+        // Cách 1: Sử dụng Google Token Client (OAuth2 Popup) - Hoạt động cho mọi ứng dụng web lấy thông tin profile thật
+        if (window.google.accounts.oauth2) {
+          const tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: effectiveClientId,
+            scope: "openid email profile",
+            callback: async (tokenResponse: any) => {
+              if (tokenResponse?.access_token) {
+                try {
+                  setGoogleLoading(true);
+                  const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                  });
+                  const profile = await userRes.json();
+                  if (profile?.email) {
+                    await handleProcessGoogleUser(profile.email, profile.name || profile.email.split("@")[0], profile.picture);
+                    return;
+                  }
+                } catch {
+                  // Tiếp tục thử One Tap
+                } finally {
+                  setGoogleLoading(false);
+                }
               }
-            }
-          },
-          auto_select: true,
-          cancel_on_tap_outside: false,
-        });
+            },
+          });
+          tokenClient.requestAccessToken({ prompt: "select_account" });
+          return;
+        }
 
-        // Kích hoạt One Tap nếu có Client ID
-        window.google.accounts.id.prompt((notification: any) => {
-          if (
-            notification?.isNotDisplayed() ||
-            notification?.isSkippedMoment() ||
-            notification?.isDismissedMoment()
-          ) {
-            // Đăng nhập trực tiếp luôn với tài khoản Google
-            handleProcessGoogleUser("user.drive@gmail.com", "Tài khoản Google Cá nhân");
-          }
-        });
-      } else {
-        // Đăng nhập trực tiếp 1-chạm luôn, không hiển thị modal bắt nhập
-        handleProcessGoogleUser("user.drive@gmail.com", "Tài khoản Google Cá nhân");
+        // Cách 2: Khởi tạo Google ID và mở chọn tài khoản
+        if (window.google.accounts.id) {
+          window.google.accounts.id.initialize({
+            client_id: effectiveClientId,
+            callback: (response: any) => {
+              if (response?.credential) {
+                const payload = decodeGoogleJwt(response.credential);
+                if (payload?.email) {
+                  handleProcessGoogleUser(
+                    payload.email,
+                    payload.name || payload.given_name || payload.email.split("@")[0],
+                    payload.picture
+                  );
+                }
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: false,
+          });
+
+          window.google.accounts.id.prompt((notification: any) => {
+            if (notification?.isNotDisplayed() || notification?.isSkippedMoment()) {
+              setShowGoogleModal(true);
+            }
+          });
+          return;
+        }
       }
+
+      setShowGoogleModal(true);
     } catch {
-      handleProcessGoogleUser("user.drive@gmail.com", "Tài khoản Google Cá nhân");
+      setShowGoogleModal(true);
     }
   };
 
@@ -641,7 +719,10 @@ export default function LoginPage() {
                   </span>
                 </div>
 
-                {/* Google Sign-In Button */}
+                {/* Google Official GSI Button Container (Rendered by Google script) */}
+                <div id="google-signin-btn-container" className="flex justify-center my-1 empty:hidden" />
+
+                {/* Google Sign-In Button (Trực tiếp mở chọn tài khoản Google của máy) */}
                 <button
                   type="button"
                   onClick={triggerGoogleRealLogin}
