@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import {
   SyncRoom,
   MediaItem,
@@ -11,7 +11,12 @@ import {
   RoomReaction,
 } from "./types";
 import { useAuth } from "@/modules/auth/authContext";
-import { extractYouTubeId, getYouTubeThumbnail, detectMediaSource } from "./youtubeHelper";
+import {
+  extractYouTubeId,
+  getYouTubeThumbnail,
+  detectMediaSource,
+  resolveEmbedUrl,
+} from "./youtubeHelper";
 
 interface WatchPartyContextType {
   rooms: SyncRoom[];
@@ -19,6 +24,8 @@ interface WatchPartyContextType {
   savedBookmarks: UserSavedBookmark[];
   reactions: RoomReaction[];
   createRoom: (name: string, description: string, isPrivate?: boolean, password?: string) => SyncRoom;
+  deleteRoom: (roomId: string) => { success: boolean; error?: string };
+  clearAllRooms: () => void;
   joinRoom: (codeOrId: string, password?: string) => { success: boolean; error?: string };
   leaveRoom: () => void;
   orderSong: (
@@ -43,150 +50,13 @@ const WatchPartyContext = createContext<WatchPartyContextType | undefined>(undef
 
 const STORAGE_ROOMS_KEY = "txclonedriver_watch_rooms";
 
-// Initial active rooms for immediate testing & party experience
-const INITIAL_ROOMS: SyncRoom[] = [
-  {
-    id: "room-lofi",
-    code: "LOFI-VIP",
-    name: "Phòng Âm Nhạc Lofi & Chillout 24/7",
-    description: "Nghe nhạc thư giãn cùng nhau, cùng chia sẻ playlist học tập và làm việc.",
-    isPrivate: false,
-    hostUsername: "admin",
-    currentMedia: {
-      id: "media-lofi-1",
-      title: "Lofi Hip Hop Radio - Beats to Relax/Study to",
-      artistOrChannel: "Lofi Girl",
-      source: "youtube",
-      url: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
-      youtubeId: "jfKfPfyJRdk",
-      isVideo: true,
-      addedBy: { username: "admin", name: "Quản trị viên" },
-      requestedAt: "Vừa xong",
-      likes: 12,
-    },
-    isPlaying: true,
-    currentTimeSeconds: 45,
-    lastSyncTimestamp: Date.now(),
-    members: [
-      {
-        id: "m-1",
-        username: "admin",
-        name: "Quản trị viên",
-        avatarInitials: "AD",
-        isHost: true,
-        joinedAt: "10 phút trước",
-      },
-      {
-        id: "m-2",
-        username: "11",
-        name: "Thành viên A",
-        avatarInitials: "11",
-        isHost: false,
-        joinedAt: "5 phút trước",
-      },
-      {
-        id: "m-3",
-        username: "userb",
-        name: "Thành viên B",
-        avatarInitials: "UB",
-        isHost: false,
-        joinedAt: "2 phút trước",
-      },
-    ],
-    queue: [
-      {
-        id: "media-queue-1",
-        title: "Synthwave Radio - Chill Synth / Retro Beats",
-        artistOrChannel: "Lofi Girl Synth",
-        source: "youtube",
-        url: "https://www.youtube.com/watch?v=4xDzrJKXOOY",
-        youtubeId: "4xDzrJKXOOY",
-        isVideo: true,
-        addedBy: { username: "11", name: "Thành viên A" },
-        requestedAt: "3 phút trước",
-        likes: 5,
-      },
-      {
-        id: "media-queue-2",
-        title: "Bản Nhạc Acoustic Guitar Nhẹ Nhàng (Google Drive)",
-        artistOrChannel: "Google Drive • TxCloneDriver",
-        source: "drive",
-        url: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-        isVideo: false,
-        addedBy: { username: "userb", name: "Thành viên B" },
-        requestedAt: "1 phút trước",
-        likes: 3,
-      },
-    ],
-    chat: [
-      {
-        id: "c-1",
-        username: "admin",
-        name: "Quản trị viên",
-        text: "Chào mừng các bạn đến phòng nghe nhạc chung TxCloneDriver! Mọi người có thể paste link YouTube vào để order bài hát nhé 🎉",
-        timestamp: "10:30",
-        isSystem: false,
-      },
-      {
-        id: "c-2",
-        username: "11",
-        name: "Thành viên A",
-        text: "Em vừa order thêm bài Synthwave vào hàng đợi rồi ạ!",
-        timestamp: "10:32",
-        isSystem: false,
-      },
-    ],
-    createdAt: "10/10/2026",
-  },
-  {
-    id: "room-cinema",
-    code: "CINEMA-4K",
-    name: "Rạp Chiếu Phim Cinema TxCloneDriver",
-    description: "Xem phim bom tấn, trailer điện ảnh độ nét cao và bàn luận trực tiếp cùng bạn bè.",
-    isPrivate: false,
-    hostUsername: "admin",
-    currentMedia: {
-      id: "media-cinema-1",
-      title: "Big Buck Bunny 4K Cinema Special Edition",
-      artistOrChannel: "Blender Animation Studio",
-      source: "direct",
-      url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      isVideo: true,
-      addedBy: { username: "admin", name: "Quản trị viên" },
-      requestedAt: "15 phút trước",
-      likes: 8,
-    },
-    isPlaying: true,
-    currentTimeSeconds: 12,
-    lastSyncTimestamp: Date.now(),
-    members: [
-      {
-        id: "m-c1",
-        username: "admin",
-        name: "Quản trị viên",
-        avatarInitials: "AD",
-        isHost: true,
-        joinedAt: "15 phút trước",
-      },
-    ],
-    queue: [],
-    chat: [
-      {
-        id: "c-c1",
-        username: "admin",
-        name: "Quản trị viên",
-        text: "Phim đang chạy chế độ Cinema 4K đồng bộ. Chủ phòng có quyền tua và chuyển cảnh.",
-        timestamp: "10:15",
-      },
-    ],
-    createdAt: "10/10/2026",
-  },
-];
+// Xóa bỏ tất cả phòng ví dụ mặc định theo yêu cầu của người dùng. Ban đầu là danh sách trống.
+const INITIAL_ROOMS: SyncRoom[] = [];
 
 export function WatchPartyProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
-  const [rooms, setRooms] = useState<SyncRoom[]>(INITIAL_ROOMS);
+  const [rooms, setRooms] = useState<SyncRoom[]>([]);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [savedBookmarks, setSavedBookmarks] = useState<UserSavedBookmark[]>([]);
   const [reactions, setReactions] = useState<RoomReaction[]>([]);
@@ -196,12 +66,19 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     try {
       const savedRooms = localStorage.getItem(STORAGE_ROOMS_KEY);
       if (savedRooms) {
-        setRooms(JSON.parse(savedRooms));
+        const parsed = JSON.parse(savedRooms);
+        // Lọc bỏ 2 phòng ví dụ cũ ("room-lofi" và "room-cinema") nếu còn lưu trong cache
+        const cleaned = Array.isArray(parsed)
+          ? parsed.filter((r: SyncRoom) => r.id !== "room-lofi" && r.id !== "room-cinema")
+          : [];
+        setRooms(cleaned);
+        localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify(cleaned));
       } else {
-        localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify(INITIAL_ROOMS));
+        setRooms([]);
+        localStorage.setItem(STORAGE_ROOMS_KEY, JSON.stringify([]));
       }
     } catch {
-      // ignore
+      setRooms([]);
     }
   }, []);
 
@@ -217,35 +94,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       if (saved) {
         setSavedBookmarks(JSON.parse(saved));
       } else {
-        // Pre-populate with nice starter bookmarks
-        const starter: UserSavedBookmark[] = [
-          {
-            id: "bm-1",
-            username: user.username,
-            title: "Lofi Hip Hop Radio (Lofi Girl)",
-            artistOrChannel: "YouTube Music",
-            url: "https://www.youtube.com/watch?v=jfKfPfyJRdk",
-            source: "youtube",
-            youtubeId: "jfKfPfyJRdk",
-            isVideo: true,
-            savedAt: "10/10/2026",
-            note: "Nhạc chill học tập",
-          },
-          {
-            id: "bm-2",
-            username: user.username,
-            title: "Chill Piano Relaxation & Nature Rain",
-            artistOrChannel: "Soothing Sounds",
-            url: "https://www.youtube.com/watch?v=lTRiuFIWV54",
-            source: "youtube",
-            youtubeId: "lTRiuFIWV54",
-            isVideo: true,
-            savedAt: "10/10/2026",
-            note: "Tiếng mưa và piano êm dịu",
-          },
-        ];
-        setSavedBookmarks(starter);
-        localStorage.setItem(key, JSON.stringify(starter));
+        setSavedBookmarks([]);
       }
     } catch {
       // ignore
@@ -268,35 +117,33 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     name: string,
     description: string,
     isPrivate = false,
-    password?: string
+    password = ""
   ): SyncRoom => {
-    const code = `TX-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Date.now()
-      .toString(36)
-      .slice(-3)
-      .toUpperCase()}`;
-
-    const hostMember: RoomMember = {
-      id: `m-${Date.now()}`,
-      username: user?.username || "guest",
-      name: user?.name || "Người dùng",
-      avatarInitials: user?.avatarInitials || "TX",
-      isHost: true,
-      joinedAt: "Vừa xong",
-    };
+    const randomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const code = isPrivate ? `PRIV-${randomCode}` : `ROOM-${randomCode}`;
 
     const newRoom: SyncRoom = {
       id: `room-${Date.now()}`,
       code,
-      name: name.trim() || "Phòng Xem Chung TxCloneDriver",
-      description: description.trim() || "Phòng thưởng thức âm nhạc và video trực tiếp",
+      name: name.trim(),
+      description: description.trim() || "Phòng xem và nghe nhạc chung không giới hạn",
       isPrivate,
-      password: password?.trim(),
-      hostUsername: user?.username || "guest",
+      password: isPrivate ? password.trim() : undefined,
+      hostUsername: user?.username || "admin",
       currentMedia: null,
       isPlaying: false,
       currentTimeSeconds: 0,
       lastSyncTimestamp: Date.now(),
-      members: [hostMember],
+      members: [
+        {
+          id: `m-${Date.now()}`,
+          username: user?.username || "admin",
+          name: user?.name || "Chủ phòng",
+          avatarInitials: user?.avatarInitials || "TX",
+          isHost: true,
+          joinedAt: "Vừa xong",
+        },
+      ],
       queue: [],
       chat: [
         {
@@ -317,6 +164,29 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     return newRoom;
   };
 
+  // Delete Room (Chủ phòng hoặc Admin xóa phòng)
+  const deleteRoom = (roomId: string): { success: boolean; error?: string } => {
+    const target = rooms.find((r) => r.id === roomId);
+    if (!target) return { success: false, error: "Phòng không tồn tại." };
+
+    if (user?.role !== "admin" && target.hostUsername !== user?.username) {
+      return { success: false, error: "Chỉ chủ phòng hoặc Quản trị viên mới được xóa phòng này." };
+    }
+
+    const updated = rooms.filter((r) => r.id !== roomId);
+    saveRoomsList(updated);
+    if (currentRoomId === roomId) {
+      setCurrentRoomId(null);
+    }
+    return { success: true };
+  };
+
+  // Clear all rooms
+  const clearAllRooms = () => {
+    saveRoomsList([]);
+    setCurrentRoomId(null);
+  };
+
   // Join Room
   const joinRoom = (codeOrId: string, password?: string): { success: boolean; error?: string } => {
     const query = codeOrId.trim().toUpperCase();
@@ -332,7 +202,6 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       return { success: false, error: "Mật khẩu phòng không chính xác." };
     }
 
-    // Add current user to members if not already inside
     const currentUsername = user?.username || "guest";
     const alreadyMember = target.members.some((m) => m.username === currentUsername);
 
@@ -377,7 +246,6 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // Remove user from room members
     const updatedMembers = currentRoom.members.filter((m) => m.username !== user.username);
     const leaveMsg: RoomChatMessage = {
       id: `c-${Date.now()}`,
@@ -399,7 +267,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     setCurrentRoomId(null);
   };
 
-  // Order Song / Video into Queue
+  // Order Song / Video into Queue (Hỗ trợ YouTube, Spotify, ZingMP3, NhacCuaTui, Google Drive, Direct)
   const orderSong = (
     url: string,
     title?: string,
@@ -412,13 +280,14 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     const trimmedUrl = url.trim();
     if (!trimmedUrl) {
-      return { success: false, error: "Vui lòng nhập đường link bài hát/video." };
+      return { success: false, error: "Vui lòng nhập đường link bài hát/video/web." };
     }
 
     const source: MediaSourceType = detectMediaSource(trimmedUrl);
     let ytId: string | undefined;
     let autoTitle = title?.trim();
     let autoThumb: string | undefined;
+    const embedUrl = resolveEmbedUrl(trimmedUrl, source, true);
 
     if (source === "youtube") {
       const extracted = extractYouTubeId(trimmedUrl);
@@ -430,18 +299,37 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       if (!autoTitle) {
         autoTitle = `YouTube Media (${extracted})`;
       }
+    } else if (source === "spotify") {
+      if (!autoTitle) autoTitle = "Spotify Music Track";
+    } else if (source === "zingmp3") {
+      if (!autoTitle) autoTitle = "Zing MP3 Bài Hát";
+    } else if (source === "nhaccuatui") {
+      if (!autoTitle) autoTitle = "NhacCuaTui Bài Hát";
     } else if (source === "drive") {
       if (!autoTitle) autoTitle = "Google Drive Audio/Video Track";
     } else {
-      if (!autoTitle) autoTitle = "Media Stream Trực Tiếp";
+      if (!autoTitle) autoTitle = "Media Stream / Trình duyệt Ngoài";
     }
 
     const newMedia: MediaItem = {
       id: `media-${Date.now()}`,
       title: autoTitle,
-      artistOrChannel: artistOrChannel?.trim() || (source === "youtube" ? "YouTube Channel" : "TxCloneDriver"),
+      artistOrChannel:
+        artistOrChannel?.trim() ||
+        (source === "youtube"
+          ? "YouTube Channel"
+          : source === "spotify"
+          ? "Spotify"
+          : source === "zingmp3"
+          ? "Zing MP3"
+          : source === "nhaccuatui"
+          ? "NhacCuaTui"
+          : source === "drive"
+          ? "Google Drive"
+          : "Web Browser"),
       source,
       url: trimmedUrl,
+      embedUrl,
       youtubeId: ytId,
       thumbnailUrl: autoThumb,
       isVideo,
@@ -455,7 +343,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     // If room currently has nothing playing, play this immediately!
     let updatedCurrent = currentRoom.currentMedia;
-    let updatedQueue = [...currentRoom.queue];
+    const updatedQueue = [...currentRoom.queue];
     let isPlaying = currentRoom.isPlaying;
 
     if (!updatedCurrent) {
@@ -469,7 +357,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       id: `c-${Date.now()}`,
       username: "system",
       name: "Hệ thống",
-      text: `🎵 @${user?.username || "user"} vừa order bài: "${newMedia.title}"`,
+      text: `🎵 @${user?.username || "user"} vừa order: "${newMedia.title}" (${newMedia.source.toUpperCase()})`,
       timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       isSystem: true,
     };
@@ -487,13 +375,13 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     return { success: true };
   };
 
-  // Play next song in Queue
+  // Play next song in Queue (Phát lần lượt theo hàng đợi)
   const playNextInQueue = () => {
-    if (!currentRoom || currentRoom.queue.length === 0) {
-      if (currentRoom) {
-        const updatedRoom = { ...currentRoom, currentMedia: null, isPlaying: false };
-        saveRoomsList(rooms.map((r) => (r.id === currentRoom.id ? updatedRoom : r)));
-      }
+    if (!currentRoom) return;
+
+    if (currentRoom.queue.length === 0) {
+      const updatedRoom = { ...currentRoom, currentMedia: null, isPlaying: false };
+      saveRoomsList(rooms.map((r) => (r.id === currentRoom.id ? updatedRoom : r)));
       return;
     }
 
@@ -504,7 +392,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       id: `c-${Date.now()}`,
       username: "system",
       name: "Hệ thống",
-      text: `▶️ Đang chuyển sang bài tiếp theo: "${nextMedia.title}"`,
+      text: `▶️ Đang chuyển sang bài tiếp theo: "${nextMedia.title}" (${nextMedia.source.toUpperCase()})`,
       timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       isSystem: true,
     };
@@ -623,7 +511,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     saveRoomsList(rooms.map((r) => (r.id === currentRoom.id ? updatedRoom : r)));
   };
 
-  // User Favorite Bookmark Manager (Lưu link theo tài khoản)
+  // User Favorite Bookmark Manager
   const saveBookmark = (title: string, url: string, isVideo = true, note?: string) => {
     if (!user) return;
     const trimmedUrl = url.trim();
@@ -679,6 +567,8 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
         savedBookmarks,
         reactions,
         createRoom,
+        deleteRoom,
+        clearAllRooms,
         joinRoom,
         leaveRoom,
         orderSong,

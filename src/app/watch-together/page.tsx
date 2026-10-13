@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Users2,
   Tv,
@@ -32,6 +32,11 @@ import {
   ArrowRight,
   LogOut,
   Moon,
+  Folder,
+  HardDrive,
+  Globe,
+  ListMusic,
+  KeyRound,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -39,19 +44,27 @@ import { Badge } from "@/components/ui/Badge";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { useWatchParty } from "@/modules/watch-party/watchPartyContext";
 import { useAuth } from "@/modules/auth/authContext";
-import { getYouTubeEmbedUrl, detectMediaSource } from "@/modules/watch-party/youtubeHelper";
+import { useDriveEndpoints, DriveFileItem } from "@/modules/storage/driveEndpointsContext";
+import {
+  getYouTubeEmbedUrl,
+  detectMediaSource,
+  resolveEmbedUrl,
+} from "@/modules/watch-party/youtubeHelper";
 import { LofiCyberRoomWidget } from "@/modules/exotic/LofiCyberRoomWidget";
 import { TarotDreamWidget } from "@/modules/exotic/TarotDreamWidget";
 import { SelfDestructNoteWidget } from "@/modules/exotic/SelfDestructNoteWidget";
 
 export default function WatchTogetherPage() {
   const { user } = useAuth();
+  const { files: driveFiles } = useDriveEndpoints();
   const {
     rooms,
     currentRoom,
     savedBookmarks,
     reactions,
     createRoom,
+    deleteRoom,
+    clearAllRooms,
     joinRoom,
     leaveRoom,
     orderSong,
@@ -81,9 +94,11 @@ export default function WatchTogetherPage() {
 
   // Order media modal
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const [orderModalTab, setOrderModalTab] = useState<"url" | "drive">("url");
   const [orderUrl, setOrderUrl] = useState("");
   const [orderTitle, setOrderTitle] = useState("");
   const [orderIsVideo, setOrderIsVideo] = useState(true);
+  const [driveSearch, setDriveSearch] = useState("");
 
   // Bookmark modal
   const [showAddBookmarkModal, setShowAddBookmarkModal] = useState(false);
@@ -95,6 +110,28 @@ export default function WatchTogetherPage() {
   const [chatInput, setChatInput] = useState("");
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Filter Drive audio and media files
+  const filteredDriveMedia = useMemo(() => {
+    return driveFiles.filter((f) => {
+      const name = f.name.toLowerCase();
+      const isMedia =
+        f.mimeType?.includes("audio") ||
+        f.mimeType?.includes("video") ||
+        name.endsWith(".mp3") ||
+        name.endsWith(".m4a") ||
+        name.endsWith(".wav") ||
+        name.endsWith(".flac") ||
+        name.endsWith(".ogg") ||
+        name.endsWith(".mp4") ||
+        name.endsWith(".mkv") ||
+        name.endsWith(".webm");
+
+      if (!isMedia) return false;
+      if (!driveSearch.trim()) return true;
+      return name.includes(driveSearch.trim().toLowerCase());
+    });
+  }, [driveFiles, driveSearch]);
 
   const triggerToast = (msg: string) => {
     setToastMsg(msg);
@@ -129,12 +166,31 @@ export default function WatchTogetherPage() {
     if (!orderUrl.trim()) return;
     const res = orderSong(orderUrl, orderTitle, orderIsVideo);
     if (res.success) {
-      triggerToast("Đã order bài hát vào hàng đợi thành công!");
+      triggerToast("Đã thêm bài hát vào hàng đợi phát lần lượt!");
       setOrderUrl("");
       setOrderTitle("");
       setShowOrderModal(false);
     } else {
       triggerToast(res.error || "Không thể order bài hát.");
+    }
+  };
+
+  const handleOrderDriveItem = (file: DriveFileItem) => {
+    const isVideo =
+      file.mimeType?.includes("video") ||
+      file.name.endsWith(".mp4") ||
+      file.name.endsWith(".mkv") ||
+      file.name.endsWith(".webm");
+
+    const streamUrl = `/api/drive/stream?id=${file.id}`;
+    const cleanTitle = file.name.replace(/\.[^/.]+$/, "");
+
+    const res = orderSong(streamUrl, cleanTitle, isVideo, "Google Drive");
+    if (res.success) {
+      triggerToast(`Đã thêm tệp "${cleanTitle}" từ Google Drive vào phòng!`);
+      setShowOrderModal(false);
+    } else {
+      triggerToast(res.error || "Không thể mở tệp từ Google Drive.");
     }
   };
 
@@ -249,7 +305,7 @@ export default function WatchTogetherPage() {
                   className="h-8 text-xs gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  <span>Order bài hát / YouTube</span>
+                  <span>Order Link / Google Drive</span>
                 </Button>
 
                 <Button
@@ -280,16 +336,56 @@ export default function WatchTogetherPage() {
                         allowFullScreen
                         className="w-full h-full border-0"
                       />
-                    ) : currentRoom.currentMedia.isVideo ? (
-                      /* Direct / Drive Video Player */
+                    ) : currentRoom.currentMedia.source === "spotify" ? (
+                      /* Spotify Embed Web Player */
+                      <iframe
+                        src={currentRoom.currentMedia.embedUrl || currentRoom.currentMedia.url}
+                        title={currentRoom.currentMedia.title}
+                        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                        className="w-full h-full border-0 rounded-2xl"
+                      />
+                    ) : currentRoom.currentMedia.source === "drive" && currentRoom.currentMedia.isVideo ? (
+                      /* Google Drive / Direct Video Player */
                       <video
                         src={currentRoom.currentMedia.url}
                         controls
                         autoPlay={currentRoom.isPlaying}
                         className="w-full h-full object-contain"
+                        onEnded={playNextInQueue}
+                      />
+                    ) : currentRoom.currentMedia.source === "drive" ? (
+                      /* Google Drive Audio Player */
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-emerald-950/40 to-black text-center space-y-4">
+                        <div className="h-28 w-28 rounded-full border-4 border-emerald-500/30 shadow-2xl shadow-emerald-500/30 flex items-center justify-center bg-slate-900 animate-spin duration-700">
+                          <HardDrive className="h-10 w-10 text-emerald-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-white max-w-md truncate">
+                            {currentRoom.currentMedia.title}
+                          </h3>
+                          <p className="text-xs text-emerald-300 mt-1">
+                            Google Drive Audio Track &bull; TxCloneDriver Cloud
+                          </p>
+                        </div>
+                        <audio
+                          src={currentRoom.currentMedia.url}
+                          autoPlay={currentRoom.isPlaying}
+                          controls
+                          className="w-full max-w-md mt-2"
+                          onEnded={playNextInQueue}
+                        />
+                      </div>
+                    ) : currentRoom.currentMedia.isVideo ? (
+                      /* Direct Web Video / Iframe */
+                      <video
+                        src={currentRoom.currentMedia.url}
+                        controls
+                        autoPlay={currentRoom.isPlaying}
+                        className="w-full h-full object-contain"
+                        onEnded={playNextInQueue}
                       />
                     ) : (
-                      /* Audio Player with Turntable Visualizer */
+                      /* Audio Player with Turntable Visualizer (MP3, ZingMP3, NhacCuaTui, Direct) */
                       <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-950 via-indigo-950/40 to-black text-center space-y-4">
                         <div className="h-28 w-28 rounded-full border-4 border-white/10 shadow-2xl shadow-blue-500/30 flex items-center justify-center bg-slate-900 animate-spin duration-700">
                           <Music className="h-10 w-10 text-sky-400" />
@@ -299,15 +395,43 @@ export default function WatchTogetherPage() {
                             {currentRoom.currentMedia.title}
                           </h3>
                           <p className="text-xs text-sky-300 mt-1">
-                            {currentRoom.currentMedia.artistOrChannel || "Google Drive • TxCloneDriver Audio"}
+                            {currentRoom.currentMedia.artistOrChannel || "Trình phát Nhạc Đa Nền Tảng"}
                           </p>
                         </div>
-                        <audio
-                          src={currentRoom.currentMedia.url}
-                          autoPlay={currentRoom.isPlaying}
-                          controls
-                          className="w-full max-w-md mt-2"
-                        />
+                        {currentRoom.currentMedia.embedUrl && currentRoom.currentMedia.embedUrl.startsWith("http") ? (
+                          <div className="w-full max-w-md space-y-2">
+                            <audio
+                              src={currentRoom.currentMedia.url}
+                              autoPlay={currentRoom.isPlaying}
+                              controls
+                              className="w-full"
+                              onEnded={playNextInQueue}
+                              onError={(e) => {
+                                // fallback if CORS prevents direct audio
+                                console.warn("Audio direct stream blocked, can be opened in browser frame");
+                              }}
+                            />
+                            <div className="text-[11px] text-slate-400 flex items-center justify-center gap-2">
+                              <span>Mở link gốc:</span>
+                              <a
+                                href={currentRoom.currentMedia.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sky-400 underline flex items-center gap-1 font-mono"
+                              >
+                                {currentRoom.currentMedia.source.toUpperCase()} <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        ) : (
+                          <audio
+                            src={currentRoom.currentMedia.url}
+                            autoPlay={currentRoom.isPlaying}
+                            controls
+                            className="w-full max-w-md mt-2"
+                            onEnded={playNextInQueue}
+                          />
+                        )}
                       </div>
                     )
                   ) : (
@@ -318,7 +442,7 @@ export default function WatchTogetherPage() {
                       </div>
                       <h3 className="text-base font-bold text-white">Chưa có bài hát hoặc video nào được phát</h3>
                       <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                        Hãy bấm nút <strong>&ldquo;Order bài hát / YouTube&rdquo;</strong> để dán link YouTube hoặc tệp Google Drive vào phòng!
+                        Hãy bấm nút <strong>&ldquo;Order Link / Google Drive&rdquo;</strong> để dán link YouTube, ZingMP3, NhacCuaTui, Spotify hoặc chọn nhạc từ Google Drive vào phòng!
                       </p>
                       <Button
                         variant="primary"
@@ -415,13 +539,13 @@ export default function WatchTogetherPage() {
 
               {/* Right Column: Queue, Members & Live Chat (4 Cols) */}
               <div className="lg:col-span-4 space-y-4">
-                {/* Order Queue Card */}
+                {/* Order Queue Card (Hàng đợi phát theo lượt) */}
                 <Card className="p-4 bg-slate-950/60 border-white/10 space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-white/10">
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-sky-400" />
                       <h3 className="font-bold text-white text-xs">
-                        Hàng Đợi Bài Hát ({currentRoom.queue.length})
+                        Hàng Đợi Phát Theo Lượt ({currentRoom.queue.length})
                       </h3>
                     </div>
                     <Button
@@ -430,7 +554,7 @@ export default function WatchTogetherPage() {
                       onClick={() => setShowOrderModal(true)}
                       className="h-6 text-[11px] px-2"
                     >
-                      + Order
+                      + Thêm bài
                     </Button>
                   </div>
 
@@ -442,14 +566,14 @@ export default function WatchTogetherPage() {
                           className="p-2.5 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between gap-2 group hover:border-white/20 transition-all"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="text-xs font-mono font-bold text-slate-500 shrink-0">
+                            <span className="text-xs font-mono font-bold text-sky-400 shrink-0">
                               #{idx + 1}
                             </span>
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-white truncate" title={item.title}>
                                 {item.title}
                               </p>
-                              <p className="text-[10px] text-slate-400 truncate">
+                              <p className="text-[10px] text-slate-400 truncate uppercase">
                                 @{item.addedBy.username} &bull; {item.source}
                               </p>
                             </div>
@@ -577,7 +701,7 @@ export default function WatchTogetherPage() {
           </div>
         ) : (
           /* ============================================================== */
-          /* VIEW B: WATCH PARTY LOBBY (LIST OF ROOMS & SAVED BOOKMARKS) */
+          /* VIEW B: WATCH PARTY LOBBY (DANH SÁCH PHÒNG & TẠO PHÒNG) */
           /* ============================================================== */
           <div className="space-y-6 animate-in fade-in duration-300">
             {/* Lobby Banner */}
@@ -591,27 +715,26 @@ export default function WatchTogetherPage() {
                   Phòng Nghe Nhạc & Xem Phim Chung
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Dán link YouTube hoặc Google Drive để cùng nghe nhạc, xem phim trực tiếp cùng bạn bè. Hỗ trợ order bài hát, đồng bộ thời gian và lưu kho bài hát cá nhân theo từng tài khoản!
+                  Thưởng thức âm nhạc đa nền tảng cùng bạn bè: dán link YouTube, ZingMP3, NhacCuaTui, Spotify, liên kết ngoài hoặc mở trực tiếp tệp từ <strong>Google Drive</strong>!
                 </p>
               </div>
 
               {/* Quick Join by Code Box */}
               <form
                 onSubmit={handleJoinByCode}
-                className="p-4 rounded-2xl glass-panel border border-white/10 bg-slate-900/70 space-y-2.5 shrink-0 w-full md:w-80"
+                className="p-4 rounded-2xl glass-panel border border-white/10 bg-slate-900/60 space-y-3 w-full md:w-80 shrink-0"
               >
-                <div className="flex items-center gap-2">
-                  <Tv className="h-4 w-4 text-sky-400" />
-                  <span className="text-xs font-bold text-white">Vào bằng Mã Phòng:</span>
+                <div className="flex items-center gap-2 text-white font-bold text-xs">
+                  <KeyRound className="h-4 w-4 text-sky-400" />
+                  <span>Vào Nhanh Bằng Mã Phòng</span>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   <input
                     type="text"
                     value={joinCodeInput}
-                    onChange={(e) => setJoinCodeInput(e.target.value)}
-                    placeholder="Nhập mã (Ví dụ: LOFI-VIP)..."
-                    className="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono text-white uppercase"
-                    required
+                    onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                    placeholder="Nhập mã phòng (vd: ROOM-ABC)..."
+                    className="w-full px-3 py-1.5 rounded-xl glass-input text-xs font-mono text-white"
                   />
                   <input
                     type="password"
@@ -628,95 +751,153 @@ export default function WatchTogetherPage() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-3">
-              {[
-                { id: "rooms", label: "Phòng Đang Hoạt Động", icon: Users2, count: rooms.length },
-                { id: "lofi_room", label: "📻 Phòng Chill Lo-fi 3D", icon: Sparkles },
-                { id: "tarot_dream", label: "🔮 Tarot & Giấc Mơ AI", icon: Moon },
-                { id: "burn_note", label: "🔥 Thư Mật Tự Hủy 60s", icon: Flame },
-                { id: "create", label: "Tạo Phòng Mới", icon: Plus },
-                { id: "bookmarks", label: "Kho Bài Hát Yêu Thích", icon: Bookmark, count: savedBookmarks.length },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeLobbyTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveLobbyTab(tab.id as typeof activeLobbyTab)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-                      isActive
-                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
-                        : "bg-surface-elevated text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span>{tab.label}</span>
-                    {tab.count !== undefined && (
-                      <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { id: "rooms", label: "Phòng Hoạt Động", icon: Users2, count: rooms.length },
+                  { id: "create", label: "Tạo Phòng Mới", icon: Plus },
+                  { id: "bookmarks", label: "Kho Bài Hát Yêu Thích", icon: Bookmark, count: savedBookmarks.length },
+                  { id: "lofi_room", label: "📻 Phòng Chill Lo-fi 3D", icon: Sparkles },
+                  { id: "tarot_dream", label: "🔮 Tarot & Giấc Mơ AI", icon: Moon },
+                  { id: "burn_note", label: "🔥 Thư Mật Tự Hủy 60s", icon: Flame },
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeLobbyTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveLobbyTab(tab.id as typeof activeLobbyTab)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
+                          : "bg-surface-elevated text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span>{tab.label}</span>
+                      {tab.count !== undefined && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-white/20">
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {rooms.length > 0 && user?.role === "admin" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (confirm("Bạn có chắc chắn muốn dọn sạch tất cả các phòng không?")) {
+                      clearAllRooms();
+                      triggerToast("Đã xóa toàn bộ phòng.");
+                    }
+                  }}
+                  className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 h-8"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Xóa tất cả phòng
+                </Button>
+              )}
             </div>
 
             {/* TAB 1: LIST OF ROOMS */}
             {activeLobbyTab === "rooms" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {rooms.map((room) => (
-                  <Card
-                    key={room.id}
-                    className="p-5 bg-slate-900/50 border-white/10 space-y-4 hover:border-white/25 transition-all flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-bold text-white text-sm">{room.name}</h3>
-                          <span className="font-mono text-[11px] text-sky-400">Mã: {room.code}</span>
-                        </div>
-                        <Badge variant={room.isPrivate ? "warning" : "success"} size="sm">
-                          {room.isPrivate ? "Riêng tư" : "Công khai"}
-                        </Badge>
-                      </div>
-
-                      <p className="text-xs text-slate-300 mt-2 line-clamp-2">
-                        {room.description}
+              <div>
+                {rooms.length === 0 ? (
+                  <div className="p-12 text-center rounded-3xl glass-panel border border-white/10 bg-slate-900/40 space-y-4">
+                    <div className="w-16 h-16 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-sky-400 flex items-center justify-center mx-auto">
+                      <Users2 className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-bold text-white">Chưa có phòng nào được tạo</h3>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Đã xóa sạch các phòng ví dụ mặc định. Bạn có thể nhấn nút <strong>&ldquo;Tạo Phòng Mới&rdquo;</strong> bên dưới để tạo phòng riêng của mình!
                       </p>
-
-                      {/* Current Playing Preview */}
-                      <div className="mt-3 p-3 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1 text-xs">
-                        <span className="text-[10px] text-slate-400 font-semibold block uppercase">
-                          Đang phát:
-                        </span>
-                        <p className="font-bold text-white truncate">
-                          {room.currentMedia ? room.currentMedia.title : "Chưa có bài nào"}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          Chủ phòng: <strong className="text-sky-300">@{room.hostUsername}</strong>
-                        </p>
-                      </div>
                     </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
-                        <Users2 className="h-3.5 w-3.5 text-emerald-400" />
-                        {room.members.length} người đang nghe
-                      </span>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => {
-                          const res = joinRoom(room.id);
-                          if (!res.success) triggerToast(res.error || "Không thể vào phòng");
-                        }}
-                        className="text-xs"
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setActiveLobbyTab("create")}
+                      className="mt-2"
+                    >
+                      <Plus className="w-4 h-4 mr-1.5" /> Tạo phòng đầu tiên ngay
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {rooms.map((room) => (
+                      <Card
+                        key={room.id}
+                        className="p-5 bg-slate-900/50 border-white/10 space-y-4 hover:border-white/25 transition-all flex flex-col justify-between"
                       >
-                        Vào phòng &rarr;
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h3 className="font-bold text-white text-sm">{room.name}</h3>
+                              <span className="font-mono text-[11px] text-sky-400">Mã: {room.code}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant={room.isPrivate ? "warning" : "success"} size="sm">
+                                {room.isPrivate ? "Riêng tư" : "Công khai"}
+                              </Badge>
+                              {(user?.role === "admin" || room.hostUsername === user?.username) && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Xóa phòng "${room.name}"?`)) {
+                                      deleteRoom(room.id);
+                                      triggerToast("Đã xóa phòng.");
+                                    }
+                                  }}
+                                  className="text-slate-500 hover:text-rose-400 p-1"
+                                  title="Xóa phòng"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-300 mt-2 line-clamp-2">
+                            {room.description}
+                          </p>
+
+                          {/* Current Playing Preview */}
+                          <div className="mt-3 p-3 rounded-2xl bg-slate-950/70 border border-white/5 space-y-1 text-xs">
+                            <span className="text-[10px] text-slate-400 font-semibold block uppercase">
+                              Đang phát:
+                            </span>
+                            <p className="font-bold text-white truncate">
+                              {room.currentMedia ? room.currentMedia.title : "Chưa có bài nào"}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              Chủ phòng: <strong className="text-sky-300">@{room.hostUsername}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                          <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                            <Users2 className="h-3.5 w-3.5 text-emerald-400" />
+                            {room.members.length} người đang nghe
+                          </span>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => {
+                              const res = joinRoom(room.id);
+                              if (!res.success) triggerToast(res.error || "Không thể vào phòng");
+                            }}
+                            className="text-xs"
+                          >
+                            Vào phòng &rarr;
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -725,7 +906,7 @@ export default function WatchTogetherPage() {
               <Card className="p-6 max-w-xl space-y-4">
                 <h3 className="font-bold text-white text-base">Tạo Phòng Xem & Nghe Chung Mới</h3>
                 <p className="text-xs text-slate-400">
-                  Bạn sẽ trở thành Chủ phòng (Host) với toàn quyền điều khiển phát, tua và kích thành viên.
+                  Bạn sẽ trở thành Chủ phòng (Host) với toàn quyền thêm nhạc từ link ngoài, Google Drive, phát lần lượt và điều khiển phòng.
                 </p>
 
                 <form onSubmit={handleCreateRoom} className="space-y-4">
@@ -735,7 +916,7 @@ export default function WatchTogetherPage() {
                       type="text"
                       value={newRoomName}
                       onChange={(e) => setNewRoomName(e.target.value)}
-                      placeholder="Ví dụ: Phòng Xem Phim Cuối Tuần..."
+                      placeholder="Ví dụ: Phòng Nghe Nhạc Chill Của Tôi..."
                       className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
                       required
                     />
@@ -746,12 +927,12 @@ export default function WatchTogetherPage() {
                     <textarea
                       value={newRoomDesc}
                       onChange={(e) => setNewRoomDesc(e.target.value)}
-                      placeholder="Mô tả thể loại nhạc hoặc bộ phim dự kiến xem..."
+                      placeholder="Mô tả thể loại nhạc hoặc danh sách bài hát dự kiến..."
                       className="w-full px-3.5 py-2 rounded-2xl glass-input text-xs text-white h-20"
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="flex items-center gap-2 pt-1">
                     <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
@@ -761,21 +942,24 @@ export default function WatchTogetherPage() {
                       />
                       <span>Đặt phòng ở chế độ Riêng tư (Yêu cầu mật khẩu để vào)</span>
                     </label>
+                  </div>
 
-                    {newRoomPrivate && (
+                  {newRoomPrivate && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-200 block">Mật khẩu phòng</label>
                       <input
                         type="password"
                         value={newRoomPass}
                         onChange={(e) => setNewRoomPass(e.target.value)}
-                        placeholder="Đặt mật khẩu phòng..."
+                        placeholder="Nhập mật khẩu..."
                         className="w-full px-3.5 py-2 rounded-2xl glass-input text-xs text-white"
                         required={newRoomPrivate}
                       />
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  <Button type="submit" variant="primary" className="w-full">
-                    Khởi tạo phòng ngay
+                  <Button type="submit" variant="primary" size="sm" className="w-full text-xs mt-2">
+                    Tạo phòng và bắt đầu phát &rarr;
                   </Button>
                 </form>
               </Card>
@@ -786,65 +970,55 @@ export default function WatchTogetherPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold text-white text-base">
-                      Kho Bài Hát & Liên Kết Yêu Thích Của @{user?.username}
-                    </h3>
-                    <p className="text-xs text-slate-400">
-                      Lưu trữ các bài hát YouTube và file Google Drive yêu thích theo tài khoản của bạn để mở nghe nhanh bất cứ lúc nào.
+                    <h3 className="font-bold text-white text-sm">Kho Bài Hát Yêu Thích Cá Nhân</h3>
+                    <p className="text-[11px] text-slate-400">
+                      Lưu trữ độc lập theo tài khoản @{user?.username}. Nhấn &ldquo;Phát ngay&rdquo; để đưa bài vào phòng đang mở!
                     </p>
                   </div>
                   <Button
                     variant="primary"
                     size="sm"
                     onClick={() => setShowAddBookmarkModal(true)}
-                    className="gap-1.5 text-xs"
+                    className="h-8 text-xs gap-1.5"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    <span>Lưu link mới</span>
+                    <span>Thêm liên kết</span>
                   </Button>
                 </div>
 
                 {savedBookmarks.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {savedBookmarks.map((bm) => (
-                      <Card
-                        key={bm.id}
-                        className="p-4 bg-slate-900/60 border-white/10 space-y-3 flex flex-col justify-between"
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
+                      <Card key={bm.id} className="p-4 bg-slate-900/50 border-white/10 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-sky-300 border border-blue-400/30 uppercase">
                               {bm.source}
                             </span>
-                            <span className="text-[10px] text-slate-500">{bm.savedAt}</span>
+                            <h4 className="font-bold text-white text-xs truncate mt-1.5" title={bm.title}>
+                              {bm.title}
+                            </h4>
                           </div>
-                          <h4 className="font-bold text-white text-xs truncate" title={bm.title}>
-                            {bm.title}
-                          </h4>
-                          {bm.note && (
-                            <p className="text-[11px] text-slate-400 italic">{bm.note}</p>
-                          )}
-                          <p className="text-[10px] font-mono text-slate-500 truncate" title={bm.url}>
-                            {bm.url}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2 border-t border-white/10">
                           <button
                             onClick={() => deleteBookmark(bm.id)}
-                            className="text-slate-500 hover:text-rose-400 p-1 transition-colors"
-                            title="Xóa link"
+                            className="text-slate-500 hover:text-rose-400 p-1"
+                            title="Xóa liên kết"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
+                        </div>
 
-                          <div className="flex items-center gap-2">
+                        {bm.note && <p className="text-[11px] text-slate-400 italic">&ldquo;{bm.note}&rdquo;</p>}
+
+                        <div className="flex items-center justify-between pt-2 border-t border-white/10 text-[10px]">
+                          <span className="text-slate-500">{bm.savedAt}</span>
+                          <div className="flex items-center gap-1.5">
                             <a
                               href={bm.url}
                               target="_blank"
-                              rel="noopener noreferrer"
+                              rel="noreferrer"
                               className="text-slate-400 hover:text-white p-1"
-                              title="Mở tab mới"
+                              title="Mở link ngoài"
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
@@ -853,11 +1027,12 @@ export default function WatchTogetherPage() {
                               size="sm"
                               className="h-7 text-xs px-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-sky-300 border border-sky-400/20"
                               onClick={() => {
-                                // If inside room, order it; otherwise join first room or notify
                                 if (rooms.length > 0) {
                                   joinRoom(rooms[0].id);
                                   setTimeout(() => playSavedBookmark(bm), 300);
                                   triggerToast(`Đang phát "${bm.title}" trong phòng ${rooms[0].name}`);
+                                } else {
+                                  triggerToast("Vui lòng tạo một phòng trước để phát bài này!");
                                 }
                               }}
                             >
@@ -889,79 +1064,195 @@ export default function WatchTogetherPage() {
         )}
 
         {/* ============================================================== */}
-        {/* MODAL 1: ORDER SONG / VIDEO (YOUTUBE & DRIVE) */}
+        {/* MODAL 1: ORDER SONG / VIDEO (YOUTUBE, ZINGMP3, NHACCUATUI, SPOTIFY, DRIVE) */}
         {/* ============================================================== */}
         {showOrderModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-            <div className="w-full max-w-md rounded-3xl glass-panel p-6 border border-white/20 bg-slate-950/95 shadow-2xl space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-pink-600 to-rose-500 flex items-center justify-center text-white">
-                  <Plus className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-white text-sm">Order Bài Hát hoặc Video</h3>
-                  <p className="text-[11px] text-slate-400">Dán link YouTube hoặc đường dẫn Google Drive</p>
+            <div className="w-full max-w-lg rounded-3xl glass-panel p-6 border border-white/20 bg-slate-950/95 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-pink-600 to-rose-500 flex items-center justify-center text-white">
+                    <ListMusic className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Thêm Bài Hát Vào Hàng Đợi Phát Theo Lượt</h3>
+                    <p className="text-[11px] text-slate-400">Link ngoài trình duyệt hoặc mở trực tiếp từ Google Drive</p>
+                  </div>
                 </div>
               </div>
 
-              <form onSubmit={handleOrderSubmit} className="space-y-3.5">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">
-                    Đường dẫn YouTube / Google Drive / MP3
-                  </label>
-                  <input
-                    type="url"
-                    value={orderUrl}
-                    onChange={(e) => setOrderUrl(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
-                    required
-                    autoFocus
-                  />
-                  <span className="text-[10px] text-slate-400 block mt-0.5">
-                    💡 Hỗ trợ mọi link YouTube (video, shorts, music), Google Drive hoặc direct stream.
-                  </span>
-                </div>
+              {/* Sub-tabs: Link ngoài vs Google Drive */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-900 border border-white/10 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setOrderModalTab("url")}
+                  className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    orderModalTab === "url"
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Dán Link Trình Duyệt / Ngoài</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderModalTab("drive")}
+                  className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    orderModalTab === "drive"
+                      ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <HardDrive className="w-3.5 h-3.5" />
+                  <span>Chọn Từ Google Drive ({driveFiles.length})</span>
+                </button>
+              </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">
-                    Tên hiển thị (Tùy chọn)
-                  </label>
-                  <input
-                    type="text"
-                    value={orderTitle}
-                    onChange={(e) => setOrderTitle(e.target.value)}
-                    placeholder="Để trống hệ thống sẽ tự nhận diện..."
-                    className="w-full px-3.5 py-2 rounded-2xl glass-input text-xs text-white"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+              {/* TAB A: PASTE URL */}
+              {orderModalTab === "url" && (
+                <form onSubmit={handleOrderSubmit} className="space-y-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">
+                      Đường dẫn URL bài hát hoặc video
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={orderIsVideo}
-                      onChange={(e) => setOrderIsVideo(e.target.checked)}
-                      className="rounded border-white/20 bg-slate-900 text-blue-600"
+                      type="url"
+                      value={orderUrl}
+                      onChange={(e) => setOrderUrl(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=... hoặc Spotify, ZingMP3, Nhaccuatui..."
+                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white"
+                      required
+                      autoFocus
                     />
-                    <span>Phát dưới dạng Video màn ảnh (Bỏ tích nếu chỉ là Audio)</span>
-                  </label>
-                </div>
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px] text-slate-400">
+                      <span className="font-semibold text-sky-400">Hỗ trợ tự động:</span>
+                      <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-mono">YouTube</span>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">Spotify</span>
+                      <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono">Zing MP3</span>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">NhacCuaTui</span>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono">MP3/MP4 Web</span>
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowOrderModal(false)}
-                  >
-                    Hủy
-                  </Button>
-                  <Button type="submit" variant="primary" size="sm">
-                    Gửi Order vào Phòng
-                  </Button>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">
+                      Tên hiển thị (Tùy chọn)
+                    </label>
+                    <input
+                      type="text"
+                      value={orderTitle}
+                      onChange={(e) => setOrderTitle(e.target.value)}
+                      placeholder="Để trống hệ thống sẽ tự đặt tên theo link..."
+                      className="w-full px-3.5 py-2 rounded-2xl glass-input text-xs text-white"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={orderIsVideo}
+                        onChange={(e) => setOrderIsVideo(e.target.checked)}
+                        className="rounded border-white/20 bg-slate-900 text-blue-600"
+                      />
+                      <span>Phát dưới dạng Video màn ảnh (Bỏ tích nếu là Audio/Nhạc nền)</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowOrderModal(false)}
+                    >
+                      Hủy
+                    </Button>
+                    <Button type="submit" variant="primary" size="sm">
+                      Gửi Order Vào Hàng Đợi
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* TAB B: PICK FROM GOOGLE DRIVE */}
+              {orderModalTab === "drive" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">
+                      Tìm kiếm bài hát / video trong Google Drive
+                    </label>
+                    <input
+                      type="text"
+                      value={driveSearch}
+                      onChange={(e) => setDriveSearch(e.target.value)}
+                      placeholder="Gõ tên bài hát, ca sĩ hoặc định dạng .mp3, .mp4..."
+                      className="w-full px-3.5 py-2 rounded-2xl glass-input text-xs text-white"
+                    />
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                    {filteredDriveMedia.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-400 bg-slate-900/40 rounded-2xl border border-white/5">
+                        {driveFiles.length === 0
+                          ? "Chưa có tệp nào trong Google Drive hoặc chưa cấu hình Apps Script."
+                          : "Không tìm thấy tệp nhạc/video nào khớp với tìm kiếm."}
+                      </div>
+                    ) : (
+                      filteredDriveMedia.map((f) => {
+                        const isVid =
+                          f.mimeType?.includes("video") ||
+                          f.name.endsWith(".mp4") ||
+                          f.name.endsWith(".mkv") ||
+                          f.name.endsWith(".webm");
+                        return (
+                          <div
+                            key={f.id}
+                            className="p-2.5 rounded-xl bg-slate-900/70 border border-white/5 hover:border-emerald-500/40 flex items-center justify-between gap-2 transition-all"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                                  isVid ? "bg-rose-500/20 text-rose-400" : "bg-emerald-500/20 text-emerald-400"
+                                }`}
+                              >
+                                {isVid ? <Film className="w-4 h-4" /> : <Music className="w-4 h-4" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-white truncate">{f.name}</p>
+                                <p className="text-[10px] text-slate-400">
+                                  {isVid ? "Video Drive" : "Audio Drive"} &bull; {(f.sizeBytes / 1024 / 1024).toFixed(1)} MB
+                                </p>
+                              </div>
+                            </div>
+
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleOrderDriveItem(f)}
+                              className="h-7 text-xs px-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 shrink-0"
+                            >
+                              Phát bài này
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-end pt-2 border-t border-white/10">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowOrderModal(false)}
+                    >
+                      Đóng
+                    </Button>
+                  </div>
                 </div>
-              </form>
+              )}
             </div>
           </div>
         )}

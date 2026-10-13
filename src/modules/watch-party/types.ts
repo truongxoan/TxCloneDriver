@@ -1,4 +1,10 @@
-export type MediaSourceType = "youtube" | "drive" | "direct";
+export type MediaSourceType =
+  | "youtube"
+  | "spotify"
+  | "zingmp3"
+  | "nhaccuatui"
+  | "drive"
+  | "direct";
 
 export interface MediaItem {
   id: string;
@@ -6,6 +12,7 @@ export interface MediaItem {
   artistOrChannel?: string;
   source: MediaSourceType;
   url: string;
+  embedUrl?: string;
   youtubeId?: string;
   durationSeconds?: number;
   thumbnailUrl?: string;
