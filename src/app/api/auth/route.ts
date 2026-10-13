@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import { ManagedUser, LockedDevice, AuditLogItem } from "@/modules/auth/types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// Hỗ trợ cả môi trường serverless (Vercel /var/task là read-only, thư mục ghi được là os.tmpdir()) và môi trường cục bộ
+const IS_VERCEL = !!process.env.VERCEL || process.env.NODE_ENV === "production";
+const DATA_DIR = IS_VERCEL
+  ? path.join(os.tmpdir(), "txclonedriver_data")
+  : path.join(process.cwd(), "data");
+
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const DEVICES_FILE = path.join(DATA_DIR, "locked_devices.json");
 const AUDIT_FILE = path.join(DATA_DIR, "audit_logs.json");
@@ -79,65 +85,104 @@ const INITIAL_USERS: ManagedUser[] = [
   },
 ];
 
+// Bộ nhớ đệm Memory Fallback an toàn tuyệt đối nếu hệ thống cấm thao tác file
+let memoryUsers: ManagedUser[] = [...INITIAL_USERS];
+let memoryDevices: LockedDevice[] = [];
+let memoryAuditLogs: AuditLogItem[] = [];
+
 function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    return true;
+  } catch (err) {
+    console.warn("Unable to create DATA_DIR, fallback to in-memory store:", err);
+    return false;
   }
 }
 
 function readUsers(): ManagedUser[] {
-  ensureDataDir();
-  if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(INITIAL_USERS, null, 2), "utf8");
-    return INITIAL_USERS;
+  if (!ensureDataDir()) {
+    return memoryUsers;
   }
   try {
+    if (!fs.existsSync(USERS_FILE)) {
+      fs.writeFileSync(USERS_FILE, JSON.stringify(INITIAL_USERS, null, 2), "utf8");
+      memoryUsers = [...INITIAL_USERS];
+      return INITIAL_USERS;
+    }
     const raw = fs.readFileSync(USERS_FILE, "utf8");
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    memoryUsers = parsed;
+    return parsed;
   } catch {
-    return INITIAL_USERS;
+    return memoryUsers;
   }
 }
 
 function writeUsers(users: ManagedUser[]) {
-  ensureDataDir();
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+  memoryUsers = users;
+  if (!ensureDataDir()) return;
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf8");
+  } catch (err) {
+    console.warn("Unable to write users file, preserved in memory:", err);
+  }
 }
 
 function readDevices(): LockedDevice[] {
-  ensureDataDir();
-  if (!fs.existsSync(DEVICES_FILE)) {
-    return [];
+  if (!ensureDataDir()) {
+    return memoryDevices;
   }
   try {
+    if (!fs.existsSync(DEVICES_FILE)) {
+      return memoryDevices;
+    }
     const raw = fs.readFileSync(DEVICES_FILE, "utf8");
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    memoryDevices = parsed;
+    return parsed;
   } catch {
-    return [];
+    return memoryDevices;
   }
 }
 
 function writeDevices(devices: LockedDevice[]) {
-  ensureDataDir();
-  fs.writeFileSync(DEVICES_FILE, JSON.stringify(devices, null, 2), "utf8");
+  memoryDevices = devices;
+  if (!ensureDataDir()) return;
+  try {
+    fs.writeFileSync(DEVICES_FILE, JSON.stringify(devices, null, 2), "utf8");
+  } catch (err) {
+    console.warn("Unable to write devices file, preserved in memory:", err);
+  }
 }
 
 function readAuditLogs(): AuditLogItem[] {
-  ensureDataDir();
-  if (!fs.existsSync(AUDIT_FILE)) {
-    return [];
+  if (!ensureDataDir()) {
+    return memoryAuditLogs;
   }
   try {
+    if (!fs.existsSync(AUDIT_FILE)) {
+      return memoryAuditLogs;
+    }
     const raw = fs.readFileSync(AUDIT_FILE, "utf8");
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    memoryAuditLogs = parsed;
+    return parsed;
   } catch {
-    return [];
+    return memoryAuditLogs;
   }
 }
 
 function writeAuditLogs(logs: AuditLogItem[]) {
-  ensureDataDir();
-  fs.writeFileSync(AUDIT_FILE, JSON.stringify(logs, null, 2), "utf8");
+  memoryAuditLogs = logs;
+  if (!ensureDataDir()) return;
+  try {
+    fs.writeFileSync(AUDIT_FILE, JSON.stringify(logs, null, 2), "utf8");
+  } catch (err) {
+    console.warn("Unable to write audit file, preserved in memory:", err);
+  }
 }
 
 // GET: Fetch users, devices, audit logs
@@ -159,8 +204,8 @@ export async function GET(request: Request) {
     const users = readUsers();
     return NextResponse.json({ success: true, users });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Error reading auth data";
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    // Luôn trả về danh sách người dùng thay vì quăng lỗi 500
+    return NextResponse.json({ success: true, users: memoryUsers });
   }
 }
 

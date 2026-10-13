@@ -496,9 +496,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
+      if (!res.ok) {
+        throw new Error(`Server status ${res.status}`);
+      }
+
       const data = await res.json();
-      if (!data.success) {
-        return { success: false, error: data.error || "Đăng nhập Google không thành công." };
+      if (!data.success || !data.user) {
+        throw new Error(data.error || "Server registration error");
       }
 
       const foundUser: ManagedUser = data.user;
