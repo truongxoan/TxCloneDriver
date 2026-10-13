@@ -20,8 +20,12 @@ import {
   Bell,
   Sparkles,
   ExternalLink,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/modules/auth/authContext";
+import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
+import { useFeedback } from "@/modules/feedback/feedbackContext";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { useMusicPlayer } from "@/modules/audio/musicPlayerContext";
 import { cn } from "@/lib/utils";
@@ -106,6 +110,10 @@ const formatSeconds = (sec: number) => {
 
 export function DynamicIsland() {
   const { currentTheme, themeId, setThemeId } = useTheme();
+  const { user, isAdmin, managedUsers } = useAuth();
+  const { files, activeEndpoint } = useDriveEndpoints();
+  const { reports } = useFeedback();
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<"music" | "cinema" | "notifications">("music");
   const [notifIndex, setNotifIndex] = useState(0);
@@ -118,6 +126,79 @@ export function DynamicIsland() {
     duration: 0,
     isPlaying: false,
   });
+
+  const pendingRequests = managedUsers.filter((u) => u.pendingNameChange).length;
+  const openReports = reports.filter((r) => r.status === "open" || r.status === "in_progress").length;
+
+  const systemNotifications: SystemNotification[] = React.useMemo(() => {
+    const list: SystemNotification[] = [
+      {
+        id: "notif-drive",
+        type: "drive",
+        icon: HardDrive,
+        iconColor: "text-blue-400",
+        title: "Google Drive Cloud",
+        detail: `Đã đồng bộ ${files.length} tệp tin • ${activeEndpoint?.name || "Bộ nhớ an toàn"}`,
+        time: "Trực tuyến",
+      },
+      {
+        id: "notif-coins",
+        type: "expenses",
+        icon: Wallet,
+        iconColor: "text-amber-400",
+        title: "Ví Điểm Cược Hệ Thống",
+        detail: `Số dư ${(user?.coins ?? 50000).toLocaleString("vi-VN")} Xu • Reset 50.000 Xu hàng ngày`,
+        time: "Hôm nay",
+      },
+    ];
+
+    if (isAdmin && pendingRequests > 0) {
+      list.unshift({
+        id: "notif-requests",
+        type: "telegram",
+        icon: Bell,
+        iconColor: "text-rose-400",
+        title: "Yêu Cầu Chờ Duyệt",
+        detail: `Có ${pendingRequests} thành viên gửi yêu cầu đổi tên chờ bạn phê duyệt.`,
+        time: "Cần xử lý",
+      });
+    }
+
+    if (openReports > 0) {
+      list.push({
+        id: "notif-reports",
+        type: "telegram",
+        icon: CheckCircle2,
+        iconColor: "text-amber-400",
+        title: "Báo Cáo Phản Hồi",
+        detail: `Có ${openReports} báo cáo lỗi/góp ý đang được theo dõi.`,
+        time: "Hôm nay",
+      });
+    }
+
+    list.push(
+      {
+        id: "notif-weather",
+        type: "weather",
+        icon: CloudSun,
+        iconColor: "text-sky-400",
+        title: "Thời Tiết Trực Tiếp",
+        detail: "Hà Nội 28°C • Trời nắng nhẹ mát mẻ, độ ẩm 62%.",
+        time: "Vừa xong",
+      },
+      {
+        id: "notif-study",
+        type: "study",
+        icon: GraduationCap,
+        iconColor: "text-emerald-400",
+        title: "Góc Ngoại Ngữ & Thi GPLX",
+        detail: "Luyện tập từ vựng HSK, tiếng Anh & bộ đề sát hạch lái xe.",
+        time: "Mỗi ngày",
+      }
+    );
+
+    return list;
+  }, [files.length, activeEndpoint?.name, user?.coins, isAdmin, pendingRequests, openReports]);
 
   // Consume Global Music Player state connected to Google Drive
   const {
@@ -137,16 +218,18 @@ export function DynamicIsland() {
   } = useMusicPlayer();
 
   const activeTrackTitle = currentTrack ? currentTrack.title : "Google Drive Music Player";
-  const activeTrackArtist = currentTrack?.artist || "MêÂmĐạoSỹ Audio Hub";
-  const activeNotif = SYSTEM_NOTIFICATIONS[notifIndex];
+  const activeTrackArtist = currentTrack?.artist || "TxCloneDriver Audio Hub";
+  const safeNotifIndex = notifIndex % (systemNotifications.length || 1);
+  const activeNotif = systemNotifications[safeNotifIndex] || systemNotifications[0];
 
   // Auto rotate notifications every 6 seconds in compact mode
   useEffect(() => {
+    if (systemNotifications.length === 0) return;
     const interval = setInterval(() => {
-      setNotifIndex((prev) => (prev + 1) % SYSTEM_NOTIFICATIONS.length);
+      setNotifIndex((prev) => (prev + 1) % systemNotifications.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [systemNotifications.length]);
 
   // Listen to Cinema Video Modal status & progress events
   useEffect(() => {
@@ -324,7 +407,7 @@ export function DynamicIsland() {
                   )}
                 >
                   <Bell className="w-3.5 h-3.5" />
-                  <span>Thông Báo ({SYSTEM_NOTIFICATIONS.length})</span>
+                  <span>Thông Báo ({systemNotifications.length})</span>
                 </button>
               </div>
 
@@ -515,7 +598,7 @@ export function DynamicIsland() {
             {/* TAB 3: SYSTEM NOTIFICATIONS */}
             {activeTab === "notifications" && (
               <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                {SYSTEM_NOTIFICATIONS.map((notif) => {
+                {systemNotifications.map((notif) => {
                   const Icon = notif.icon;
                   return (
                     <div

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <circle cx="200" cy="180" r="140" fill="#ffffff" stroke="#dc2626" stroke-width="26" />
+  <!-- Motorbike silhouette -->
+  <g transform="translate(115, 125) scale(0.95)" fill="#1e293b">
+    <!-- Back wheel -->
+    <circle cx="35" cy="85" r="24" stroke="#1e293b" stroke-width="8" fill="none" />
+    <circle cx="35" cy="85" r="8" fill="#1e293b" />
+    <!-- Front wheel -->
+    <circle cx="145" cy="85" r="24" stroke="#1e293b" stroke-width="8" fill="none" />
+    <circle cx="145" cy="85" r="8" fill="#1e293b" />
+    <!-- Frame -->
+    <path d="M 35 85 L 75 55 L 120 55 L 145 85" stroke="#1e293b" stroke-width="7" fill="none" stroke-linecap="round" />
+    <path d="M 75 55 L 90 85 L 145 85" stroke="#1e293b" stroke-width="6" fill="none" stroke-linecap="round" />
+    <!-- Seat & Tank -->
+    <path d="M 60 52 C 75 42 105 42 120 52 Z" fill="#1e293b" />
+    <!-- Handlebars -->
+    <path d="M 120 55 L 132 30 L 145 28" stroke="#1e293b" stroke-width="6" fill="none" stroke-linecap="round" />
+    <!-- Headlight -->
+    <circle cx="148" cy="35" r="5" fill="#f59e0b" />
+    <!-- Rider silhouette -->
+    <circle cx="95" cy="22" r="10" fill="#1e293b" />
+    <path d="M 90 32 L 80 55 L 105 55 L 125 40 Z" fill="#1e293b" />
+  </g>
+  <!-- Red slash bar -->
+  <line x1="95" y1="85" x2="295" y2="285" stroke="#dc2626" stroke-width="22" stroke-linecap="round" />
+  <!-- Label badge -->
+  <rect x="50" y="340" width="300" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="365" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="15" font-weight="bold">Biển P.104: Cấm xe mô tô hai bánh</text>
+</svg>

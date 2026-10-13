@@ -67,10 +67,15 @@ const config: Config = {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-6px)" },
         },
+        "storm-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(124,58,237,0)" },
+          "50%": { boxShadow: "0 0 30px 5px rgba(124,58,237,0.3)" },
+        },
       },
       animation: {
         "pulse-slow": "pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         float: "float 6s ease-in-out infinite",
+        "storm-pulse": "storm-pulse 3s ease-in-out infinite",
       },
     },
   },

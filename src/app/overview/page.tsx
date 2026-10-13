@@ -21,6 +21,7 @@ import {
   FileText,
   Plus,
   Coins,
+  Wallet,
   Users,
   Settings,
   User,
@@ -40,6 +41,7 @@ import { LiveChatWidget } from "@/modules/overview/LiveChatWidget";
 import { BugReportWidget } from "@/modules/overview/BugReportWidget";
 import { LeaderboardWidget } from "@/modules/overview/LeaderboardWidget";
 import { ProfileEditModal } from "@/modules/overview/ProfileEditModal";
+import { QuickTodoWidget } from "@/modules/overview/QuickTodoWidget";
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return "0 B";
@@ -54,16 +56,18 @@ export default function OverviewPage() {
   const { activeEndpoint, files } = useDriveEndpoints();
   const { reports } = useFeedback();
 
-  const [searchVal, setSearchVal] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("Tháng 10 2026");
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [notesCount, setNotesCount] = useState<number>(3);
   const [projectsCount, setProjectsCount] = useState<number>(4);
+  const [totalMonthExpense, setTotalMonthExpense] = useState<number>(2450000);
 
-  // Load actual local notes & projects counts
+  // Load actual local notes, projects & expenses counts
   useEffect(() => {
     try {
-      const rawNotes = localStorage.getItem("datavault_notes");
+      const rawNotes =
+        localStorage.getItem("datavault_notes_v2") ||
+        localStorage.getItem("datavault_notes");
       if (rawNotes) {
         const parsed = JSON.parse(rawNotes);
         if (Array.isArray(parsed)) setNotesCount(parsed.length);
@@ -72,6 +76,16 @@ export default function OverviewPage() {
       if (rawProjects) {
         const parsed = JSON.parse(rawProjects);
         if (Array.isArray(parsed)) setProjectsCount(parsed.length);
+      }
+      const rawExp = localStorage.getItem("txclonedriver_expenses");
+      if (rawExp) {
+        const parsed = JSON.parse(rawExp);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const sum = parsed
+            .filter((item: any) => item.type === "expense")
+            .reduce((acc: number, item: any) => acc + (Number(item.amount) || 0), 0);
+          if (sum > 0) setTotalMonthExpense(sum);
+        }
       }
     } catch {
       // ignore
@@ -90,6 +104,51 @@ export default function OverviewPage() {
 
   const pendingNameRequests = managedUsers.filter((u) => u.pendingNameChange).length;
   const openBugsCount = reports.filter((r) => r.status === "open" || r.status === "in_progress").length;
+
+  // Calendar dynamic computations
+  const calYear = calendarDate.getFullYear();
+  const calMonth = calendarDate.getMonth();
+  const monthLabel = `Tháng ${calMonth + 1} ${calYear}`;
+
+  const handlePrevMonth = () => {
+    setCalendarDate(new Date(calYear, calMonth - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate(new Date(calYear, calMonth + 1, 1));
+  };
+
+  const handleResetToday = () => {
+    setCalendarDate(new Date());
+  };
+
+  const firstDayRaw = new Date(calYear, calMonth, 1).getDay();
+  const startDayOffset = firstDayRaw === 0 ? 6 : firstDayRaw - 1; // 0 for Mon, 6 for Sun
+
+  const totalDaysInCurrentMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const totalDaysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+
+  const prevOverflowDays: number[] = [];
+  for (let i = startDayOffset - 1; i >= 0; i--) {
+    prevOverflowDays.push(totalDaysInPrevMonth - i);
+  }
+
+  const currentMonthDays: number[] = [];
+  for (let d = 1; d <= totalDaysInCurrentMonth; d++) {
+    currentMonthDays.push(d);
+  }
+
+  const totalCells = startDayOffset + totalDaysInCurrentMonth > 35 ? 42 : 35;
+  const remainingCells = totalCells - (startDayOffset + totalDaysInCurrentMonth);
+  const nextOverflowDays: number[] = [];
+  for (let d = 1; d <= remainingCells; d++) {
+    nextOverflowDays.push(d);
+  }
+
+  const today = new Date();
+  const isViewingCurrentMonth =
+    today.getFullYear() === calYear && today.getMonth() === calMonth;
+  const todayDate = today.getDate();
 
   return (
     <ModuleGuard moduleId="overview" moduleName="Tổng quan">
@@ -164,24 +223,21 @@ export default function OverviewPage() {
             )}
 
             {/* Global Search Bar */}
-            <div className="relative mt-4 max-w-2xl">
-              <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
+            <div
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("tx-open-search"));
+              }}
+              className="relative mt-4 max-w-2xl cursor-pointer group"
+              title="Nhấn để mở tìm kiếm Spotlight nhanh (Ctrl+K)"
+            >
+              <Search className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
               <input
                 type="text"
-                value={searchVal}
-                onChange={(e) => setSearchVal(e.target.value)}
+                readOnly
                 placeholder="Tìm kiếm tệp Google Drive, ghi chú, dự án, báo cáo lỗi..."
-                className="w-full pl-11 pr-24 py-3 rounded-2xl glass-input text-xs sm:text-sm placeholder:text-slate-400 shadow-sm border border-white/10"
+                className="w-full pl-11 pr-24 py-3 rounded-2xl glass-input text-xs sm:text-sm placeholder:text-slate-400 shadow-sm border border-white/10 group-hover:border-primary/40 cursor-pointer pointer-events-none"
               />
-              <div className="absolute right-3.5 top-2.5 flex items-center gap-1.5">
-                {searchVal && (
-                  <button
-                    onClick={() => setSearchVal("")}
-                    className="p-1 rounded-md text-slate-400 hover:text-white"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
+              <div className="absolute right-3.5 top-2.5 flex items-center gap-1.5 pointer-events-none">
                 <kbd className="hidden sm:inline-block rounded-lg border border-white/15 bg-white/5 px-2 py-0.5 text-[10px] text-slate-400 font-mono">
                   Ctrl + K
                 </kbd>
@@ -192,21 +248,40 @@ export default function OverviewPage() {
           {/* Right: Sleek Month Calendar Widget */}
           <div className="lg:col-span-4 rounded-3xl glass-card p-4 border border-white/10 shadow-glass">
             <div className="flex items-center justify-between mb-2.5">
-              <h3 className="text-xs font-bold text-white tracking-wide">
-                {selectedMonth}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-white tracking-wide">
+                  {monthLabel}
+                </h3>
+                {!isViewingCurrentMonth && (
+                  <button
+                    onClick={handleResetToday}
+                    className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30 hover:bg-blue-500/30 transition-all font-semibold"
+                    title="Trở về tháng hiện tại"
+                  >
+                    Hôm nay
+                  </button>
+                )}
+              </div>
               <div className="flex items-center gap-1 text-slate-400">
-                <button className="p-1 hover:text-white rounded-lg transition-colors">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  title="Tháng trước"
+                >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <button className="p-1 hover:text-white rounded-lg transition-colors">
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  title="Tháng sau"
+                >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
 
             {/* Weekday Row */}
-            <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 mb-1">
+            <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 mb-1 select-none">
               <span>T2</span>
               <span>T3</span>
               <span>T4</span>
@@ -218,57 +293,66 @@ export default function OverviewPage() {
 
             {/* Days Grid */}
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium">
-              <span className="py-1 text-slate-600">29</span>
-              <span className="py-1 text-slate-600">30</span>
-              <span className="py-1 text-slate-400">1</span>
-              <span className="py-1 text-slate-400">2</span>
-              <span className="py-1 text-slate-400">3</span>
-              <span className="py-1 text-slate-400">4</span>
-              <span className="py-1 text-rose-500/60">5</span>
-
-              <span className="py-1 text-slate-300">6</span>
-              <span className="py-1 text-slate-300">7</span>
-              <span className="py-1 text-slate-300">8</span>
-              <span className="py-1 text-slate-300">9</span>
-              <span className="py-1 text-slate-300">10</span>
-              <span className="py-1 flex items-center justify-center">
-                <span className="h-6 w-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shadow-lg shadow-blue-500/50">
-                  11
+              {/* Prev Month Days */}
+              {prevOverflowDays.map((d) => (
+                <span key={`prev-${d}`} className="py-1 text-slate-600 select-none">
+                  {d}
                 </span>
-              </span>
-              <span className="py-1 text-rose-400">12</span>
+              ))}
 
-              <span className="py-1 text-slate-300">13</span>
-              <span className="py-1 text-slate-300">14</span>
-              <span className="py-1 text-slate-300">15</span>
-              <span className="py-1 text-slate-300">16</span>
-              <span className="py-1 text-slate-300">17</span>
-              <span className="py-1 text-slate-300">18</span>
-              <span className="py-1 text-rose-400">19</span>
+              {/* Current Month Days */}
+              {currentMonthDays.map((d, idx) => {
+                const dayOfWeek = (startDayOffset + idx) % 7;
+                const isSunday = dayOfWeek === 6;
+                const isToday = isViewingCurrentMonth && d === todayDate;
 
-              <span className="py-1 text-slate-300">20</span>
-              <span className="py-1 text-slate-300">21</span>
-              <span className="py-1 text-slate-300">22</span>
-              <span className="py-1 text-slate-300">23</span>
-              <span className="py-1 text-slate-300">24</span>
-              <span className="py-1 text-slate-300">25</span>
-              <span className="py-1 text-rose-400">26</span>
+                return (
+                  <span
+                    key={`curr-${d}`}
+                    className={cn(
+                      "py-1 flex items-center justify-center rounded-xl transition-all cursor-default",
+                      isToday
+                        ? ""
+                        : isSunday
+                        ? "text-rose-400 hover:bg-white/10"
+                        : "text-slate-300 hover:bg-white/10"
+                    )}
+                  >
+                    {isToday ? (
+                      <span className="h-6 w-6 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center shadow-lg shadow-blue-500/50">
+                        {d}
+                      </span>
+                    ) : (
+                      d
+                    )}
+                  </span>
+                );
+              })}
 
-              <span className="py-1 text-slate-300">27</span>
-              <span className="py-1 text-slate-300">28</span>
-              <span className="py-1 text-slate-300">29</span>
-              <span className="py-1 text-slate-300">30</span>
-              <span className="py-1 text-slate-300">31</span>
-              <span className="py-1 text-slate-600">1</span>
-              <span className="py-1 text-rose-500/60">2</span>
+              {/* Next Month Days */}
+              {nextOverflowDays.map((d, idx) => {
+                const dayOfWeek = (startDayOffset + currentMonthDays.length + idx) % 7;
+                const isSunday = dayOfWeek === 6;
+                return (
+                  <span
+                    key={`next-${d}`}
+                    className={cn(
+                      "py-1 select-none",
+                      isSunday ? "text-rose-500/40" : "text-slate-600"
+                    )}
+                  >
+                    {d}
+                  </span>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* ============================================================== */}
-        {/* 2. REAL METRICS CARDS (DUNG LƯỢNG, GHI CHÚ, DỰ ÁN, ĐIỂM CƯỢC) */}
+        {/* 2. REAL METRICS CARDS (DUNG LƯỢNG, GHI CHÚ, DỰ ÁN, CHI TIÊU, XU) */}
         {/* ============================================================== */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 pt-1">
           {/* Card 1: Dung lượng Google Drive Thực */}
           <Link
             href="/storage"
@@ -351,7 +435,30 @@ export default function OverviewPage() {
             </div>
           </Link>
 
-          {/* Card 4: Ví Điểm Cược & Hệ Thống Game */}
+          {/* Card 4: Sổ Chi Tiêu Tháng Này */}
+          <Link
+            href="/expenses"
+            className="rounded-3xl glass-card p-4 border border-white/10 hover:border-rose-400/40 transition-all flex flex-col justify-between group hover:scale-[1.01]"
+          >
+            <div className="flex items-center justify-between">
+              <div className="h-10 w-10 rounded-2xl bg-rose-500/20 border border-rose-400/30 flex items-center justify-center text-rose-300 shrink-0">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
+            </div>
+
+            <div className="mt-3">
+              <span className="text-[11px] text-slate-400 block font-medium">Chi Tiêu Tháng Này</span>
+              <span className="text-xl font-black text-white mt-0.5 block truncate">
+                {totalMonthExpense.toLocaleString("vi-VN")} ₫
+              </span>
+              <p className="text-[11px] text-rose-300 font-medium mt-1">
+                Theo dõi ngân sách & thu chi
+              </p>
+            </div>
+          </Link>
+
+          {/* Card 5: Ví Điểm Cược & Hệ Thống Game */}
           <Link
             href="/games"
             className="rounded-3xl glass-card p-4 border border-white/10 hover:border-amber-400/40 transition-all flex flex-col justify-between group hover:scale-[1.01]"
@@ -396,9 +503,9 @@ export default function OverviewPage() {
         </div>
 
         {/* ============================================================== */}
-        {/* 4. MIDDLE ROW: DỰ ÁN ĐANG LÀM (LEFT) & GHI CHÚ NHANH (RIGHT)   */}
+        {/* 4. MIDDLE ROW: DỰ ÁN, GHI CHÚ NHANH & VIỆC CẦN LÀM TODO        */}
         {/* ============================================================== */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {/* Column 1: Dự án đang làm */}
           <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col justify-between space-y-4">
             <div className="flex items-center justify-between">
@@ -570,6 +677,9 @@ export default function OverviewPage() {
               <ChevronRight className="h-4 w-4 text-slate-500 group-hover:text-white transition-colors" />
             </a>
           </div>
+
+          {/* Column 3: Việc Cần Làm Nhanh (Quick Tasks) */}
+          <QuickTodoWidget />
         </div>
 
         {/* ============================================================== */}

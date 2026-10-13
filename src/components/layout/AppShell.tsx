@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
+import { StormOverlay } from "@/modules/seasonal-effects/StormOverlay";
 import { QuickSearchModal } from "./QuickSearchModal";
 import { FloatingMessenger } from "@/modules/chat/FloatingMessenger";
 import { DynamicIsland } from "./DynamicIsland";
@@ -22,6 +23,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  React.useEffect(() => {
+    const handleOpen = () => setSearchOpen(true);
+    window.addEventListener("tx-open-search", handleOpen);
+    return () => window.removeEventListener("tx-open-search", handleOpen);
+  }, []);
 
   // If on login page, render standalone view without sidebar and header
   if (pathname === "/login") {
@@ -47,9 +54,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Layer 1: Seasonal Particle Canvas */}
       <SeasonalCanvas />
+      <StormOverlay />
 
       {/* Layer 2: Main Layout UI */}
-      <div className="relative z-10 flex w-full min-h-screen">
+      <div className="relative z-10 flex w-full min-h-screen" data-storm-target>
         {/* Left Sidebar */}
         <Sidebar
           collapsed={collapsed}

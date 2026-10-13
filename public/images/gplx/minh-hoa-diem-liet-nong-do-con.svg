@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+  <rect width="600" height="450" rx="20" fill="#0b1329" />
+  <!-- Red glowing badge -->
+  <rect x="40" y="30" width="520" height="65" rx="14" fill="#ef4444" fill-opacity="0.2" stroke="#ef4444" stroke-width="2" />
+  <text x="300" y="70" text-anchor="middle" fill="#f87171" font-size="18" font-weight="900">⚠️ CÂU ĐIỂM LIỆT: ĐÃ UỐNG RƯỢU BIA - KHÔNG LÁI XE</text>
+
+  <!-- Big prohibition circle -->
+  <circle cx="300" cy="240" r="115" fill="#ffffff" stroke="#dc2626" stroke-width="22" />
+  <!-- Beer glass and bottle -->
+  <g transform="translate(235, 175)" fill="#1e293b">
+    <!-- Bottle -->
+    <path d="M 30 115 L 30 55 Q 30 40 42 35 L 42 10 L 58 10 L 58 35 Q 70 40 70 55 L 70 115 Z" fill="#059669" />
+    <!-- Glass mug -->
+    <path d="M 85 115 L 80 45 L 125 45 L 120 115 Z" fill="#d97706" />
+    <path d="M 125 55 L 140 55 C 145 55 145 95 122 95" stroke="#d97706" stroke-width="8" fill="none" />
+    <rect x="75" y="40" width="55" height="12" rx="4" fill="#ffffff" />
+  </g>
+  <!-- Diagonal prohibition line -->
+  <line x1="215" y1="155" x2="385" y2="325" stroke="#dc2626" stroke-width="20" stroke-linecap="round" />
+
+  <!-- Speedometer gauge showing 0.00 mg/L -->
+  <rect x="180" y="380" width="240" height="45" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="2" />
+  <text x="300" y="408" text-anchor="middle" fill="#38bdf8" font-size="15" font-weight="bold">Quy định: Nồng độ = 0.00</text>
+</svg>

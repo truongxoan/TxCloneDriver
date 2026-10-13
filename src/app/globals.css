@@ -95,3 +95,211 @@ body {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px var(--primary-glow);
 }
+
+/* ═══════════════════════════════════════════════
+   ⛈️ THUNDERSTORM THEME — Wind, Lightning & Cracks
+   ═══════════════════════════════════════════════ */
+
+/* Sidebar & Header wind-tilt — continuous sway when storm is active */
+.storm-wind-active aside {
+  animation: storm-wind-sway 3s ease-in-out infinite;
+  transform-origin: bottom left;
+}
+
+.storm-wind-active header,
+.storm-wind-active [class*="glass-pill"] {
+  animation: storm-header-sway 4s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+/* Navigation items wobble individually — staggered */
+.storm-wind-active nav a:nth-child(odd) {
+  animation: storm-nav-wobble 2.5s ease-in-out infinite;
+}
+.storm-wind-active nav a:nth-child(even) {
+  animation: storm-nav-wobble 3s ease-in-out infinite reverse;
+}
+
+/* Cards and panels shake subtly */
+.storm-wind-active .glass-card {
+  animation: storm-card-rattle 5s ease-in-out infinite;
+}
+
+/* Sidebar brand logo flickers like a broken neon */
+.storm-wind-active aside a div[class*="bg-gradient"] {
+  animation: storm-neon-flicker 4s linear infinite;
+}
+
+/* Screen shake when lightning strikes */
+.storm-shake {
+  animation: storm-screen-shake 0.4s ease-out !important;
+}
+
+/* Lightning crack SVG drawing animation */
+.storm-crack-animate {
+  animation: storm-crack-draw 0.6s ease-out forwards, storm-crack-fade 2s 0.6s ease-out forwards;
+  stroke-dasharray: 300;
+  stroke-dashoffset: 300;
+}
+
+/* Rain overlay — CSS-only diagonal rain streaks */
+.storm-rain-overlay {
+  background: repeating-linear-gradient(
+    110deg,
+    transparent,
+    transparent 97%,
+    rgba(148, 163, 184, 0.06) 97.5%,
+    transparent 98%
+  );
+  animation: storm-rain-fall 0.7s linear infinite;
+}
+
+/* Wind-blown particles (debris) — CSS pseudo-element dots */
+.storm-wind-particles::before,
+.storm-wind-particles::after {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(192, 132, 252, 0.3);
+  box-shadow:
+    20vw 15vh 0 rgba(148,163,184,0.2),
+    45vw 35vh 0 rgba(192,132,252,0.15),
+    70vw 20vh 0 rgba(124,58,237,0.2),
+    15vw 60vh 0 rgba(148,163,184,0.15),
+    80vw 50vh 0 rgba(192,132,252,0.2),
+    35vw 80vh 0 rgba(124,58,237,0.15),
+    55vw 45vh 0 rgba(148,163,184,0.2),
+    90vw 70vh 0 rgba(192,132,252,0.15);
+  animation: storm-debris-fly 2.5s linear infinite;
+}
+
+.storm-wind-particles::after {
+  animation-delay: -1.2s;
+  animation-duration: 3s;
+  box-shadow:
+    10vw 25vh 0 rgba(192,132,252,0.15),
+    60vw 10vh 0 rgba(148,163,184,0.2),
+    25vw 55vh 0 rgba(124,58,237,0.15),
+    75vw 40vh 0 rgba(192,132,252,0.2),
+    40vw 70vh 0 rgba(148,163,184,0.15),
+    85vw 30vh 0 rgba(124,58,237,0.2);
+}
+
+/* Glass surfaces get a "cracked glass" texture when storm hits */
+.storm-wind-active .glass-panel,
+.storm-wind-active .glass-card {
+  position: relative;
+}
+.storm-wind-active .glass-panel::after,
+.storm-wind-active .glass-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(192,132,252,0.04) 0%, transparent 40%),
+    radial-gradient(circle at 75% 60%, rgba(124,58,237,0.03) 0%, transparent 35%);
+  mix-blend-mode: overlay;
+  animation: storm-glass-stress 6s ease-in-out infinite;
+}
+
+/* Border glow pulse — simulates electrical charge on borders */
+.storm-wind-active .glass-panel {
+  border-color: rgba(124, 58, 237, 0.2);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.storm-wind-active .glass-panel:hover {
+  border-color: rgba(192, 132, 252, 0.4);
+  box-shadow: 
+    0 0 15px -3px rgba(124, 58, 237, 0.3),
+    inset 0 0 20px -10px rgba(192, 132, 252, 0.1);
+}
+
+/* ═══════════════════════════════════════════════
+   ⛈️ KEYFRAMES
+   ═══════════════════════════════════════════════ */
+
+/* Sidebar sways as if wind is pushing it */
+@keyframes storm-wind-sway {
+  0%, 100% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(0.4deg) translateX(1px); }
+  50% { transform: rotate(-0.2deg) translateX(-0.5px); }
+  75% { transform: rotate(0.3deg) translateX(0.8px); }
+}
+
+/* Header pills sway independently */
+@keyframes storm-header-sway {
+  0%, 100% { transform: skewX(0deg) translateX(0); }
+  20% { transform: skewX(-0.5deg) translateX(1px); }
+  40% { transform: skewX(0.3deg) translateX(-0.5px); }
+  60% { transform: skewX(-0.4deg) translateX(0.8px); }
+  80% { transform: skewX(0.2deg) translateX(-0.3px); }
+}
+
+/* Nav items wobble individually */
+@keyframes storm-nav-wobble {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  30% { transform: translateX(1.5px) rotate(0.3deg); }
+  60% { transform: translateX(-1px) rotate(-0.2deg); }
+  80% { transform: translateX(0.8px) rotate(0.15deg); }
+}
+
+/* Cards rattle */
+@keyframes storm-card-rattle {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(0.5px, 0.3px) rotate(0.1deg); }
+  30% { transform: translate(-0.3px, -0.2px) rotate(-0.08deg); }
+  50% { transform: translate(0.4px, -0.1px) rotate(0.05deg); }
+  70% { transform: translate(-0.2px, 0.4px) rotate(-0.1deg); }
+  90% { transform: translate(0.3px, -0.3px) rotate(0.07deg); }
+}
+
+/* Neon flicker on logo */
+@keyframes storm-neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; filter: brightness(1); }
+  20% { opacity: 0.7; filter: brightness(1.5); }
+  22% { opacity: 0.85; filter: brightness(0.9); }
+  24% { opacity: 0.9; filter: brightness(1.3); }
+  55% { opacity: 0.75; filter: brightness(1.4); }
+}
+
+/* Screen shake on lightning */
+@keyframes storm-screen-shake {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(-3px, 1px) rotate(-0.3deg); }
+  30% { transform: translate(2px, -2px) rotate(0.2deg); }
+  45% { transform: translate(-1px, 2px) rotate(-0.15deg); }
+  60% { transform: translate(2px, -1px) rotate(0.1deg); }
+  75% { transform: translate(-1px, 0.5px) rotate(-0.05deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* SVG crack drawing */
+@keyframes storm-crack-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes storm-crack-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Rain fall animation */
+@keyframes storm-rain-fall {
+  from { background-position: 0 0; }
+  to { background-position: 40px 80px; }
+}
+
+/* Debris flying across screen */
+@keyframes storm-debris-fly {
+  from { transform: translateX(0) translateY(0); }
+  to { transform: translateX(100vw) translateY(-20vh); }
+}
+
+/* Glass stress fracture glow */
+@keyframes storm-glass-stress {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}

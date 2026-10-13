@@ -47,25 +47,60 @@ interface SidebarLinkItem {
   module: AppModuleId;
 }
 
-const SIDEBAR_LINKS: SidebarLinkItem[] = [
-  { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
-  { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
-  { href: "/image-studio", label: "AI Image Studio", icon: Wand2, module: "image_studio" },
-  { href: "/google-flow", label: "Google Flow Tools", icon: Workflow, module: "google_flow" },
-  { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
-  { href: "/downloader", label: "Tải Video", icon: Download, module: "downloader" },
-  { href: "/memories", label: "Kỷ Niệm Cá Nhân", icon: Images, module: "memories" },
-  { href: "/games", label: "Game & Giải Trí", icon: Gamepad2, module: "games" },
-  { href: "/study", label: "Học Ngoại Ngữ", icon: GraduationCap, module: "study" },
-  { href: "/driver-license", label: "Ôn Thi GPLX", icon: Car, module: "driver_license" },
-  { href: "/vault", label: "Két Sắt & 2FA", icon: KeyRound, module: "vault" },
-  { href: "/expenses", label: "Tính Chi Tiêu", icon: Wallet, module: "expenses" },
-  { href: "/qr", label: "Tạo Mã QR", icon: QrCode, module: "qr" },
-  { href: "/notes", label: "Ghi chú & Link", icon: Link2, module: "notes" },
-  { href: "/projects", label: "Dự án", icon: Folder, module: "projects" },
-  { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays, module: "events" },
-  { href: "/weather", label: "Thời tiết", icon: CloudSun, module: "weather" },
-  { href: "/settings", label: "Cài đặt", icon: Settings, module: "settings" },
+interface SidebarGroup {
+  category: string;
+  items: SidebarLinkItem[];
+}
+
+const SIDEBAR_GROUPS: SidebarGroup[] = [
+  {
+    category: "Tổng Quan",
+    items: [
+      { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
+      { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
+    ],
+  },
+  {
+    category: "Sáng Tạo & AI",
+    items: [
+      { href: "/image-studio", label: "AI Image Studio", icon: Wand2, module: "image_studio" as AppModuleId },
+      { href: "/google-flow", label: "Google Flow Tools", icon: Workflow, module: "google_flow" as AppModuleId },
+    ],
+  },
+  {
+    category: "Giải Trí",
+    items: [
+      { href: "/watch-together", label: "Xem & Nghe Chung", icon: Users2, module: "watch_together" },
+      { href: "/downloader", label: "Tải Video", icon: Download, module: "downloader" },
+      { href: "/memories", label: "Kỷ Niệm Cá Nhân", icon: Images, module: "memories" },
+      { href: "/games", label: "Game & Giải Trí", icon: Gamepad2, module: "games" },
+    ],
+  },
+  {
+    category: "Học Tập",
+    items: [
+      { href: "/study", label: "Học Ngoại Ngữ", icon: GraduationCap, module: "study" },
+      { href: "/driver-license", label: "Ôn Thi GPLX", icon: Car, module: "driver_license" },
+    ],
+  },
+  {
+    category: "Công Cụ",
+    items: [
+      { href: "/vault", label: "Két Sắt & 2FA", icon: KeyRound, module: "vault" },
+      { href: "/expenses", label: "Tính Chi Tiêu", icon: Wallet, module: "expenses" },
+      { href: "/qr", label: "Tạo Mã QR", icon: QrCode, module: "qr" },
+      { href: "/notes", label: "Ghi chú & Link", icon: Link2, module: "notes" },
+    ],
+  },
+  {
+    category: "Hệ Thống",
+    items: [
+      { href: "/projects", label: "Dự án", icon: Folder, module: "projects" },
+      { href: "/events", label: "Lịch & Sự kiện", icon: CalendarDays, module: "events" },
+      { href: "/weather", label: "Thời tiết", icon: CloudSun, module: "weather" },
+      { href: "/settings", label: "Cài đặt", icon: Settings, module: "settings" },
+    ],
+  },
 ];
 
 export function Sidebar({
@@ -159,63 +194,76 @@ export function Sidebar({
           </div>
 
           {/* Navigation Items */}
-          <nav className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-290px)] pr-1">
-            {SIDEBAR_LINKS.map((item, idx) => {
-              const Icon = item.icon;
-              const isAllowed = isAdmin || hasModuleAccess(item.module);
-
-              // Check active status
-              const isActive =
-                item.href === "/overview"
-                  ? pathname === "/overview" || pathname === "/"
-                  : pathname === item.href;
-
-              return (
-                <Link
-                  key={idx}
-                  href={item.href}
-                  onClick={onCloseMobile}
-                  className={cn(
-                    "flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all group",
-                    isActive
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 font-bold"
-                      : isAllowed
-                      ? "text-slate-300 hover:text-white hover:bg-white/10"
-                      : "text-slate-500 hover:text-slate-300 hover:bg-white/5 opacity-75"
-                  )}
-                  title={
-                    collapsed
-                      ? isAllowed
-                        ? item.label
-                        : `${item.label} (Chưa được cấp quyền)`
-                      : undefined
-                  }
-                >
-                  <div className="flex items-center gap-3 truncate">
-                    <Icon
-                      className={cn(
-                        "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
-                        isActive
-                          ? "text-white"
-                          : isAllowed
-                          ? "text-slate-400 group-hover:text-white"
-                          : "text-slate-500"
-                      )}
-                    />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
+          <nav className="space-y-3 overflow-y-auto max-h-[calc(100vh-270px)] pr-1 no-scrollbar">
+            {SIDEBAR_GROUPS.map((group, gIdx) => (
+              <div key={group.category} className="space-y-1">
+                {/* Category Header or Divider */}
+                {!collapsed ? (
+                  <div className={cn("px-3.5 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none", gIdx > 0 && "pt-2 border-t border-white/5")}>
+                    {group.category}
                   </div>
+                ) : (
+                  gIdx > 0 && <div className="my-1.5 border-t border-white/10" />
+                )}
 
-                  {!collapsed && !isAllowed && (
-                    <span
-                      title="Quyền truy cập bị khóa"
-                      className="ml-auto flex items-center justify-center h-4 w-4 rounded-full bg-slate-800 text-amber-400/80 border border-amber-400/20"
+                {group.items.map((item, idx) => {
+                  const Icon = item.icon;
+                  const isAllowed = isAdmin || hasModuleAccess(item.module);
+
+                  // Check active status
+                  const isActive =
+                    item.href === "/overview"
+                      ? pathname === "/overview" || pathname === "/"
+                      : pathname === item.href;
+
+                  return (
+                    <Link
+                      key={idx}
+                      href={item.href}
+                      onClick={onCloseMobile}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2 rounded-2xl text-xs font-semibold transition-all group",
+                        isActive
+                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 font-bold"
+                          : isAllowed
+                          ? "text-slate-300 hover:text-white hover:bg-white/10"
+                          : "text-slate-500 hover:text-slate-300 hover:bg-white/5 opacity-75"
+                      )}
+                      title={
+                        collapsed
+                          ? isAllowed
+                            ? item.label
+                            : `${item.label} (Chưa được cấp quyền)`
+                          : undefined
+                      }
                     >
-                      <Lock className="h-2.5 w-2.5" />
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+                      <div className="flex items-center gap-3 truncate">
+                        <Icon
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-transform group-hover:scale-110",
+                            isActive
+                              ? "text-white"
+                              : isAllowed
+                              ? "text-slate-400 group-hover:text-white"
+                              : "text-slate-500"
+                          )}
+                        />
+                        {!collapsed && <span className="truncate">{item.label}</span>}
+                      </div>
+
+                      {!collapsed && !isAllowed && (
+                        <span
+                          title="Quyền truy cập bị khóa"
+                          className="ml-auto flex items-center justify-center h-4 w-4 rounded-full bg-slate-800 text-amber-400/80 border border-amber-400/20"
+                        >
+                          <Lock className="h-2.5 w-2.5" />
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </div>
 

@@ -19,6 +19,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/modules/auth/authContext";
+import { AppModuleId } from "@/modules/auth/types";
 
 interface DockItem {
   id: string;
@@ -108,8 +110,23 @@ const DOCK_ITEMS: DockItem[] = [
   },
 ];
 
+const MODULE_ID_MAP: Record<string, AppModuleId | null> = {
+  overview: "overview",
+  storage: "storage",
+  "image-studio": "image_studio",
+  "google-flow": "google_flow",
+  "watch-together": "watch_together",
+  games: "games",
+  study: "study",
+  downloader: "downloader",
+  memories: "memories",
+  themes: null,
+  settings: "settings",
+};
+
 export function MacOsDock() {
   const pathname = usePathname();
+  const { hasModuleAccess, isAdmin } = useAuth();
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const [isCinemaOpen, setIsCinemaOpen] = useState(false);
   const [isHoveringDockArea, setIsHoveringDockArea] = useState(false);
@@ -138,7 +155,7 @@ export function MacOsDock() {
     };
   }, []);
 
-  // Smart Auto-Hide timer when idle for 4.5s
+  // Smart Auto-Hide timer when idle for 5s
   useEffect(() => {
     const resetTimer = () => {
       setIsAutoHidden(false);
@@ -159,6 +176,14 @@ export function MacOsDock() {
       window.removeEventListener("scroll", resetTimer);
     };
   }, []);
+
+  // Filter items by permission
+  const visibleDockItems = DOCK_ITEMS.filter((item) => {
+    if (isAdmin) return true;
+    const modId = MODULE_ID_MAP[item.id];
+    if (!modId) return true;
+    return hasModuleAccess(modId);
+  });
 
   // If on login page or cinema mode is open, hide dock completely
   if (pathname === "/login" || isCinemaOpen) return null;
@@ -200,7 +225,7 @@ export function MacOsDock() {
           !isDockVisible && "pointer-events-none"
         )}
       >
-        {DOCK_ITEMS.map((item, idx) => {
+        {visibleDockItems.map((item, idx) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
 

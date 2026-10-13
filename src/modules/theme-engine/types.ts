@@ -10,7 +10,8 @@ export type ThemeId =
   | "bento-grid"
   | "vision-os"
   | "cyber-hud"
-  | "neo-brutalism";
+  | "neo-brutalism"
+  | "thunderstorm";
 
 export type EffectType =
   | "blossom"
@@ -22,6 +23,7 @@ export type EffectType =
   | "bubbles"
   | "hud-grid"
   | "particles"
+  | "thunderstorm"
   | "none";
 
 export interface ThemeDefinition {

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Clock,
   Calendar,
@@ -20,6 +21,13 @@ import {
   ShieldAlert,
   Mic,
   Headphones,
+  Timer,
+  Play,
+  Pause,
+  RotateCcw,
+  CheckCircle2,
+  HardDrive,
+  Wallet,
 } from "lucide-react";
 import { VoiceAssistantModal } from "@/components/voice/VoiceAssistantModal";
 import { AmbientSoundPlayer } from "@/components/audio/AmbientSoundPlayer";
@@ -29,6 +37,7 @@ import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar
 import { getUpcomingHolidayCountdowns } from "@/modules/holiday-countdown/holidaysData";
 import { getWeather } from "@/modules/weather/weatherMockService";
 import { useAuth } from "@/modules/auth/authContext";
+import { useFeedback } from "@/modules/feedback/feedbackContext";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +67,8 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   } = useTheme();
 
   const { user, isAdmin, logout } = useAuth();
+  const { reports } = useFeedback();
+  const router = useRouter();
 
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
@@ -65,6 +76,37 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [ambientPlayerOpen, setAmbientPlayerOpen] = useState(false);
+  const [pomodoroOpen, setPomodoroOpen] = useState(false);
+
+  // Pomodoro Timer State
+  const [pomodoroActive, setPomodoroActive] = useState(false);
+  const [pomodoroSeconds, setPomodoroSeconds] = useState(25 * 60);
+  const [pomodoroMode, setPomodoroMode] = useState<"work" | "break">("work");
+  const [readNotifIds, setReadNotifIds] = useState<string[]>([]);
+
+  // Pomodoro countdown timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (pomodoroActive && pomodoroSeconds > 0) {
+      timer = setInterval(() => {
+        setPomodoroSeconds((prev) => prev - 1);
+      }, 1000);
+    } else if (pomodoroActive && pomodoroSeconds === 0) {
+      if (pomodoroMode === "work") {
+        setPomodoroMode("break");
+        setPomodoroSeconds(5 * 60);
+      } else {
+        setPomodoroMode("work");
+        setPomodoroSeconds(25 * 60);
+      }
+      setPomodoroActive(false);
+    }
+    return () => clearInterval(timer);
+  }, [pomodoroActive, pomodoroSeconds, pomodoroMode]);
+
+  const pomodoroMin = Math.floor(pomodoroSeconds / 60);
+  const pomodoroSec = pomodoroSeconds % 60;
+  const pomodoroDisplay = `${String(pomodoroMin).padStart(2, "0")}:${String(pomodoroSec).padStart(2, "0")}`;
 
   const weather = getWeather("hanoi");
 
@@ -94,6 +136,53 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   // Tết Nguyên Đán countdown
   const holidayList = getUpcomingHolidayCountdowns(now);
   const tetHoliday = holidayList.find((h) => h.id === "tet-nguyen-dan") || holidayList[0];
+
+  const openReports = reports.filter((r) => r.status === "open" || r.status === "in_progress").length;
+
+  const notificationsList = [
+    {
+      id: "notif-drive",
+      title: "Google Drive Cloud Hub",
+      desc: "Hệ thống lưu trữ đám mây đang sẵn sàng và hoạt động ổn định.",
+      time: "Trực tuyến",
+      href: "/storage",
+      icon: HardDrive,
+      color: "text-blue-400 bg-blue-500/20",
+    },
+    {
+      id: "notif-coins",
+      title: "Ví Điểm Cược & Xu Thưởng",
+      desc: `Số dư ${(user?.coins ?? 50000).toLocaleString("vi-VN")} Xu • Tặng 50.000 Xu mỗi 24 giờ.`,
+      time: "Hôm nay",
+      href: "/games",
+      icon: Wallet,
+      color: "text-amber-400 bg-amber-500/20",
+    },
+    ...(openReports > 0
+      ? [
+          {
+            id: "notif-bugs",
+            title: "Báo Cáo Lỗi & Phản Hồi",
+            desc: `Đang có ${openReports} báo cáo lỗi đang mở cần chú ý.`,
+            time: "Cần xử lý",
+            href: "/overview",
+            icon: CheckCircle2,
+            color: "text-rose-400 bg-rose-500/20",
+          },
+        ]
+      : []),
+    {
+      id: "notif-security",
+      title: "Phân Quyền & Bảo Mật",
+      desc: isAdmin ? "Tài khoản Quản trị viên Tối cao — Toàn quyền truy cập." : "Tài khoản Thành viên tiêu chuẩn an toàn.",
+      time: "Bảo vệ",
+      href: "/settings",
+      icon: Shield,
+      color: "text-emerald-400 bg-emerald-500/20",
+    },
+  ];
+
+  const unreadCount = notificationsList.filter((n) => !readNotifIds.includes(n.id)).length;
 
   return (
     <header className="sticky top-0 z-30 flex h-auto min-h-[64px] w-full items-center justify-between md:justify-end px-3 sm:px-6 py-2.5 gap-4">
@@ -185,10 +274,23 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                         )}
                       >
                         <div className="flex items-center gap-2.5">
-                          <span
-                            className="h-3 w-3 rounded-full border border-white/20 shadow-sm shrink-0"
-                            style={{ backgroundColor: theme.primaryColor }}
-                          />
+                          <div className="flex items-center -space-x-1 shrink-0">
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-white/20 shadow-sm"
+                              style={{ backgroundColor: theme.primaryColor }}
+                              title="Màu chính"
+                            />
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-white/20 shadow-sm"
+                              style={{ backgroundColor: theme.accentColor }}
+                              title="Màu điểm nhấn"
+                            />
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-white/20 shadow-sm"
+                              style={{ backgroundColor: theme.cssVars["--background"] || "#0a0d18" }}
+                              title="Màu nền"
+                            />
+                          </div>
                           <div>
                             <div className="text-foreground font-medium">
                               {theme.nameVi}
@@ -233,14 +335,210 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
           <Headphones className="h-4 w-4 transition-transform group-hover:scale-110" />
         </button>
 
-        {/* Notifications Button */}
-        <button
-          onClick={() => setNotificationsOpen(!notificationsOpen)}
-          className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all relative"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-slate-950" />
-        </button>
+        {/* Pomodoro Focus Timer Button & Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setPomodoroOpen(!pomodoroOpen)}
+            className={cn(
+              "flex items-center gap-1.5 h-9 px-2.5 rounded-2xl glass-pill hover:bg-white/10 transition-all text-xs font-semibold",
+              pomodoroActive
+                ? "bg-rose-500/20 border-rose-500/40 text-rose-300 shadow-sm shadow-rose-500/20"
+                : "text-emerald-400 hover:text-emerald-300"
+            )}
+            title="Đồng hồ tập trung Pomodoro (25/5 phút)"
+          >
+            <Timer className={cn("h-4 w-4", pomodoroActive && "animate-pulse")} />
+            {pomodoroActive && (
+              <span className="font-mono text-xs font-bold text-white">
+                {pomodoroDisplay}
+              </span>
+            )}
+          </button>
+
+          {pomodoroOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setPomodoroOpen(false)}
+              />
+              <div className="absolute right-0 mt-2 z-50 w-64 rounded-2xl glass-panel p-3.5 shadow-2xl border border-white/15 animate-in fade-in zoom-in-95 duration-150 text-center space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                    <Timer className="h-4 w-4 text-rose-400" />
+                    <span>Pomodoro Tập Trung</span>
+                  </div>
+                  <span
+                    className={cn(
+                      "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase",
+                      pomodoroMode === "work"
+                        ? "bg-rose-500/20 text-rose-300"
+                        : "bg-emerald-500/20 text-emerald-300"
+                    )}
+                  >
+                    {pomodoroMode === "work" ? "Làm việc" : "Nghỉ ngơi"}
+                  </span>
+                </div>
+
+                <div className="py-2">
+                  <div className="text-3xl font-black font-mono tracking-tight text-white">
+                    {pomodoroDisplay}
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {pomodoroMode === "work"
+                      ? "Tập trung sâu 25 phút"
+                      : "Nghỉ giải lao 5 phút"}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setPomodoroActive(!pomodoroActive)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all shadow-md",
+                      pomodoroActive
+                        ? "bg-amber-600 hover:bg-amber-500"
+                        : "bg-rose-600 hover:bg-rose-500"
+                    )}
+                  >
+                    {pomodoroActive ? (
+                      <Pause className="h-3.5 w-3.5" />
+                    ) : (
+                      <Play className="h-3.5 w-3.5 fill-current" />
+                    )}
+                    <span>{pomodoroActive ? "Tạm dừng" : "Bắt đầu"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setPomodoroActive(false);
+                      setPomodoroSeconds(pomodoroMode === "work" ? 25 * 60 : 5 * 60);
+                    }}
+                    className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors"
+                    title="Đặt lại thời gian"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+                  <button
+                    onClick={() => {
+                      setPomodoroMode("work");
+                      setPomodoroSeconds(25 * 60);
+                      setPomodoroActive(false);
+                    }}
+                    className={cn(
+                      "hover:text-white transition-colors",
+                      pomodoroMode === "work" && "text-white font-bold"
+                    )}
+                  >
+                    25m Làm việc
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPomodoroMode("break");
+                      setPomodoroSeconds(5 * 60);
+                      setPomodoroActive(false);
+                    }}
+                    className={cn(
+                      "hover:text-white transition-colors",
+                      pomodoroMode === "break" && "text-white font-bold"
+                    )}
+                  >
+                    5m Nghỉ ngơi
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Notifications Button & Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+            className="flex h-9 w-9 items-center justify-center rounded-2xl glass-pill hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all relative"
+            title="Trung tâm thông báo"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-slate-950 animate-pulse" />
+            )}
+          </button>
+
+          {notificationsOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setNotificationsOpen(false)}
+              />
+              <div className="absolute right-0 mt-2 z-50 w-80 rounded-2xl glass-panel p-3.5 shadow-2xl border border-white/15 animate-in fade-in zoom-in-95 duration-150 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white">
+                      Thông Báo
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-black">
+                        {unreadCount} mới
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => setReadNotifIds(notificationsList.map((n) => n.id))}
+                      className="text-[10px] text-slate-400 hover:text-white transition-colors"
+                    >
+                      Đánh dấu đã đọc
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {notificationsList.map((notif) => {
+                    const Icon = notif.icon;
+                    const isRead = readNotifIds.includes(notif.id);
+                    return (
+                      <div
+                        key={notif.id}
+                        onClick={() => {
+                          setReadNotifIds((prev) => [...prev, notif.id]);
+                          if (notif.href) {
+                            router.push(notif.href);
+                            setNotificationsOpen(false);
+                          }
+                        }}
+                        className={cn(
+                          "p-2.5 rounded-xl border transition-all flex items-start gap-2.5 cursor-pointer group",
+                          isRead
+                            ? "bg-white/5 border-white/5 opacity-60"
+                            : "bg-white/10 border-white/10 hover:border-white/20 hover:bg-white/15"
+                        )}
+                      >
+                        <div className={cn("p-1.5 rounded-lg shrink-0 mt-0.5", notif.color)}>
+                          <Icon className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-white truncate group-hover:text-primary transition-colors">
+                              {notif.title}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                              {notif.time}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mt-0.5 leading-snug">
+                            {notif.desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* User Profile Avatar Pill with Role & Logout */}
         <div className="relative">

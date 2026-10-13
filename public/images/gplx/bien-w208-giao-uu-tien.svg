@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <rect width="400" height="400" rx="24" fill="#0f172a" />
+  <!-- Inverted triangle (apex pointing down) -->
+  <polygon points="55,65 345,65 200,320" fill="#facc15" stroke="#dc2626" stroke-width="24" stroke-linejoin="round" />
+  <!-- Center symbol: exclamation point / warning note -->
+  <text x="200" y="195" text-anchor="middle" fill="#1e293b" font-family="system-ui, sans-serif" font-size="70" font-weight="900">!</text>
+  <rect x="40" y="342" width="320" height="40" rx="12" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+  <text x="200" y="367" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="14" font-weight="bold">Biển W.208: Giao nhau với đường ưu tiên (Phải nhường)</text>
+</svg>

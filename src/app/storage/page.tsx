@@ -38,6 +38,15 @@ import {
   Copy,
   Layers,
   Sparkles,
+  ArrowUpDown,
+  ArrowDownUp,
+  SlidersHorizontal,
+  Disc,
+  Cpu,
+  Laptop,
+  Zap,
+  KeyRound,
+  Package,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -51,6 +60,12 @@ import { detectDuplicates } from "@/modules/storage/duplicateDetector";
 import { scanJunkFiles, getJunkDetail, JunkCategory, JunkDetail } from "@/modules/storage/junkFilter";
 import { useMusicPlayer } from "@/modules/audio/musicPlayerContext";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
+import {
+  classifyFileRole,
+  sortDriveItems,
+  StorageSortOption,
+  FileRoleType,
+} from "@/modules/storage/roleClassifier";
 
 // Default demo junk & system files to demonstrate smart junk filtering
 const DEFAULT_DEMO_JUNK_FILES: DriveFileItem[] = [
@@ -149,6 +164,7 @@ export default function StoragePage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<StorageSortOption>("size-desc");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showToast, setShowToast] = useState<string | null>(null);
 
@@ -200,6 +216,31 @@ export default function StoragePage() {
   const duplicateScan = useMemo(() => {
     const listToScan = autoFilterJunk ? junkScan.cleanItems : allDisplayFiles;
     return detectDuplicates(listToScan);
+  }, [allDisplayFiles, autoFilterJunk, junkScan.cleanItems]);
+
+  // Detailed role statistics across clean drive items
+  const roleStats = useMemo(() => {
+    const list = autoFilterJunk ? junkScan.cleanItems : allDisplayFiles;
+    const stats: Record<string, { count: number; totalBytes: number }> = {
+      os_installer: { count: 0, totalBytes: 0 },
+      software: { count: 0, totalBytes: 0 },
+      automation_tool: { count: 0, totalBytes: 0 },
+      movie_video: { count: 0, totalBytes: 0 },
+      music_audio: { count: 0, totalBytes: 0 },
+      license_key: { count: 0, totalBytes: 0 },
+      document: { count: 0, totalBytes: 0 },
+      image: { count: 0, totalBytes: 0 },
+      archive_misc: { count: 0, totalBytes: 0 },
+    };
+
+    for (const item of list) {
+      const { role } = classifyFileRole(item);
+      if (stats[role]) {
+        stats[role].count++;
+        stats[role].totalBytes += item.sizeBytes || 0;
+      }
+    }
+    return stats;
   }, [allDisplayFiles, autoFilterJunk, junkScan.cleanItems]);
 
   // Playlist of all audio files available in drive (excluding junk files)
@@ -267,36 +308,44 @@ export default function StoragePage() {
       if (selectedCategory === "duplicates") {
         return duplicateScan.duplicateIds.has(item.id);
       }
-      if (selectedCategory === "audio") {
-        return (
-          item.mimeType?.includes("audio") ||
-          item.name.endsWith(".mp3") ||
-          item.name.endsWith(".m4a") ||
-          item.name.endsWith(".wav") ||
-          item.name.endsWith(".flac")
-        );
+
+      const roleInfo = classifyFileRole(item);
+      if (selectedCategory === "os_installer") {
+        return roleInfo.role === "os_installer";
       }
-      if (selectedCategory === "video") {
-        return (
-          item.mimeType?.includes("video") ||
-          item.name.endsWith(".mp4") ||
-          item.name.endsWith(".mkv") ||
-          item.name.endsWith(".mov") ||
-          item.name.endsWith(".webm")
-        );
+      if (selectedCategory === "software") {
+        return roleInfo.role === "software";
       }
-      if (selectedCategory === "image") {
-        return item.mimeType?.includes("image");
+      if (selectedCategory === "automation_tool") {
+        return roleInfo.role === "automation_tool";
+      }
+      if (selectedCategory === "license_key") {
+        return roleInfo.role === "license_key";
+      }
+      if (selectedCategory === "movie_video") {
+        return roleInfo.role === "movie_video";
+      }
+      if (selectedCategory === "music_audio" || selectedCategory === "audio") {
+        return roleInfo.role === "music_audio";
       }
       if (selectedCategory === "document") {
-        return item.mimeType?.includes("pdf") || item.mimeType?.includes("document") || item.mimeType?.includes("sheet");
+        return roleInfo.role === "document";
       }
-      if (selectedCategory === "archive") {
-        return item.mimeType?.includes("zip") || item.mimeType?.includes("tar") || item.mimeType?.includes("rar");
+      if (selectedCategory === "image") {
+        return roleInfo.role === "image";
       }
+      if (selectedCategory === "archive_misc" || selectedCategory === "archive") {
+        return roleInfo.role === "archive_misc";
+      }
+
       return true;
     });
   }, [allDisplayFiles, searchTerm, selectedCategory, duplicateScan, autoFilterJunk, junkScan]);
+
+  // Sort filtered files according to the chosen sort strategy
+  const sortedFiles = useMemo(() => {
+    return sortDriveItems(filteredFiles, sortBy);
+  }, [filteredFiles, sortBy]);
 
   const triggerAction = (msg: string) => {
     setShowToast(msg);
@@ -443,7 +492,33 @@ export default function StoragePage() {
     }
   };
 
-  const getFileIcon = (mimeType: string, fileName?: string) => {
+  const getFileIcon = (mimeType: string, fileName?: string, item?: DriveFileItem) => {
+    if (item) {
+      const roleInfo = classifyFileRole(item);
+      switch (roleInfo.role) {
+        case "os_installer":
+          return <Disc className="h-5 w-5 text-blue-400" />;
+        case "software":
+          return <Cpu className="h-5 w-5 text-violet-400" />;
+        case "automation_tool":
+          return <Zap className="h-5 w-5 text-emerald-400" />;
+        case "license_key":
+          return <KeyRound className="h-5 w-5 text-amber-400" />;
+        case "movie_video":
+          return <Film className="h-5 w-5 text-rose-400" />;
+        case "music_audio":
+          return <Music className="h-5 w-5 text-pink-400" />;
+        case "document":
+          return <FileText className="h-5 w-5 text-sky-400" />;
+        case "image":
+          return <ImageIcon className="h-5 w-5 text-teal-400" />;
+        case "junk_ghost":
+          return <Trash2 className="h-5 w-5 text-rose-400" />;
+        case "archive_misc":
+        default:
+          return <Package className="h-5 w-5 text-orange-400" />;
+      }
+    }
     if (mimeType?.includes("video") || fileName?.endsWith(".mp4") || fileName?.endsWith(".mkv"))
       return <Film className="h-5 w-5 text-rose-400" />;
     if (mimeType?.includes("audio") || fileName?.endsWith(".mp3") || fileName?.endsWith(".m4a"))
@@ -593,7 +668,88 @@ export default function StoragePage() {
         </div>
       </div>
 
-      {/* Filter and Search Bar with Category Tabs */}
+      {/* Quick Role Overview Showcase Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+        {[
+          {
+            id: "os_installer",
+            title: "Bộ cài Windows",
+            count: roleStats.os_installer.count,
+            size: formatBytes(roleStats.os_installer.totalBytes),
+            icon: <Disc className="h-4 w-4 text-blue-400" />,
+            border: "hover:border-blue-500/50 hover:bg-blue-500/10",
+            activeBorder: "border-blue-500/60 bg-blue-500/15 shadow-sm shadow-blue-500/20",
+          },
+          {
+            id: "software",
+            title: "Phần mềm & Tiện ích",
+            count: roleStats.software.count,
+            size: formatBytes(roleStats.software.totalBytes),
+            icon: <Cpu className="h-4 w-4 text-violet-400" />,
+            border: "hover:border-violet-500/50 hover:bg-violet-500/10",
+            activeBorder: "border-violet-500/60 bg-violet-500/15 shadow-sm shadow-violet-500/20",
+          },
+          {
+            id: "automation_tool",
+            title: "Tool Tự động hóa",
+            count: roleStats.automation_tool.count,
+            size: formatBytes(roleStats.automation_tool.totalBytes),
+            icon: <Zap className="h-4 w-4 text-emerald-400" />,
+            border: "hover:border-emerald-500/50 hover:bg-emerald-500/10",
+            activeBorder: "border-emerald-500/60 bg-emerald-500/15 shadow-sm shadow-emerald-500/20",
+          },
+          {
+            id: "movie_video",
+            title: "Video & Phim Rạp",
+            count: roleStats.movie_video.count,
+            size: formatBytes(roleStats.movie_video.totalBytes),
+            icon: <Film className="h-4 w-4 text-rose-400" />,
+            border: "hover:border-rose-500/50 hover:bg-rose-500/10",
+            activeBorder: "border-rose-500/60 bg-rose-500/15 shadow-sm shadow-rose-500/20",
+          },
+          {
+            id: "music_audio",
+            title: "Nhạc DJ Nonstop",
+            count: roleStats.music_audio.count,
+            size: formatBytes(roleStats.music_audio.totalBytes),
+            icon: <Music className="h-4 w-4 text-pink-400" />,
+            border: "hover:border-pink-500/50 hover:bg-pink-500/10",
+            activeBorder: "border-pink-500/60 bg-pink-500/15 shadow-sm shadow-pink-500/20",
+          },
+          {
+            id: "license_key",
+            title: "Key & Bản quyền",
+            count: roleStats.license_key.count,
+            size: formatBytes(roleStats.license_key.totalBytes),
+            icon: <KeyRound className="h-4 w-4 text-amber-400" />,
+            border: "hover:border-amber-500/50 hover:bg-amber-500/10",
+            activeBorder: "border-amber-500/60 bg-amber-500/15 shadow-sm shadow-amber-500/20",
+          },
+        ].map((stat) => (
+          <button
+            key={stat.id}
+            onClick={() => setSelectedCategory(selectedCategory === stat.id ? "all" : stat.id)}
+            className={cn(
+              "p-3 rounded-2xl glass-panel border transition-all text-left flex flex-col justify-between cursor-pointer group",
+              selectedCategory === stat.id ? stat.activeBorder : "border-white/10 " + stat.border
+            )}
+            title={`Lọc theo nhóm: ${stat.title}`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="p-1.5 rounded-lg bg-surface-elevated border border-surface-border group-hover:scale-105 transition-transform">
+                {stat.icon}
+              </span>
+              <span className="text-xs font-bold text-white font-mono">{stat.count}</span>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-slate-200 truncate">{stat.title}</p>
+              <p className="text-[10px] text-muted-foreground font-mono">{stat.size}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Filter and Search Bar with Category Tabs and Sorting */}
       <Card className="p-3.5 space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search Input */}
@@ -603,12 +759,12 @@ export default function StoragePage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm kiếm bài hát, phim, tệp trong thư mục..."
+              placeholder="Tìm kiếm bài hát, phim, bộ cài OS, tool trong thư mục..."
               className="w-full pl-9 pr-3 py-1.5 rounded-xl glass-input text-xs"
             />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {/* Auto Junk Filter Toggle */}
             <button
               onClick={() => {
@@ -645,8 +801,30 @@ export default function StoragePage() {
               )}
             </button>
 
+            {/* Sorting Dropdown Controls */}
+            <div className="flex items-center gap-1.5 border-l border-surface-border pl-3">
+              <span className="text-xs text-muted-foreground hidden lg:inline flex items-center gap-1">
+                <ArrowUpDown className="h-3.5 w-3.5 text-primary" />
+                Sắp xếp:
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as StorageSortOption)}
+                className="px-2.5 py-1 rounded-xl glass-input text-xs font-semibold bg-slate-900 border border-white/20 text-white cursor-pointer"
+                title="Sắp xếp tệp theo tiêu chí"
+              >
+                <option value="size-desc">📊 Dung lượng: Lớn ➔ Nhỏ</option>
+                <option value="size-asc">📊 Dung lượng: Nhỏ ➔ Lớn</option>
+                <option value="name-asc">🔤 Tên: A ➔ Z</option>
+                <option value="name-desc">🔤 Tên: Z ➔ A</option>
+                <option value="date-desc">🕒 Ngày: Mới ➔ Cũ</option>
+                <option value="date-asc">🕒 Ngày: Cũ ➔ Mới</option>
+                <option value="role">🎯 Gom theo Vai trò</option>
+              </select>
+            </div>
+
             <span className="text-xs text-muted-foreground">
-              Tìm thấy: <strong className="text-white">{filteredFiles.length}</strong> tệp
+              Tìm thấy: <strong className="text-white">{sortedFiles.length}</strong> tệp
             </span>
 
             {/* View Mode */}
@@ -683,8 +861,12 @@ export default function StoragePage() {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-t border-white/10 pt-2.5">
           {[
             { id: "all", label: "Tất cả tệp", count: autoFilterJunk ? junkScan.cleanItems.length : allDisplayFiles.length },
-            { id: "audio", label: "Âm nhạc & Audio 🎵", count: audioPlaylist.length },
-            { id: "video", label: "Video & Phim 🎬", count: videoPlaylist.length },
+            { id: "os_installer", label: "Bộ cài Windows 💿", count: roleStats.os_installer.count },
+            { id: "software", label: "Phần mềm & Tiện ích 💻", count: roleStats.software.count },
+            { id: "automation_tool", label: "Tool Tự động hóa ⚡", count: roleStats.automation_tool.count },
+            { id: "movie_video", label: "Video & Phim 🎬", count: roleStats.movie_video.count },
+            { id: "music_audio", label: "Âm nhạc & Audio 🎵", count: roleStats.music_audio.count },
+            { id: "license_key", label: "Key & Bản quyền 🔑", count: roleStats.license_key.count },
             {
               id: "duplicates",
               label: "Tệp trùng lặp ⚠️",
@@ -697,21 +879,8 @@ export default function StoragePage() {
               count: junkScan.totalCount,
               badgeColor: junkScan.totalCount > 0 ? "bg-rose-500/20 text-rose-300 border border-rose-400/40" : "",
             },
-            {
-              id: "document",
-              label: "Tài liệu",
-              count: (autoFilterJunk ? junkScan.cleanItems : allDisplayFiles).filter((f) => f.mimeType?.includes("pdf") || f.mimeType?.includes("sheet")).length,
-            },
-            {
-              id: "image",
-              label: "Hình ảnh",
-              count: (autoFilterJunk ? junkScan.cleanItems : allDisplayFiles).filter((f) => f.mimeType?.includes("image")).length,
-            },
-            {
-              id: "archive",
-              label: "Lưu trữ (Zip/Tar)",
-              count: (autoFilterJunk ? junkScan.cleanItems : allDisplayFiles).filter((f) => f.mimeType?.includes("zip")).length,
-            },
+            { id: "document", label: "Tài liệu & Data 📄", count: roleStats.document.count },
+            { id: "archive_misc", label: "Tập tin nén khác 📦", count: roleStats.archive_misc.count },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -1082,41 +1251,88 @@ export default function StoragePage() {
           <Card className="p-0 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-surface-elevated/40 border-b border-surface-border text-muted-foreground">
+                <thead className="bg-surface-elevated/50 border-b border-surface-border text-muted-foreground select-none">
                   <tr>
-                    <th className="py-3 px-4 font-medium">Tên tệp</th>
-                    <th className="py-3 px-4 font-medium">Định dạng</th>
-                    <th className="py-3 px-4 font-medium">Dung lượng</th>
-                    <th className="py-3 px-4 font-medium">Cập nhật</th>
-                    <th className="py-3 px-4 font-medium text-right">Hành động</th>
+                    <th
+                      className="py-3 px-4 font-semibold cursor-pointer hover:text-white transition-colors"
+                      onClick={() => setSortBy(sortBy === "name-asc" ? "name-desc" : "name-asc")}
+                      title="Nhấn để sắp xếp theo Tên"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Tên tệp & Vai trò chi tiết</span>
+                        <ArrowUpDown className={cn("h-3.5 w-3.5", sortBy.startsWith("name") ? "text-primary" : "text-muted-foreground/40")} />
+                      </div>
+                    </th>
+                    <th
+                      className="py-3 px-4 font-semibold cursor-pointer hover:text-white transition-colors"
+                      onClick={() => setSortBy("role")}
+                      title="Nhấn để sắp xếp gom nhóm theo Vai trò"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Phân loại vai trò</span>
+                        <SlidersHorizontal className={cn("h-3.5 w-3.5", sortBy === "role" ? "text-primary" : "text-muted-foreground/40")} />
+                      </div>
+                    </th>
+                    <th
+                      className="py-3 px-4 font-semibold cursor-pointer hover:text-white transition-colors"
+                      onClick={() => setSortBy(sortBy === "size-desc" ? "size-asc" : "size-desc")}
+                      title="Nhấn để sắp xếp theo Dung lượng"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Dung lượng</span>
+                        <ArrowUpDown className={cn("h-3.5 w-3.5", sortBy.startsWith("size") ? "text-primary" : "text-muted-foreground/40")} />
+                      </div>
+                    </th>
+                    <th
+                      className="py-3 px-4 font-semibold cursor-pointer hover:text-white transition-colors"
+                      onClick={() => setSortBy(sortBy === "date-desc" ? "date-asc" : "date-desc")}
+                      title="Nhấn để sắp xếp theo Ngày cập nhật"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>Cập nhật</span>
+                        <ArrowUpDown className={cn("h-3.5 w-3.5", sortBy.startsWith("date") ? "text-primary" : "text-muted-foreground/40")} />
+                      </div>
+                    </th>
+                    <th className="py-3 px-4 font-semibold text-right">Hành động</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-border/40">
-                  {filteredFiles.map((item) => {
+                  {sortedFiles.map((item) => {
                     const audio = isAudioFile(item);
                     const video = isVideoFile(item);
                     const isCurrentPlayingAudio = currentTrack?.id === item.id && isGlobalPlaying;
                     const isDuplicate = duplicateScan.duplicateIds.has(item.id);
                     const junkDetail = getJunkDetail(item);
+                    const roleInfo = classifyFileRole(item);
 
                     return (
                       <tr
                         key={item.id}
                         className={cn(
                           "hover:bg-surface-elevated/40 transition-colors group",
-                          isCurrentPlayingAudio && "bg-blue-600/10",
+                          isCurrentPlayingAudio && "bg-pink-600/10",
                           junkDetail && "bg-rose-500/5"
                         )}
                       >
-                        <td className="py-3 px-4 flex items-center gap-3 font-medium text-foreground">
-                          <span className="p-1.5 rounded-xl bg-surface-elevated border border-surface-border shrink-0">
-                            {getFileIcon(item.mimeType, item.name)}
+                        <td className="py-3 px-4 flex items-start gap-3 font-medium text-foreground">
+                          <span className="p-2 rounded-xl bg-surface-elevated border border-surface-border shrink-0 mt-0.5">
+                            {getFileIcon(item.mimeType, item.name, item)}
                           </span>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <p className="truncate max-w-[260px] sm:max-w-md font-semibold text-white">
+                              <p className="truncate max-w-[280px] sm:max-w-md font-semibold text-white">
                                 {item.name}
                               </p>
+                              {/* Prominent Role Badge */}
+                              <span
+                                className={cn(
+                                  "text-[10px] px-2 py-0.5 rounded-full border font-semibold inline-flex items-center gap-1",
+                                  roleInfo.badgeColor
+                                )}
+                                title={roleInfo.description}
+                              >
+                                {roleInfo.label}
+                              </span>
                               {isDuplicate && (
                                 <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
                                   Bản sao
@@ -1128,33 +1344,39 @@ export default function StoragePage() {
                                 </span>
                               )}
                             </div>
+                            {/* Role functional description subtitle */}
+                            <p className="text-[10px] text-slate-400 truncate max-w-lg mt-0.5">
+                              {roleInfo.description}
+                            </p>
                             {audio && (
-                              <span className="text-[10px] text-pink-400 font-medium">
-                                {isCurrentPlayingAudio ? "🎶 Đang phát..." : "Tệp âm thanh • Nhấn để phát"}
+                              <span className="text-[10px] text-pink-400 font-medium mt-0.5 block">
+                                {isCurrentPlayingAudio ? "🎶 Đang phát trên Music Player & Dynamic Island..." : "Tệp âm thanh • Nhấn để phát"}
                               </span>
                             )}
                             {video && (
-                              <span className="text-[10px] text-rose-400 font-medium">
-                                🎬 Video rạp chiếu • Nhấn để xem phim
+                              <span className="text-[10px] text-rose-400 font-medium mt-0.5 block">
+                                🎬 Video rạp chiếu • Nhấn để xem phim Cinema
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-muted-foreground text-[11px] truncate max-w-[150px]">
-                          {item.mimeType}
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="text-[11px] font-semibold text-slate-200 px-2 py-1 rounded-lg bg-surface-elevated border border-surface-border inline-block">
+                            {roleInfo.groupLabel}
+                          </span>
                         </td>
-                        <td className="py-3 px-4 text-muted-foreground font-mono">
+                        <td className="py-3 px-4 text-slate-200 font-mono font-semibold whitespace-nowrap">
                           {formatBytes(item.sizeBytes)}
                         </td>
-                        <td className="py-3 px-4 text-muted-foreground">{item.updatedAt}</td>
-                        <td className="py-3 px-4 text-right">
+                        <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">{item.updatedAt}</td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             {/* Play Music Button */}
                             {audio && (
                               <button
                                 onClick={() => playFileAudio(item)}
                                 className={cn(
-                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs border transition-all",
+                                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs border transition-all cursor-pointer",
                                   isCurrentPlayingAudio
                                     ? "bg-pink-600 text-white border-pink-400 shadow-md shadow-pink-500/30"
                                     : "bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border-pink-500/40"
@@ -1170,7 +1392,7 @@ export default function StoragePage() {
                             {video && (
                               <button
                                 onClick={() => playFileVideo(item)}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md shadow-rose-500/30 transition-all"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold text-xs bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md shadow-rose-500/30 transition-all cursor-pointer"
                                 title="Mở Rạp chiếu phim"
                               >
                                 <Film className="h-3.5 w-3.5" />
@@ -1185,6 +1407,7 @@ export default function StoragePage() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-xs border border-emerald-500/40 transition-all"
+                                title="Tải xuống tệp tin từ Google Drive"
                               >
                                 <Download className="h-3.5 w-3.5" />
                                 <span className="hidden sm:inline">Tải xuống</span>
@@ -1193,6 +1416,7 @@ export default function StoragePage() {
                               <button
                                 onClick={() => triggerAction(`Tải xuống "${item.name}"`)}
                                 className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20"
+                                title="Tải xuống"
                               >
                                 <Download className="h-4 w-4" />
                               </button>
@@ -1209,12 +1433,13 @@ export default function StoragePage() {
         ) : (
           /* Grid View */
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredFiles.map((item) => {
+            {sortedFiles.map((item) => {
               const audio = isAudioFile(item);
               const video = isVideoFile(item);
               const isCurrentPlayingAudio = currentTrack?.id === item.id && isGlobalPlaying;
               const isDuplicate = duplicateScan.duplicateIds.has(item.id);
               const junkDetail = getJunkDetail(item);
+              const roleInfo = classifyFileRole(item);
 
               return (
                 <Card
@@ -1227,11 +1452,21 @@ export default function StoragePage() {
                   )}
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 rounded-xl bg-surface-elevated border border-surface-border">
-                        {getFileIcon(item.mimeType, item.name)}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="p-2 rounded-xl bg-surface-elevated border border-surface-border shrink-0">
+                        {getFileIcon(item.mimeType, item.name, item)}
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-col items-end gap-1 flex-1 min-w-0">
+                        {/* Prominent Role Badge */}
+                        <span
+                          className={cn(
+                            "text-[9px] px-2 py-0.5 rounded-full border font-semibold truncate max-w-full text-right",
+                            roleInfo.badgeColor
+                          )}
+                          title={roleInfo.description}
+                        >
+                          {roleInfo.label}
+                        </span>
                         {isDuplicate && (
                           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">
                             Bản sao
@@ -1242,49 +1477,55 @@ export default function StoragePage() {
                             {junkDetail.categoryLabel}
                           </span>
                         )}
-                        {audio && (
-                          <button
-                            onClick={() => playFileAudio(item)}
-                            className="p-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-400/30 transition-transform active:scale-95"
-                            title="Phát bài hát này"
-                          >
-                            <Play className="h-4 w-4 fill-current" />
-                          </button>
-                        )}
-                        {video && (
-                          <button
-                            onClick={() => playFileVideo(item)}
-                            className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-md transition-transform active:scale-95"
-                            title="Xem phim rạp chiếu"
-                          >
-                            <Film className="h-4 w-4" />
-                          </button>
-                        )}
                       </div>
                     </div>
-                    <h4 className="font-semibold text-xs text-foreground truncate mb-1" title={item.name}>
+                    <h4 className="font-bold text-xs text-foreground truncate mb-1" title={item.name}>
                       {item.name}
                     </h4>
+                    {/* Role description subtitle */}
+                    <p className="text-[10px] text-slate-400 line-clamp-2 mb-2 leading-relaxed" title={roleInfo.description}>
+                      {roleInfo.description}
+                    </p>
                     <p className="text-[11px] text-muted-foreground font-mono">
-                      {formatBytes(item.sizeBytes)} &bull; {item.updatedAt}
+                      <strong className="text-white">{formatBytes(item.sizeBytes)}</strong> &bull; {item.updatedAt}
                     </p>
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-surface-border/50 flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                      {item.mimeType}
+                    <span className="text-[10px] text-slate-300 px-2 py-0.5 rounded-md bg-surface-elevated border border-surface-border font-medium">
+                      {roleInfo.groupLabel}
                     </span>
-                    {item.downloadUrl && (
-                      <a
-                        href={item.downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                        title="Tải xuống tệp tin"
-                      >
-                        <Download className="h-4 w-4" />
-                      </a>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {audio && (
+                        <button
+                          onClick={() => playFileAudio(item)}
+                          className="p-1.5 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-400/30 transition-transform active:scale-95 cursor-pointer"
+                          title="Phát bài hát này"
+                        >
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                        </button>
+                      )}
+                      {video && (
+                        <button
+                          onClick={() => playFileVideo(item)}
+                          className="p-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-md transition-transform active:scale-95 cursor-pointer"
+                          title="Xem phim rạp chiếu"
+                        >
+                          <Film className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {item.downloadUrl && (
+                        <a
+                          href={item.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                          title="Tải xuống tệp tin"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </Card>
               );

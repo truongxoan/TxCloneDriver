@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 450" width="100%" height="100%">
+  <rect width="600" height="450" rx="20" fill="#0b1329" />
+  <text x="300" y="45" text-anchor="middle" fill="#38bdf8" font-size="18" font-weight="bold">PHÂN BIỆT VẠCH KẺ ĐƯỜNG VÀNG &amp; TRẮNG</text>
+
+  <!-- Case 1: Vạch vàng nét đứt -->
+  <g transform="translate(60, 80)">
+    <rect x="0" y="0" width="220" height="240" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2" />
+    <line x1="110" y1="15" x2="110" y2="225" stroke="#facc15" stroke-dasharray="16,16" stroke-width="8" />
+    <rect x="20" y="190" width="180" height="36" rx="8" fill="#059669" />
+    <text x="110" y="213" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">ĐƯỢC PHÉP ĐÈ VẠCH / VƯỢT</text>
+    <text x="110" y="40" text-anchor="middle" fill="#facc15" font-size="13" font-weight="bold">Vạch Vàng Nét Đứt</text>
+  </g>
+
+  <!-- Case 2: Vạch vàng nét liền -->
+  <g transform="translate(320, 80)">
+    <rect x="0" y="0" width="220" height="240" rx="12" fill="#1e293b" stroke="#334155" stroke-width="2" />
+    <line x1="110" y1="15" x2="110" y2="225" stroke="#facc15" stroke-width="8" />
+    <rect x="20" y="190" width="180" height="36" rx="8" fill="#dc2626" />
+    <text x="110" y="213" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="bold">CẤM ĐÈ VẠCH / CẤM VƯỢT</text>
+    <text x="110" y="40" text-anchor="middle" fill="#facc15" font-size="13" font-weight="bold">Vạch Vàng Nét Liền</text>
+  </g>
+
+  <rect x="40" y="340" width="520" height="45" rx="8" fill="#1e293b" stroke="#475569" />
+  <text x="300" y="362" text-anchor="middle" fill="#facc15" font-size="13" font-weight="bold">Vạch MÀU VÀNG: Phân chia 2 chiều xe chạy ngược chiều nhau (Tim đường)</text>
+  <text x="300" y="378" text-anchor="middle" fill="#cbd5e1" font-size="12">Vạch MÀU TRẮNG: Phân chia các làn xe chạy cùng chiều</text>
+</svg>
