@@ -117,7 +117,15 @@ if (-not $NoBrowser) {
 }
 
 # 5. Khởi chạy Next.js Server
-if ($HasBuild) {
+$env:NODE_OPTIONS = "--max-old-space-size=2048 --dns-result-order=ipv4first"
+$env:PORT = "$Port"
+$env:HOSTNAME = "0.0.0.0"
+
+$StandaloneServer = "$ProjectDir\.next\standalone\server.js"
+if (Test-Path $StandaloneServer) {
+    Write-Host "[START] Chạy chế độ Độc Lập Siêu Tốc Standalone (node server.js)..." -ForegroundColor Green
+    & node $StandaloneServer
+} elseif ($HasBuild) {
     Write-Host "[START] Chạy chế độ Production Tối Ưu (next start)..." -ForegroundColor Green
     & npx next start -p $Port -H 0.0.0.0
 } else {

@@ -23,9 +23,18 @@ if not exist ".next\" (
     call npm run build
 )
 
+set NODE_OPTIONS=--max-old-space-size=2048 --dns-result-order=ipv4first
+set PORT=3000
+set HOSTNAME=0.0.0.0
+
 echo [*] Khởi động Production Server tại http://localhost:3000...
 start "" powershell -NoProfile -Command "Start-Sleep -Seconds 2; Start-Process 'http://localhost:3000'"
 
-call npm run start
+if exist ".next\standalone\server.js" (
+    echo [*] Chạy Standalone Engine siêu tốc...
+    node .next\standalone\server.js
+) else (
+    call npm run start
+)
 
 pause

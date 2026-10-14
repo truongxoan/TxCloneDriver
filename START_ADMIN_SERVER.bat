@@ -48,11 +48,19 @@ echo     • Nhấn Ctrl + C để dừng máy chủ bất cứ lúc nào.
 echo ----------------------------------------------------------------------
 echo.
 
-REM Mở trình duyệt sau 3 giây
-start "" powershell -NoProfile -Command "Start-Sleep -Seconds 3; Start-Process 'http://localhost:3000'"
+REM Cấp tài nguyên V8 & Ưu tiên kết nối mạng IPv4 siêu tốc
+set NODE_OPTIONS=--max-old-space-size=2048 --dns-result-order=ipv4first
+set PORT=3000
+set HOSTNAME=0.0.0.0
 
-REM Khởi chạy Next.js: Nếu có thư mục .next đã build thì chạy 'npm run start', nếu không thì 'npm run dev'
-if exist ".next" (
+REM Mở trình duyệt sau 2 giây
+start "" powershell -NoProfile -Command "Start-Sleep -Seconds 2; Start-Process 'http://localhost:3000'"
+
+REM Khởi chạy: Ưu tiên chế độ Standalone siêu tốc nếu đã build, hoặc npm run start, fallback về dev
+if exist ".next\standalone\server.js" (
+    echo [START] Khởi chạy chế độ Độc lập Siêu tốc Standalone (node server.js)...
+    node .next\standalone\server.js
+) else if exist ".next" (
     echo [START] Khởi chạy chế độ Production (npm run start)...
     call npm run start -- -p 3000 -H 0.0.0.0
 ) else (
