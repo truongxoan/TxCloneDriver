@@ -6,22 +6,8 @@
     "description": "â",
     "isPrivate": false,
     "hostUsername": "admin",
-    "currentMedia": {
-      "id": "media-1791931406600",
-      "title": "Nonstop ( BẢN ĐẶC BIỆT ) ĐỘC CÔ CỬU KIẾM.mp3",
-      "artistOrChannel": "Google Drive",
-      "source": "drive",
-      "url": "/api/drive/stream?id=1wLRScHLeB8MLOqunODPeN_aWJizLjxgB",
-      "embedUrl": "/api/drive/stream?id=1wLRScHLeB8MLOqunODPeN_aWJizLjxgB",
-      "isVideo": false,
-      "addedBy": {
-        "username": "admin",
-        "name": "Quản trị viên Tối cao"
-      },
-      "requestedAt": "Vừa xong",
-      "likes": 1
-    },
-    "isPlaying": true,
+    "currentMedia": null,
+    "isPlaying": false,
     "currentTimeSeconds": 0,
     "lastSyncTimestamp": 1791931403017,
     "members": [
@@ -34,68 +20,7 @@
         "joinedAt": "Vừa xong"
       }
     ],
-    "queue": [
-      {
-        "id": "media-1791931458702",
-        "title": "Người nhện",
-        "artistOrChannel": "Google Drive",
-        "source": "drive",
-        "url": "/api/drive/stream?id=14hMpiNNqd2PPZk0QsefNopbyHI2U9kfs",
-        "embedUrl": "/api/drive/stream?id=14hMpiNNqd2PPZk0QsefNopbyHI2U9kfs",
-        "isVideo": true,
-        "addedBy": {
-          "username": "admin",
-          "name": "Quản trị viên Tối cao"
-        },
-        "requestedAt": "Vừa xong",
-        "likes": 1
-      },
-      {
-        "id": "media-1791931512222",
-        "title": "Nonstop ( BẢN ĐẶC BIỆT ) ĐỘC CÔ CỬU KIẾM.mp3",
-        "artistOrChannel": "Google Drive",
-        "source": "drive",
-        "url": "/api/drive/stream?id=1wLRScHLeB8MLOqunODPeN_aWJizLjxgB",
-        "embedUrl": "/api/drive/stream?id=1wLRScHLeB8MLOqunODPeN_aWJizLjxgB",
-        "isVideo": false,
-        "addedBy": {
-          "username": "admin",
-          "name": "Quản trị viên Tối cao"
-        },
-        "requestedAt": "Vừa xong",
-        "likes": 1
-      },
-      {
-        "id": "media-1791931513836",
-        "title": "Nonstop - (Thửa - Trôi  Kem) - Lục Dã Tiên Tùng 3H - Dj kenbjn RMX",
-        "artistOrChannel": "Google Drive",
-        "source": "drive",
-        "url": "/api/drive/stream?id=1xCk4kURxTzcdiVhHI5eHsy-jnzBtI4pb",
-        "embedUrl": "/api/drive/stream?id=1xCk4kURxTzcdiVhHI5eHsy-jnzBtI4pb",
-        "isVideo": false,
-        "addedBy": {
-          "username": "admin",
-          "name": "Quản trị viên Tối cao"
-        },
-        "requestedAt": "Vừa xong",
-        "likes": 1
-      },
-      {
-        "id": "media-1791931515484",
-        "title": "Cực phẩm Vipppp 1 - Hái sao , tiên cảnh",
-        "artistOrChannel": "Google Drive",
-        "source": "drive",
-        "url": "/api/drive/stream?id=1xEUo01UQ7EyHAgWZprI8A6MZlspHNrqd",
-        "embedUrl": "/api/drive/stream?id=1xEUo01UQ7EyHAgWZprI8A6MZlspHNrqd",
-        "isVideo": false,
-        "addedBy": {
-          "username": "admin",
-          "name": "Quản trị viên Tối cao"
-        },
-        "requestedAt": "Vừa xong",
-        "likes": 1
-      }
-    ],
+    "queue": [],
     "chat": [
       {
         "id": "c-1791931403017",
@@ -122,27 +47,59 @@
         "isSystem": true
       },
       {
-        "id": "c-1791931512223",
+        "id": "c-1791932115163",
         "username": "system",
         "name": "Hệ thống",
-        "text": "🎵 @admin vừa order: \"Nonstop ( BẢN ĐẶC BIỆT ) ĐỘC CÔ CỬU KIẾM.mp3\" (DRIVE)",
-        "timestamp": "05:45",
+        "text": "🎵 @admin vừa order: \"https://www.youtube.com/watch?v=nAnNT6xx_bw\" (YOUTUBE)",
+        "timestamp": "05:55",
         "isSystem": true
       },
       {
-        "id": "c-1791931513836",
+        "id": "c-1791932117836",
         "username": "system",
         "name": "Hệ thống",
-        "text": "🎵 @admin vừa order: \"Nonstop - (Thửa - Trôi  Kem) - Lục Dã Tiên Tùng 3H - Dj kenbjn RMX\" (DRIVE)",
-        "timestamp": "05:45",
+        "text": "▶️ Đang chuyển sang bài tiếp theo: \"Người nhện\" (DRIVE)",
+        "timestamp": "05:55",
         "isSystem": true
       },
       {
-        "id": "c-1791931515484",
+        "id": "c-1791932120012",
         "username": "system",
         "name": "Hệ thống",
-        "text": "🎵 @admin vừa order: \"Cực phẩm Vipppp 1 - Hái sao , tiên cảnh\" (DRIVE)",
-        "timestamp": "05:45",
+        "text": "▶️ Đang chuyển sang bài tiếp theo: \"https://www.youtube.com/watch?v=nAnNT6xx_bw\" (YOUTUBE)",
+        "timestamp": "05:55",
+        "isSystem": true
+      },
+      {
+        "id": "c-1791932165000",
+        "username": "system",
+        "name": "Hệ thống",
+        "text": "🎵 @admin vừa order: \"https://www.youtube.com/watch?v=wwsoApt1yQw\" (YOUTUBE)",
+        "timestamp": "05:56",
+        "isSystem": true
+      },
+      {
+        "id": "c-1791932172563",
+        "username": "system",
+        "name": "Hệ thống",
+        "text": "🎵 @admin vừa order: \"https://www.youtube.com/watch?v=wwsoApt1yQw\" (YOUTUBE)",
+        "timestamp": "05:56",
+        "isSystem": true
+      },
+      {
+        "id": "c-1791932173879",
+        "username": "system",
+        "name": "Hệ thống",
+        "text": "▶️ Đang chuyển sang bài tiếp theo: \"https://www.youtube.com/watch?v=wwsoApt1yQw\" (YOUTUBE)",
+        "timestamp": "05:56",
+        "isSystem": true
+      },
+      {
+        "id": "c-1791932175285",
+        "username": "system",
+        "name": "Hệ thống",
+        "text": "▶️ Đang chuyển sang bài tiếp theo: \"https://www.youtube.com/watch?v=wwsoApt1yQw\" (YOUTUBE)",
+        "timestamp": "05:56",
         "isSystem": true
       }
     ],
