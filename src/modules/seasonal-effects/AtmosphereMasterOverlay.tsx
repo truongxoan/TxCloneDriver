@@ -65,24 +65,6 @@ interface ShootingStar {
   color: string;
 }
 
-// ─── Wind Petal / Leaf ───────────────────────────────────────
-interface WindPetal {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  rotX: number;
-  rotY: number;
-  rotZ: number;
-  rotSpeedX: number;
-  rotSpeedY: number;
-  rotSpeedZ: number;
-  size: number;
-  color: string;
-  type: "sakura" | "maple" | "leaf";
-  alpha: number;
-}
-
 // ─── Floating Lantern / Firefly ──────────────────────────────
 interface Firefly {
   x: number;
@@ -112,7 +94,7 @@ interface OceanBubble {
 }
 
 export function AtmosphereMasterOverlay() {
-  const { currentTheme, effectsEnabled, intensity, customEffectType, flowerType } = useTheme();
+  const { currentTheme, effectsEnabled, intensity, customEffectType } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const flashOverlayRef = useRef<HTMLDivElement | null>(null);
 
@@ -121,13 +103,10 @@ export function AtmosphereMasterOverlay() {
       ? customEffectType
       : currentTheme.effectType;
 
-  const currentFlower = flowerType || "sakura";
-
   // Particle Pools
   const fireworksSparksRef = useRef<FireworkSpark[]>([]);
   const fireworksRocketsRef = useRef<FireworkRocket[]>([]);
   const shootingStarsRef = useRef<ShootingStar[]>([]);
-  const windPetalsRef = useRef<WindPetal[]>([]);
   const firefliesRef = useRef<Firefly[]>([]);
   const oceanBubblesRef = useRef<OceanBubble[]>([]);
 
@@ -219,47 +198,6 @@ export function AtmosphereMasterOverlay() {
     });
   }, []);
 
-  // ─── Wind Gust for Cherry Blossom & Autumn Leaves ──────────
-  const triggerWindGust = useCallback((type: "sakura" | "maple") => {
-    if (typeof window === "undefined") return;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    playGentleWindSound();
-
-    const flowerColors: Record<string, string[]> = {
-      sakura: ["#fbcfe8", "#f472b6", "#fda4af", "#ffe4e6", "#f9a8d4"],
-      apricot: ["#fde047", "#facc15", "#eab308", "#fef08a", "#ca8a04"],
-      rose: ["#f43f5e", "#e11d48", "#be123c", "#fda4af", "#fb7185"],
-      maple: ["#ea580c", "#f97316", "#eab308", "#c2410c", "#b45309"],
-    };
-
-    const count = intensity === "high" ? 45 : intensity === "low" ? 18 : 28;
-    const colors =
-      type === "sakura"
-        ? (flowerColors[currentFlower] || flowerColors.sakura)
-        : flowerColors.maple;
-
-    for (let i = 0; i < count; i++) {
-      windPetalsRef.current.push({
-        x: -50 - Math.random() * 200,
-        y: Math.random() * h * 0.8,
-        vx: 8 + Math.random() * 9,
-        vy: 2 + Math.random() * 4,
-        rotX: Math.random() * 360,
-        rotY: Math.random() * 360,
-        rotZ: Math.random() * 360,
-        rotSpeedX: (Math.random() - 0.5) * 8,
-        rotSpeedY: (Math.random() - 0.5) * 6,
-        rotSpeedZ: (Math.random() - 0.5) * 4,
-        size: type === "sakura" ? Math.random() * 6 + 6 : Math.random() * 8 + 8,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        type: type === "sakura" ? "sakura" : "maple",
-        alpha: 0.85,
-      });
-    }
-  }, [intensity, currentFlower]);
-
   // ─── Main Atmospheric Animation & Scheduler Loop ───────────
   useEffect(() => {
     if (!effectsEnabled || activeEffect === "none") return;
@@ -282,7 +220,6 @@ export function AtmosphereMasterOverlay() {
     fireworksSparksRef.current = [];
     fireworksRocketsRef.current = [];
     shootingStarsRef.current = [];
-    windPetalsRef.current = [];
     firefliesRef.current = [];
     oceanBubblesRef.current = [];
 
@@ -352,18 +289,6 @@ export function AtmosphereMasterOverlay() {
           spawnShootingStar();
           schedulePeriodic();
         }, delay);
-      } else if (activeEffect === "blossom") {
-        const delay = intensity === "high" ? 3500 : 5000;
-        effectTimer = setTimeout(() => {
-          triggerWindGust("sakura");
-          schedulePeriodic();
-        }, delay);
-      } else if (activeEffect === "autumn" || activeEffect === "leaves") {
-        const delay = intensity === "high" ? 3500 : 5000;
-        effectTimer = setTimeout(() => {
-          triggerWindGust("maple");
-          schedulePeriodic();
-        }, delay);
       } else if (activeEffect === "sparkles") {
         const delay = 4000;
         effectTimer = setTimeout(() => {
@@ -385,10 +310,6 @@ export function AtmosphereMasterOverlay() {
         launchFirework(width * 0.5, height * 0.3);
       } else if (activeEffect === "cosmic" || activeEffect === "stars") {
         spawnShootingStar();
-      } else if (activeEffect === "blossom") {
-        triggerWindGust("sakura");
-      } else if (activeEffect === "autumn" || activeEffect === "leaves") {
-        triggerWindGust("maple");
       } else if (activeEffect === "sparkles") {
         playCrystalChimeSound();
       } else if (activeEffect === "cyber" || activeEffect === "hud-grid") {
@@ -404,15 +325,9 @@ export function AtmosphereMasterOverlay() {
     const handleShootingStarEvent = () => {
       if (activeEffect === "cosmic" || activeEffect === "stars") spawnShootingStar();
     };
-    const handleWindEvent = (e: any) => {
-      if (activeEffect === "blossom" || activeEffect === "autumn" || activeEffect === "leaves") {
-        triggerWindGust(e.detail?.type || (activeEffect === "blossom" ? "sakura" : "maple"));
-      }
-    };
 
     window.addEventListener("tx_trigger_firework", handleFireworkEvent);
     window.addEventListener("tx_trigger_shooting_star", handleShootingStarEvent);
-    window.addEventListener("tx_trigger_wind_gust", handleWindEvent);
 
     // ─── Main Render Loop ───
     const render = () => {
@@ -429,163 +344,125 @@ export function AtmosphereMasterOverlay() {
         return;
       }
 
-      // ── 1. RENDER FIREWORKS ROCKETS & BURSTS ──────────────────────
-      const rockets = fireworksRocketsRef.current;
-      for (let i = rockets.length - 1; i >= 0; i--) {
-        const r = rockets[i];
-        r.y += r.vy;
+      // ── 1. RENDER FIREWORKS ROCKETS & BURSTS (ONLY WHEN activeEffect === "fireworks") ──
+      if (activeEffect === "fireworks") {
+        const rockets = fireworksRocketsRef.current;
+        for (let i = rockets.length - 1; i >= 0; i--) {
+          const r = rockets[i];
+          r.y += r.vy;
 
-        // Glowing rocket head
-        ctx.save();
-        ctx.fillStyle = r.color;
-        ctx.shadowColor = r.color;
-        ctx.shadowBlur = 12;
-        ctx.beginPath();
-        ctx.arc(r.x, r.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Spark trail
-        ctx.fillStyle = "#fbbf24";
-        ctx.beginPath();
-        ctx.arc(r.x + (Math.random() - 0.5) * 2, r.y + 6, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        if (r.y <= r.targetY) {
-          detonateFirework(r.x, r.y, r.color);
-          rockets.splice(i, 1);
-        }
-      }
-
-      const sparks = fireworksSparksRef.current;
-      for (let i = sparks.length - 1; i >= 0; i--) {
-        const sp = sparks[i];
-        sp.life++;
-        if (sp.life >= sp.maxLife) {
-          sparks.splice(i, 1);
-          continue;
-        }
-
-        sp.trail.unshift({ x: sp.x, y: sp.y });
-        if (sp.trail.length > 5) sp.trail.pop();
-
-        sp.x += sp.vx;
-        sp.y += sp.vy;
-        sp.vy += 0.12; // gravity
-        sp.vx *= 0.97; // air drag
-        sp.vy *= 0.97;
-
-        const progress = sp.life / sp.maxLife;
-        sp.alpha = Math.max(0, 1 - progress);
-
-        // Draw spark with trail
-        ctx.save();
-        ctx.globalAlpha = sp.alpha;
-        ctx.fillStyle = sp.color;
-        ctx.shadowColor = sp.color;
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (sp.trail.length > 1) {
-          ctx.strokeStyle = sp.color;
-          ctx.lineWidth = sp.size * 0.6;
+          // Glowing rocket head
+          ctx.save();
+          ctx.fillStyle = r.color;
+          ctx.shadowColor = r.color;
+          ctx.shadowBlur = 12;
           ctx.beginPath();
-          ctx.moveTo(sp.trail[0].x, sp.trail[0].y);
-          for (let t = 1; t < sp.trail.length; t++) {
-            ctx.lineTo(sp.trail[t].x, sp.trail[t].y);
+          ctx.arc(r.x, r.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Spark trail
+          ctx.fillStyle = "#fbbf24";
+          ctx.beginPath();
+          ctx.arc(r.x + (Math.random() - 0.5) * 2, r.y + 6, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          if (r.y <= r.targetY) {
+            detonateFirework(r.x, r.y, r.color);
+            rockets.splice(i, 1);
           }
+        }
+
+        const sparks = fireworksSparksRef.current;
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const sp = sparks[i];
+          sp.life++;
+          if (sp.life >= sp.maxLife) {
+            sparks.splice(i, 1);
+            continue;
+          }
+
+          sp.trail.unshift({ x: sp.x, y: sp.y });
+          if (sp.trail.length > 5) sp.trail.pop();
+
+          sp.x += sp.vx;
+          sp.y += sp.vy;
+          sp.vy += 0.12; // gravity
+          sp.vx *= 0.97; // air drag
+          sp.vy *= 0.97;
+
+          const progress = sp.life / sp.maxLife;
+          sp.alpha = Math.max(0, 1 - progress);
+
+          // Draw spark with trail
+          ctx.save();
+          ctx.globalAlpha = sp.alpha;
+          ctx.fillStyle = sp.color;
+          ctx.shadowColor = sp.color;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (sp.trail.length > 1) {
+            ctx.strokeStyle = sp.color;
+            ctx.lineWidth = sp.size * 0.6;
+            ctx.beginPath();
+            ctx.moveTo(sp.trail[0].x, sp.trail[0].y);
+            for (let t = 1; t < sp.trail.length; t++) {
+              ctx.lineTo(sp.trail[t].x, sp.trail[t].y);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      // ── 2. RENDER SHOOTING STARS / METEORS (ONLY WHEN activeEffect === "cosmic" || activeEffect === "stars") ──
+      if (activeEffect === "cosmic" || activeEffect === "stars") {
+        const stars = shootingStarsRef.current;
+        for (let i = stars.length - 1; i >= 0; i--) {
+          const st = stars[i];
+          st.life++;
+          if (st.life >= st.maxLife) {
+            stars.splice(i, 1);
+            continue;
+          }
+
+          st.x += st.vx;
+          st.y += st.vy;
+
+          // Fade in then out
+          const p = st.life / st.maxLife;
+          st.alpha = p < 0.2 ? (p / 0.2) * st.maxAlpha : (1 - (p - 0.2) / 0.8) * st.maxAlpha;
+
+          const tailX = st.x - (st.vx / Math.hypot(st.vx, st.vy)) * st.length;
+          const tailY = st.y - (st.vy / Math.hypot(st.vx, st.vy)) * st.length;
+
+          ctx.save();
+          ctx.globalAlpha = st.alpha;
+          const grad = ctx.createLinearGradient(st.x, st.y, tailX, tailY);
+          grad.addColorStop(0, "#ffffff");
+          grad.addColorStop(0.3, st.color);
+          grad.addColorStop(1, "transparent");
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = st.thickness;
+          ctx.lineCap = "round";
+          ctx.shadowColor = st.color;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.moveTo(st.x, st.y);
+          ctx.lineTo(tailX, tailY);
           ctx.stroke();
-        }
-        ctx.restore();
-      }
 
-      // ── 2. RENDER SHOOTING STARS / METEORS ─────────────────────────
-      const stars = shootingStarsRef.current;
-      for (let i = stars.length - 1; i >= 0; i--) {
-        const st = stars[i];
-        st.life++;
-        if (st.life >= st.maxLife) {
-          stars.splice(i, 1);
-          continue;
-        }
-
-        st.x += st.vx;
-        st.y += st.vy;
-
-        // Fade in then out
-        const p = st.life / st.maxLife;
-        st.alpha = p < 0.2 ? (p / 0.2) * st.maxAlpha : (1 - (p - 0.2) / 0.8) * st.maxAlpha;
-
-        const tailX = st.x - (st.vx / Math.hypot(st.vx, st.vy)) * st.length;
-        const tailY = st.y - (st.vy / Math.hypot(st.vx, st.vy)) * st.length;
-
-        ctx.save();
-        ctx.globalAlpha = st.alpha;
-        const grad = ctx.createLinearGradient(st.x, st.y, tailX, tailY);
-        grad.addColorStop(0, "#ffffff");
-        grad.addColorStop(0.3, st.color);
-        grad.addColorStop(1, "transparent");
-
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = st.thickness;
-        ctx.lineCap = "round";
-        ctx.shadowColor = st.color;
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.moveTo(st.x, st.y);
-        ctx.lineTo(tailX, tailY);
-        ctx.stroke();
-
-        // Meteor head bright dot
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(st.x, st.y, st.thickness * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // ── 3. RENDER 3D SAKURA & AUTUMN PETALS VORTEX ─────────────────
-      const petals = windPetalsRef.current;
-      for (let i = petals.length - 1; i >= 0; i--) {
-        const pt = petals[i];
-        pt.x += pt.vx;
-        pt.y += pt.vy;
-        pt.rotX += pt.rotSpeedX;
-        pt.rotY += pt.rotSpeedY;
-        pt.rotZ += pt.rotSpeedZ;
-
-        if (pt.x > width + 50 || pt.y > height + 50) {
-          petals.splice(i, 1);
-          continue;
-        }
-
-        ctx.save();
-        ctx.translate(pt.x, pt.y);
-        ctx.rotate((pt.rotZ * Math.PI) / 180);
-        const scaleX = Math.cos((pt.rotX * Math.PI) / 180);
-        const scaleY = Math.sin((pt.rotY * Math.PI) / 180);
-        ctx.scale(scaleX, scaleY);
-        ctx.globalAlpha = pt.alpha;
-        ctx.fillStyle = pt.color;
-        ctx.shadowColor = pt.color;
-        ctx.shadowBlur = 4;
-
-        if (pt.type === "sakura") {
-          // Petal shape
+          // Meteor head bright dot
+          ctx.fillStyle = "#ffffff";
           ctx.beginPath();
-          ctx.moveTo(0, -pt.size);
-          ctx.quadraticCurveTo(pt.size * 0.8, -pt.size * 0.2, 0, pt.size);
-          ctx.quadraticCurveTo(-pt.size * 0.8, -pt.size * 0.2, 0, -pt.size);
+          ctx.arc(st.x, st.y, st.thickness * 1.5, 0, Math.PI * 2);
           ctx.fill();
-        } else {
-          // Maple leaf shape
-          ctx.beginPath();
-          ctx.ellipse(0, 0, pt.size, pt.size * 0.6, 0, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.restore();
         }
-        ctx.restore();
       }
 
       // ── 4. RENDER MID-AUTUMN FIREFLIES & GODRAYS ───────────────────
@@ -668,7 +545,6 @@ export function AtmosphereMasterOverlay() {
       document.removeEventListener("visibilitychange", handleVis);
       window.removeEventListener("tx_trigger_firework", handleFireworkEvent);
       window.removeEventListener("tx_trigger_shooting_star", handleShootingStarEvent);
-      window.removeEventListener("tx_trigger_wind_gust", handleWindEvent);
       if (effectTimer) clearTimeout(effectTimer);
     };
   }, [
@@ -679,7 +555,6 @@ export function AtmosphereMasterOverlay() {
     launchFirework,
     detonateFirework,
     spawnShootingStar,
-    triggerWindGust,
   ]);
 
   if (!effectsEnabled || activeEffect === "none") return null;

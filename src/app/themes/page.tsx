@@ -15,9 +15,6 @@ import {
   Sword,
   Star,
   RefreshCw,
-  Flower2,
-  Wind,
-  Snowflake,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -42,8 +39,6 @@ export default function ThemesPage() {
     setIntensity,
     customEffectType,
     setCustomEffectType,
-    flowerType,
-    setFlowerType,
   } = useTheme();
 
   // Custom Cursor Style State (synced with MouseEffectsProvider via localStorage & events)
@@ -203,23 +198,9 @@ export default function ThemesPage() {
           </p>
         </div>
 
-        {/* Quick Atmosphere Toggle Switches Bar */}
+        {/* Quick Atmosphere Toggle Switches Bar: Exclusively Thunderstorm, Fireworks, and Cosmic Stars */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* 1. Blossom / Flower Switch */}
-          {renderToggleSwitch(
-            "blossom",
-            "🌸 Hoa Rơi",
-            <Flower2 className="h-3.5 w-3.5 text-pink-400 animate-pulse" />,
-            {
-              card: "bg-pink-950/60 border-pink-500/60 text-pink-200 shadow-pink-500/20",
-              track: "bg-pink-500",
-              text: "text-pink-300",
-            },
-            "tx_trigger_wind_gust",
-            { type: flowerType || "sakura" }
-          )}
-
-          {/* 2. Thunderstorm Switch */}
+          {/* 1. Thunderstorm Switch */}
           {renderToggleSwitch(
             "thunderstorm",
             "⚡ Sấm Sét 4D",
@@ -232,7 +213,7 @@ export default function ThemesPage() {
             "tx_trigger_lightning"
           )}
 
-          {/* 3. Fireworks Switch */}
+          {/* 2. Fireworks Switch */}
           {renderToggleSwitch(
             "fireworks",
             "🎆 Pháo Hoa",
@@ -245,7 +226,7 @@ export default function ThemesPage() {
             "tx_trigger_firework"
           )}
 
-          {/* 4. Cosmic Shooting Star Switch */}
+          {/* 3. Cosmic Shooting Star Switch */}
           {renderToggleSwitch(
             "cosmic",
             "🌌 Sao Băng",
@@ -256,18 +237,6 @@ export default function ThemesPage() {
               text: "text-cyan-300",
             },
             "tx_trigger_shooting_star"
-          )}
-
-          {/* 5. Snow Switch */}
-          {renderToggleSwitch(
-            "snow",
-            "❄️ Tuyết Rơi",
-            <Snowflake className="h-3.5 w-3.5 text-sky-200 animate-spin" />,
-            {
-              card: "bg-slate-900/90 border-cyan-400/50 text-cyan-100 shadow-cyan-500/20",
-              track: "bg-cyan-400",
-              text: "text-cyan-200",
-            }
           )}
 
           {/* Reset to Theme Default */}
@@ -294,243 +263,6 @@ export default function ThemesPage() {
           </Badge>
         </div>
       </div>
-
-      {/* 🌸 Dedicated Global Flower Shower Studio Card */}
-      <Card className="p-6 glass-card border border-pink-500/30 bg-gradient-to-br from-pink-950/20 via-slate-900/60 to-purple-950/20 relative overflow-hidden">
-        {/* Ambient atmospheric glow */}
-        <div className="absolute -top-16 -right-16 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 space-y-5">
-          {/* Header & Master Toggle */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-pink-500/20">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                  <Flower2 className="h-5 w-5 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                    Cài Đặt Hiệu Ứng Hoa Rơi Toàn Web
-                    <Badge variant="primary" size="sm" className="bg-pink-500/20 text-pink-300 border-pink-500/40">
-                      Toàn Hệ Thống (All Pages)
-                    </Badge>
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Cánh hoa hoặc lá rơi liên tục, bay lượn 3D tự nhiên trên tất cả các trang web theo tùy chỉnh của Admin
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Master Switch for Falling Flowers */}
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => {
-                  toggleEffect(
-                    "blossom",
-                    "🌸 Hoa Rơi Toàn Web",
-                    "tx_trigger_wind_gust",
-                    { type: flowerType || "sakura" }
-                  );
-                }}
-                role="switch"
-                aria-checked={isEffectActive("blossom")}
-                className={cn(
-                  "px-4 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-3 transition-all duration-300 shadow-xl border cursor-pointer select-none active:scale-95",
-                  isEffectActive("blossom")
-                    ? "bg-pink-600 text-white border-pink-400 shadow-pink-600/30 scale-[1.02]"
-                    : "bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-slate-300"
-                )}
-              >
-                <span>{isEffectActive("blossom") ? "🌸 Trạng thái: ĐANG RƠI" : "🌸 Trạng thái: ĐÃ TẮT"}</span>
-                {/* Switch Slider */}
-                <div
-                  className={cn(
-                    "w-9 h-4.5 rounded-full p-0.5 transition-colors relative flex items-center",
-                    isEffectActive("blossom") ? "bg-pink-900/90" : "bg-slate-700"
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "w-3.5 h-3.5 rounded-full bg-white shadow-md transition-transform duration-300 transform",
-                      isEffectActive("blossom") ? "translate-x-4.5" : "translate-x-0"
-                    )}
-                  />
-                </div>
-                <span className={cn("text-[10px] font-black uppercase", isEffectActive("blossom") ? "text-yellow-200" : "text-slate-400")}>
-                  {isEffectActive("blossom") ? "BẬT" : "TẮT"}
-                </span>
-              </button>
-
-              {/* Instant Wind Gust Test Button */}
-              <button
-                onClick={() => {
-                  playClickSound();
-                  if (!isEffectActive("blossom")) {
-                    if (!effectsEnabled) setEffectsEnabled(true);
-                    setCustomEffectType("blossom");
-                  }
-                  if (typeof window !== "undefined") {
-                    window.dispatchEvent(
-                      new CustomEvent("tx_trigger_wind_gust", {
-                        detail: { type: flowerType || "sakura" },
-                      })
-                    );
-                  }
-                  showToast("🌪️ Đã tạo cơn gió lốc cuốn hoa 3D cực mạnh!");
-                }}
-                className="px-3 py-2.5 rounded-2xl bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/40 text-pink-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
-                title="Tạo luồng gió xoáy cuốn hoa bay qua màn hình ngay lập tức"
-              >
-                <Wind className="h-4 w-4 text-pink-300 animate-pulse" />
-                <span>Thổi Cơn Lốc Hoa 3D</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Controls: Flower Type & Falling Intensity */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {/* 1. Flower Type Selector */}
-            <div className="space-y-3 p-4 rounded-2xl bg-surface-elevated/40 border border-surface-border">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Palette className="h-4 w-4 text-pink-400" />
-                  1. Chọn Loại Hoa Rơi (&quot;Hoa đào hoặc hoa gì đó&quot;):
-                </span>
-                <span className="text-[11px] font-mono font-bold text-pink-400">
-                  {flowerType === "sakura" ? "🌸 Hoa Đào Hồng" : flowerType === "apricot" ? "🌼 Hoa Mai Vàng" : flowerType === "rose" ? "🌹 Cánh Hoa Hồng" : "🍁 Lá Phong Đỏ"}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  {
-                    id: "sakura" as const,
-                    name: "Hoa Đào Hồng",
-                    sub: "Sakura Nhật Bản",
-                    emoji: "🌸",
-                    activeBg: "bg-pink-950/70 text-pink-200 border-pink-400 shadow-pink-500/30",
-                  },
-                  {
-                    id: "apricot" as const,
-                    name: "Hoa Mai Vàng",
-                    sub: "Tết Cổ Truyền",
-                    emoji: "🌼",
-                    activeBg: "bg-yellow-950/70 text-yellow-200 border-yellow-400 shadow-yellow-500/30",
-                  },
-                  {
-                    id: "rose" as const,
-                    name: "Cánh Hoa Hồng",
-                    sub: "Lãng Mạn Tình Yêu",
-                    emoji: "🌹",
-                    activeBg: "bg-rose-950/70 text-rose-200 border-rose-400 shadow-rose-500/30",
-                  },
-                  {
-                    id: "maple" as const,
-                    name: "Lá Phong Đỏ",
-                    sub: "Mùa Thu Ấm Áp",
-                    emoji: "🍁",
-                    activeBg: "bg-orange-950/70 text-orange-200 border-orange-400 shadow-orange-500/30",
-                  },
-                ].map((item) => {
-                  const isSelected = flowerType === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        playClickSound();
-                        setFlowerType(item.id);
-                        if (!isEffectActive("blossom")) {
-                          if (!effectsEnabled) setEffectsEnabled(true);
-                          setCustomEffectType("blossom");
-                        }
-                        showToast(`Đã áp dụng loại hoa: ${item.name} trên toàn hệ thống!`);
-                      }}
-                      className={cn(
-                        "p-3 rounded-xl border text-left flex flex-col items-center sm:items-start gap-1 transition-all cursor-pointer relative active:scale-95",
-                        isSelected
-                          ? cn("scale-105 shadow-lg font-bold border-2", item.activeBg)
-                          : "bg-slate-900/50 hover:bg-slate-800/70 border-slate-700/60 text-slate-300"
-                      )}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-xl">{item.emoji}</span>
-                        {isSelected && <CheckCircle2 className="h-4 w-4 text-emerald-400 fill-emerald-400/20" />}
-                      </div>
-                      <span className="text-xs font-bold leading-tight mt-1">{item.name}</span>
-                      <span className="text-[10px] text-muted-foreground">{item.sub}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 2. Intensity Selector */}
-            <div className="space-y-3 p-4 rounded-2xl bg-surface-elevated/40 border border-surface-border">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                  <Sliders className="h-4 w-4 text-pink-400" />
-                  2. Mức Độ Rơi Liên Tục (Intensity do Admin tùy chỉnh):
-                </span>
-                <span className="text-[11px] font-mono font-bold text-primary">
-                  {intensity === "low" ? "🍃 Nhẹ (~30 cánh)" : intensity === "medium" ? "🌸 Vừa (~60 cánh)" : "🌪️ Dày đặc (~100 cánh)"}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    level: "low" as const,
-                    label: "Nhẹ",
-                    desc: "30 cánh - Êm đềm",
-                    icon: "🍃",
-                  },
-                  {
-                    level: "medium" as const,
-                    label: "Vừa",
-                    desc: "60 cánh - Tự nhiên",
-                    icon: "🌸",
-                  },
-                  {
-                    level: "high" as const,
-                    label: "Dày đặc",
-                    desc: "100 cánh - Bão hoa",
-                    icon: "🌪️",
-                  },
-                ].map((item) => {
-                  const isSelected = intensity === item.level;
-                  return (
-                    <button
-                      key={item.level}
-                      onClick={() => {
-                        playClickSound();
-                        setIntensity(item.level);
-                        showToast(`Mức độ rơi hoa: ${item.label} (${item.desc})`);
-                      }}
-                      className={cn(
-                        "p-3 rounded-xl border text-center flex flex-col items-center gap-1 transition-all cursor-pointer active:scale-95",
-                        isSelected
-                          ? "bg-primary/20 border-primary text-primary font-bold shadow-md scale-105"
-                          : "bg-slate-900/50 hover:bg-slate-800/70 border-slate-700/60 text-slate-300"
-                      )}
-                    >
-                      <span className="text-base">{item.icon}</span>
-                      <span className="text-xs font-bold">{item.label}</span>
-                      <span className="text-[10px] text-muted-foreground">{item.desc}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <p className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1">
-                <Sparkles className="h-3.5 w-3.5 text-pink-400 shrink-0" />
-                Cánh hoa rơi liên tục được vẽ bằng Canvas 2D/3D hiệu năng cao, tự động tái sinh hạt khi chạm mép màn hình và tạm dừng khi ẩn tab để tiết kiệm pin.
-              </p>
-            </div>
-          </div>
-        </div>
-      </Card>
 
       {/* Seasonal Control Panel */}
       <Card className="p-5 glass-card">
@@ -600,7 +332,6 @@ export default function ThemesPage() {
             { id: "lanterns", label: "🏮 Đèn Lồng Rằm Trung Thu" },
             { id: "sparkles", label: "🎄 Ánh Sao Giáng Sinh" },
             { id: "cosmic", label: "🌌 Tinh Vân Vũ Trụ Sâu" },
-            { id: "blossom", label: "🌸 Hoa Anh Đào Bay" },
             { id: "leaves", label: "🌿 Lá Rơi Mùa Hạ" },
             { id: "autumn", label: "🍂 Lá Phong Mùa Thu" },
             { id: "snow", label: "❄️ Bông Tuyết Mùa Đông" },

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { ThemeId, ThemeDefinition, EffectType, FlowerType } from "./types";
+import { ThemeId, ThemeDefinition, EffectType } from "./types";
 import { THEMES } from "./themesData";
 
 interface ThemeContextType {
@@ -16,8 +16,6 @@ interface ThemeContextType {
   setIntensity: (intensity: "low" | "medium" | "high") => void;
   customEffectType: EffectType | "theme-default";
   setCustomEffectType: (effect: EffectType | "theme-default") => void;
-  flowerType: FlowerType;
-  setFlowerType: (type: FlowerType) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -36,7 +34,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isAutoSeason, setIsAutoSeasonState] = useState<boolean>(false);
   const [intensity, setIntensityState] = useState<"low" | "medium" | "high">("medium");
   const [customEffectType, setCustomEffectTypeState] = useState<EffectType | "theme-default">("theme-default");
-  const [flowerType, setFlowerTypeState] = useState<FlowerType>("sakura");
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -46,7 +43,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const savedAuto = localStorage.getItem("datavault_auto_season");
       const savedIntensity = localStorage.getItem("datavault_intensity") as "low" | "medium" | "high";
       const savedCustomEffect = localStorage.getItem("datavault_custom_effect") as EffectType | "theme-default";
-      const savedFlowerType = localStorage.getItem("datavault_flower_type") as FlowerType;
 
       if (savedAuto === "true") {
         setIsAutoSeasonState(true);
@@ -65,10 +61,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
       if (savedCustomEffect) {
         setCustomEffectTypeState(savedCustomEffect);
-      }
-
-      if (savedFlowerType && ["sakura", "apricot", "rose", "maple"].includes(savedFlowerType)) {
-        setFlowerTypeState(savedFlowerType);
       }
     } catch {
       // localStorage may fail in private mode
@@ -137,18 +129,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setFlowerType = (type: FlowerType) => {
-    setFlowerTypeState(type);
-    try {
-      localStorage.setItem("datavault_flower_type", type);
-    } catch {
-      // ignore
-    }
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("tx_flower_changed", { detail: { type } }));
-    }
-  };
-
   const currentTheme = THEMES.find((t) => t.id === themeId) || THEMES[0];
 
   // Apply CSS variables to root
@@ -176,8 +156,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setIntensity,
         customEffectType,
         setCustomEffectType,
-        flowerType,
-        setFlowerType,
       }}
     >
       {children}

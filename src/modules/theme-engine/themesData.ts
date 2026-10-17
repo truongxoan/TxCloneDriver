@@ -6,7 +6,7 @@ export const THEMES: ThemeDefinition[] = [
     name: "Spring Blossom",
     nameVi: "Xuân Anh Đào",
     description: "Hoa anh đào phớt hồng, không gian hồ nước thanh tịnh và chùa cổ kính.",
-    effectType: "blossom",
+    effectType: "none",
     accentColor: "#fb7185",
     primaryColor: "#f472b6",
     badge: "🌸 Mùa Xuân",

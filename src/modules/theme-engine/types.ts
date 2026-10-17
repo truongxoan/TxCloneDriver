@@ -17,8 +17,6 @@ export type ThemeId =
   | "neo-brutalism"
   | "thunderstorm";
 
-export type FlowerType = "sakura" | "apricot" | "rose" | "maple";
-
 export type EffectType =
   | "blossom"
   | "leaves"

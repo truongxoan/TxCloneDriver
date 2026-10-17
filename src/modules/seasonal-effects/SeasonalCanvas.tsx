@@ -22,15 +22,13 @@ interface Particle {
 }
 
 export function SeasonalCanvas() {
-  const { currentTheme, effectsEnabled, intensity, customEffectType, flowerType } = useTheme();
+  const { currentTheme, effectsEnabled, intensity, customEffectType } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const activeEffect =
     customEffectType && customEffectType !== "theme-default"
       ? customEffectType
       : currentTheme.effectType;
-
-  const currentFlower = flowerType || "sakura";
 
   useEffect(() => {
     if (!effectsEnabled || activeEffect === "none") {
@@ -60,25 +58,13 @@ export function SeasonalCanvas() {
     window.addEventListener("resize", handleResize);
 
     // Particle count by intensity
-    let maxParticles = 45;
-    if (activeEffect === "blossom") {
-      maxParticles = intensity === "low" ? 30 : intensity === "high" ? 100 : 58;
-    } else {
-      if (intensity === "low") maxParticles = 20;
-      if (intensity === "high") maxParticles = 70;
-    }
+    let maxParticles = 40;
+    if (intensity === "low") maxParticles = 20;
+    if (intensity === "high") maxParticles = 70;
 
     const effect = activeEffect;
 
-    const flowerPalettes: Record<string, string[]> = {
-      sakura: ["#fbcfe8", "#f472b6", "#fda4af", "#ffe4e6", "#f9a8d4", "#fecdd3"],
-      apricot: ["#fde047", "#facc15", "#eab308", "#fef08a", "#fef9c3", "#ca8a04"],
-      rose: ["#f43f5e", "#e11d48", "#be123c", "#fda4af", "#fb7185", "#881337"],
-      maple: ["#ea580c", "#f97316", "#eab308", "#c2410c", "#b45309", "#9a3412"],
-    };
-
     const colorPalettes: Record<string, string[]> = {
-      blossom: flowerPalettes[currentFlower] || flowerPalettes.sakura,
       leaves: ["#34d399", "#10b981", "#6ee7b7", "#fbbf24"],
       autumn: ["#ea580c", "#f97316", "#eab308", "#c2410c", "#b45309"],
       snow: ["#ffffff", "#e0f2fe", "#bae6fd", "#f8fafc"],
@@ -99,7 +85,7 @@ export function SeasonalCanvas() {
     const particles: Particle[] = [];
 
     const initParticle = (p?: Partial<Particle>): Particle => {
-      const isSnowOrFall = effect === "snow" || effect === "autumn" || effect === "blossom" || effect === "leaves";
+      const isSnowOrFall = effect === "snow" || effect === "autumn" || effect === "leaves";
       const isRise = effect === "bubbles" || effect === "cyber" || effect === "lanterns" || effect === "fireworks";
       const isThunderstorm = effect === "thunderstorm";
       const isCosmic = effect === "cosmic";
@@ -108,9 +94,7 @@ export function SeasonalCanvas() {
       return {
         x: p?.x ?? Math.random() * width,
         y: p?.y ?? (isRise ? height + Math.random() * 50 : isHudOrParticles ? Math.random() * height : Math.random() * -50),
-        size: effect === "blossom"
-          ? Math.random() * 5 + 6.5
-          : isThunderstorm
+        size: isThunderstorm
           ? Math.random() * 2.2 + 0.8
           : isCosmic
           ? Math.random() * 3.5 + 1
@@ -123,18 +107,14 @@ export function SeasonalCanvas() {
           : effect === "fireworks"
           ? Math.random() * 4 + 2.5
           : Math.random() * (effect === "snow" ? 3.5 : effect === "cyber" ? 2.5 : 8) + 2,
-        speedX: effect === "blossom"
-          ? (Math.random() - 0.5) * 1.6 + 0.7
-          : isThunderstorm
+        speedX: isThunderstorm
           ? 5 + Math.random() * 6
           : effect === "fireworks"
           ? (Math.random() - 0.5) * 3
           : isHudOrParticles
           ? (Math.random() - 0.5) * 0.9
           : (Math.random() - 0.5) * (effect === "autumn" || effect === "lanterns" ? 1.5 : 1),
-        speedY: effect === "blossom"
-          ? Math.random() * 1.3 + (intensity === "high" ? 1.5 : intensity === "low" ? 0.8 : 1.1)
-          : isThunderstorm
+        speedY: isThunderstorm
           ? 22 + Math.random() * 16
           : effect === "lanterns"
           ? -(Math.random() * 1.0 + 0.4)
@@ -219,77 +199,6 @@ export function SeasonalCanvas() {
           ctx.beginPath();
           ctx.ellipse(0, 0, p.size * 1.4, p.size * 0.7, 0, 0, Math.PI * 2);
           ctx.fill();
-        } else if (effect === "blossom") {
-          // Dynamic 3D fluttering & realistic flower petal styling
-          p.rotX = (p.rotX || 0) + (p.rotSpeedX || 0.025);
-          p.rotY = (p.rotY || 0) + (p.rotSpeedY || 0.02);
-          const scX = Math.cos(p.rotX);
-          const scY = Math.sin(p.rotY);
-          ctx.scale(Math.abs(scX) < 0.18 ? 0.18 : scX, Math.abs(scY) < 0.18 ? 0.18 : scY);
-
-          const s = p.size;
-          if (currentFlower === "sakura") {
-            // Realistic cherry blossom petal with notched apex & stem
-            ctx.beginPath();
-            ctx.moveTo(0, s);
-            ctx.bezierCurveTo(s * 1.1, s * 0.3, s * 1.0, -s * 0.7, s * 0.22, -s);
-            ctx.lineTo(0, -s * 0.72);
-            ctx.bezierCurveTo(-s * 0.22, -s, -s * 1.0, -s * 0.7, -s * 1.1, s * 0.3);
-            ctx.closePath();
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 3;
-            ctx.fill();
-          } else if (currentFlower === "apricot") {
-            // Golden yellow apricot blossom petal with rich glow
-            ctx.beginPath();
-            ctx.ellipse(0, 0, s * 0.88, s * 1.15, 0, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = "#f59e0b";
-            ctx.shadowBlur = 5;
-            ctx.fill();
-            // Golden center dot
-            ctx.beginPath();
-            ctx.arc(0, 0, s * 0.25, 0, Math.PI * 2);
-            ctx.fillStyle = "#ca8a04";
-            ctx.fill();
-          } else if (currentFlower === "rose") {
-            // Deep romantic velvet rose petal
-            ctx.beginPath();
-            ctx.moveTo(0, s * 1.1);
-            ctx.bezierCurveTo(s * 1.3, s * 0.2, s * 1.2, -s * 0.8, 0, -s * 1.1);
-            ctx.bezierCurveTo(-s * 1.2, -s * 0.8, -s * 1.3, s * 0.2, 0, s * 1.1);
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 4;
-            ctx.fill();
-          } else if (currentFlower === "maple") {
-            // Autumn maple leaf
-            ctx.beginPath();
-            ctx.moveTo(0, -s * 1.3);
-            ctx.lineTo(s * 0.35, -s * 0.6);
-            ctx.lineTo(s * 1.1, -s * 0.4);
-            ctx.lineTo(s * 0.5, s * 0.1);
-            ctx.lineTo(s * 0.75, s * 0.9);
-            ctx.lineTo(0, s * 0.5);
-            ctx.lineTo(-s * 0.75, s * 0.9);
-            ctx.lineTo(-s * 0.5, s * 0.1);
-            ctx.lineTo(-s * 1.1, -s * 0.4);
-            ctx.lineTo(-s * 0.35, -s * 0.6);
-            ctx.closePath();
-            ctx.fillStyle = p.color;
-            ctx.shadowColor = p.color;
-            ctx.shadowBlur = 3;
-            ctx.fill();
-          } else {
-            // Default petal shape
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.moveTo(0, -s);
-            ctx.quadraticCurveTo(s, 0, 0, s);
-            ctx.quadraticCurveTo(-s, 0, 0, -s);
-            ctx.fill();
-          }
         } else if (effect === "cyber") {
           // Cyber square particle with glow
           ctx.fillStyle = p.color;
@@ -456,13 +365,6 @@ export function SeasonalCanvas() {
           if (p.y < -30 || p.x < -30 || p.x > width + 30) {
             particles[i] = initParticle();
           }
-        } else if (effect === "blossom") {
-          if (p.y > height + 30 || p.x > width + 50 || p.x < -60) {
-            particles[i] = initParticle({
-              x: Math.random() * (width + 120) - 60,
-              y: -25 - Math.random() * 45,
-            });
-          }
         } else {
           if (p.y > height + 30 || p.x < -30 || p.x > width + 30) {
             particles[i] = initParticle();
@@ -506,7 +408,7 @@ export function SeasonalCanvas() {
       window.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("tx_trigger_firework", handleFireworkTrigger);
     };
-  }, [activeEffect, effectsEnabled, intensity, currentFlower]);
+  }, [activeEffect, effectsEnabled, intensity]);
 
   if (!effectsEnabled || activeEffect === "none") {
     return null;
