@@ -4,6 +4,7 @@ import path from "path";
 import os from "os";
 import { ManagedUser, LockedDevice, AuditLogItem } from "@/modules/auth/types";
 import { SyncRoom } from "@/modules/watch-party/types";
+import { hashPassword } from "@/lib/password";
 
 // Hỗ trợ cả môi trường serverless Vercel (/tmp) và máy chủ cục bộ / VPS (thư mục ./data)
 const IS_VERCEL = !!process.env.VERCEL;
@@ -540,10 +541,13 @@ export async function POST(request: Request) {
         now.getMonth() + 1
       ).padStart(2, "0")}/${now.getFullYear()}`;
 
+      // Băm mật khẩu bằng bcrypt bảo vệ danh tính và dữ liệu người dùng
+      const hashedPassword = await hashPassword(p);
+
       const newUser: ManagedUser = {
         id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         username: u,
-        password: p,
+        password: hashedPassword,
         name: n,
         role: "user",
         status: "pending",

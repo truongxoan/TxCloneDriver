@@ -3,6 +3,10 @@ export type ThemeId =
   | "summer-nature"
   | "autumn-leaves"
   | "winter-crystal"
+  | "tet-fireworks"
+  | "mid-autumn"
+  | "christmas-magic"
+  | "deep-space"
   | "cyber-3d"
   | "midnight-luxury"
   | "ocean-glass"
@@ -13,11 +17,17 @@ export type ThemeId =
   | "neo-brutalism"
   | "thunderstorm";
 
+export type FlowerType = "sakura" | "apricot" | "rose" | "maple";
+
 export type EffectType =
   | "blossom"
   | "leaves"
   | "autumn"
   | "snow"
+  | "fireworks"
+  | "lanterns"
+  | "sparkles"
+  | "cosmic"
   | "cyber"
   | "stars"
   | "bubbles"

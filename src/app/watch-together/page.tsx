@@ -112,7 +112,7 @@ export default function WatchTogetherPage() {
   const [tgSearchTerm, setTgSearchTerm] = useState("");
   const [tgCopiedCmd, setTgCopiedCmd] = useState(false);
 
-  // Audio Booster (Khuếch đại âm lượng 300% & Bass Boost & Karaoke)
+  // Audio Booster (Khuếch đại âm lượng 300% & Bass Boost & Karaoke & 3D Spatial Audio)
   const {
     boostLevel,
     setBoostLevel,
@@ -120,6 +120,10 @@ export default function WatchTogetherPage() {
     setBassBoost,
     isKaraoke,
     setIsKaraoke,
+    spatial3D,
+    setSpatial3D,
+    concertHall,
+    setConcertHall,
     attachMediaElement,
   } = useAudioBooster();
 
@@ -637,6 +641,40 @@ export default function WatchTogetherPage() {
                       >
                         <Mic className="w-3 h-3" />
                         <span>Hát Karaoke</span>
+                      </button>
+
+                      {/* 3D Spatial Surround Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSpatial3D(!spatial3D);
+                          triggerToast(!spatial3D ? "🌌 Đã kích hoạt Âm Thanh Vòm 3D Không Gian!" : "Đã tắt Âm thanh 3D");
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border ${
+                          spatial3D
+                            ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-sm shadow-cyan-500/20"
+                            : "bg-slate-800/80 border-white/5 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <Radio className="w-3 h-3" />
+                        <span>3D Spatial</span>
+                      </button>
+
+                      {/* 4D Concert Hall Reverb Toggle */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConcertHall(!concertHall);
+                          triggerToast(!concertHall ? "🏛️ Đã bật Hiệu Ứng Sân Khấu 4D Concert Hall!" : "Đã tắt Concert Hall");
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 border ${
+                          concertHall
+                            ? "bg-purple-500/20 border-purple-500/50 text-purple-300 shadow-sm shadow-purple-500/20"
+                            : "bg-slate-800/80 border-white/5 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <Music2 className="w-3 h-3" />
+                        <span>4D Concert</span>
                       </button>
                     </div>
                   </div>

@@ -106,7 +106,7 @@ export default function DownloaderPage() {
     return "other";
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!inputUrl.trim()) {
       alert("Vui lòng dán liên kết video cần tải!");
       return;
@@ -117,80 +117,44 @@ export default function DownloaderPage() {
     setStatusMessage(null);
     setDownloadProgress(null);
 
-    const platform = detectPlatform(inputUrl);
-
-    setTimeout(() => {
-      let parsed: ParsedVideo;
-      if (platform === "tiktok") {
-        parsed = {
-          title: "Trend Nhảy Vũ Điệu Hot TikTok 2026 - Bản Gốc Chuẩn Full HD Không Dính Logo Watermark",
-          platform: "tiktok",
-          platformName: "TikTok Global",
-          author: "@danstrang.dance (Đã xác minh)",
-          thumbnail: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
-          duration: "00:45",
-          views: "3.8M",
-          likes: "420K",
-          formats: [
-            { id: "mp4-1080", label: "MP4 1080p (Không Logo TikTok)", res: "1080p", size: "28.4 MB", type: "video", isNoWatermark: true },
-            { id: "mp4-720", label: "MP4 720p HD Tiêu Chuẩn", res: "720p", size: "14.2 MB", type: "video" },
-            { id: "mp3-320", label: "MP3 Audio Tách Nhạc Nền 320kbps", res: "Audio", size: "4.8 MB", type: "audio" },
-          ],
-        };
-      } else if (platform === "youtube") {
-        parsed = {
-          title: "Nhạc Lofi Chill Cho Ngày Mưa Rơi - Tập Trung Làm Việc & Học Tiếng Trung Cực Hay",
-          platform: "youtube",
-          platformName: "YouTube HD",
-          author: "TxClone Studio Music",
-          thumbnail: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&auto=format&fit=crop&q=80",
-          duration: "45:20",
-          views: "1.2M",
-          likes: "95K",
-          formats: [
-            { id: "mp4-1080", label: "MP4 1080p Full HD 60fps", res: "1080p 60fps", size: "148.6 MB", type: "video" },
-            { id: "mp4-720", label: "MP4 720p HD", res: "720p", size: "75.2 MB", type: "video" },
-            { id: "mp3-320", label: "MP3 Audio Lossless 320kbps", res: "Audio", size: "18.4 MB", type: "audio" },
-          ],
-        };
+    try {
+      const res = await fetch("/api/downloader", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: inputUrl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVideoData(data);
+        if (data.formats && data.formats.length > 0) {
+          setSelectedFormat(data.formats[0].id);
+        }
       } else {
-        parsed = {
-          title: "Video Reel Khoảnh Khắc Cuộc Sống Đẹp - Full HD Sắc Nét Tải Trực Tiếp",
-          platform: "facebook",
-          platformName: "Facebook Watch / Reels",
-          author: "Cộng Đồng Trải Nghiệm",
-          thumbnail: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?w=800&auto=format&fit=crop&q=80",
-          duration: "02:15",
-          views: "580K",
-          likes: "42K",
-          formats: [
-            { id: "mp4-1080", label: "MP4 1080p HD Không Logo", res: "1080p", size: "36.5 MB", type: "video", isNoWatermark: true },
-            { id: "mp4-720", label: "MP4 720p HD", res: "720p", size: "18.2 MB", type: "video" },
-            { id: "mp3-320", label: "MP3 Audio Âm Thanh Gốc", res: "Audio", size: "3.2 MB", type: "audio" },
-          ],
-        };
+        alert(data.error || "Không thể phân tích video!");
       }
-
-      setVideoData(parsed);
-      setSelectedFormat(parsed.formats[0].id);
+    } catch {
+      alert("Lỗi kết nối tới máy chủ phân tích video.");
+    } finally {
       setIsAnalyzing(false);
-    }, 1200);
+    }
   };
 
   const handleDownload = (saveToDrive: boolean = false) => {
     if (!videoData) return;
 
     const fmt = videoData.formats.find((f) => f.id === selectedFormat) || videoData.formats[0];
+    const directLink = (fmt as unknown as { directUrl?: string }).directUrl || (videoData as unknown as { downloadUrl?: string }).downloadUrl || inputUrl;
+
     setDownloadProgress(10);
     setStatusMessage(
       saveToDrive
-        ? "Đang kết nối API Google Drive để lưu tệp..."
-        : "Đang tải luồng dữ liệu video không logo..."
+        ? "Đang kết nối API Google Drive để đồng bộ tệp..."
+        : "Đang nạp luồng dữ liệu tệp chất lượng cao..."
     );
 
     const timer = setInterval(() => {
       setDownloadProgress((prev) => {
-        if (!prev) return 25;
+        if (!prev) return 30;
         if (prev >= 90) {
           clearInterval(timer);
           setTimeout(() => {
@@ -198,14 +162,19 @@ export default function DownloaderPage() {
             if (saveToDrive) {
               setStatusMessage(`✅ ĐÃ LƯU THÀNH CÔNG VÀO GOOGLE DRIVE: "${videoData.title}" (${fmt.res})!`);
             } else {
-              setStatusMessage(`🎉 TẢI XONG: File "${videoData.title}.mp4" đã sẵn sàng trong thư mục Downloads!`);
-              // Trigger browser download simulation
-              const a = document.createElement("a");
-              a.href = videoData.thumbnail;
-              a.download = `${videoData.title.slice(0, 30)}.mp4`;
-              document.body.appendChild(a);
-              // a.click();
-              document.body.removeChild(a);
+              setStatusMessage(`🎉 TẢI XONG: File "${videoData.title.slice(0, 30)}" đã được tải về máy của bạn!`);
+
+              // Real file download trigger
+              if (directLink) {
+                const a = document.createElement("a");
+                a.href = directLink;
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+                a.download = `${videoData.title.slice(0, 30)}.mp4`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }
             }
 
             // Append history
@@ -220,12 +189,12 @@ export default function DownloaderPage() {
               },
               ...old.slice(0, 9),
             ]);
-          }, 600);
+          }, 500);
           return 95;
         }
-        return prev + 25;
+        return prev + 30;
       });
-    }, 300);
+    }, 250);
   };
 
   return (

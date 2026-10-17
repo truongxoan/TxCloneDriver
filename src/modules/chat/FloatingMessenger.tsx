@@ -84,14 +84,27 @@ export function FloatingMessenger() {
     };
   }, []);
 
-  // Listen for open-floating-messenger event (e.g. from LiveChatWidget Maximize button or Header button)
+  // Listen for open/close floating messenger events
   useEffect(() => {
     const handleOpen = () => {
       setIsOpen(true);
       setLastActivity(Date.now());
     };
+    const handleClose = () => {
+      setIsOpen(false);
+    };
+    const handleToggle = () => {
+      setIsOpen((prev) => !prev);
+      setLastActivity(Date.now());
+    };
     window.addEventListener("open-floating-messenger", handleOpen);
-    return () => window.removeEventListener("open-floating-messenger", handleOpen);
+    window.addEventListener("close-floating-messenger", handleClose);
+    window.addEventListener("toggle-floating-messenger", handleToggle);
+    return () => {
+      window.removeEventListener("open-floating-messenger", handleOpen);
+      window.removeEventListener("close-floating-messenger", handleClose);
+      window.removeEventListener("toggle-floating-messenger", handleToggle);
+    };
   }, []);
 
   const changeSizeMode = (mode: SizeMode) => {
@@ -322,77 +335,47 @@ export function FloatingMessenger() {
 
   return (
     <>
-      {/* DOCKED EDGE LAUNCHER: Hiển thị cực nhỏ dính vào cạnh màn hình bên phải.
-          Rê chuột vào và giữ 1 giây thì mới bung ra icon bong bóng chat đầy đủ */}
+      {/* DOCKED FLOATING LAUNCHER: Tọa lạc gọn gàng ở góc dưới phải (bottom-24 right-4),
+          trên thanh dock, không che thanh cuộn, không đè nút của các ứng dụng/game */}
       {isChatWidgetVisible && !isOpen && (
-        <div
-          onMouseEnter={handleEdgeMouseEnter}
-          onMouseLeave={handleEdgeMouseLeave}
-          className="fixed right-0 top-2/3 -translate-y-1/2 z-[9999] flex items-center justify-end"
-        >
-          {/* Trạng thái 1: Thanh nhỏ dính sát cạnh phải màn hình (cực kỳ gọn gàng, tinh tế) */}
-          {!isEdgeHovered ? (
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(true);
-                setLastActivity(Date.now());
-                setIsEdgeHovered(false);
-              }}
-              className="group flex items-center gap-1 py-3 px-2 rounded-l-2xl bg-slate-900/90 hover:bg-slate-800 backdrop-blur-md border-l border-y border-sky-400/40 text-sky-400 shadow-2xl cursor-pointer transition-all duration-200 hover:translate-x-[-4px] active:scale-95"
-              title="Nhấp để mở khung chat (hoặc giữ chuột 1s để xem bong bóng chat)"
-            >
-              <div className="flex flex-col items-center gap-1.5 pointer-events-none">
-                <MessageCircle className="w-4 h-4 text-sky-400 transition-transform group-hover:scale-110" />
-                <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse" />
-                {messages.length > 0 && (
-                  <span className="text-[9px] font-black text-rose-300 px-1 rounded-full bg-rose-500/20 font-mono">
-                    {messages.length > 9 ? "9+" : messages.length}
-                  </span>
-                )}
-              </div>
-            </button>
-          ) : (
-            /* Trạng thái 2: Sau khi rê chuột đủ 1 giây, bung ra bóng chat đầy đủ với hiệu ứng mượt */
-            <div className="flex items-center gap-2 pr-4 pl-3 py-2 mr-0 rounded-l-3xl bg-slate-950/95 backdrop-blur-xl border-l border-y border-white/20 shadow-2xl animate-in fade-in slide-in-from-right-4 duration-200">
-              {/* Nút Tắt/Ẩn hoàn toàn nhanh */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleChatWidget(false);
-                  setIsEdgeHovered(false);
-                }}
-                className="h-8 w-8 rounded-full bg-white/10 hover:bg-rose-600/90 text-slate-300 hover:text-white border border-white/10 shadow flex items-center justify-center transition-colors cursor-pointer"
-                title="Tắt/Ẩn biểu tượng chat hoàn toàn (Có thể bật lại ở thanh Header)"
-              >
-                <EyeOff className="w-4 h-4" />
-              </button>
+        <div className="fixed bottom-24 right-4 sm:right-6 z-[60] flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200 select-none">
+          {/* Nút Ẩn Nhanh Hoàn Toàn */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleChatWidget(false);
+            }}
+            className="h-8 w-8 rounded-full bg-slate-900/90 hover:bg-rose-600/90 text-slate-400 hover:text-white border border-white/10 shadow-lg flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+            title="Ẩn nút chat này (Bật lại bất cứ lúc nào ở thanh Header)"
+          >
+            <EyeOff className="w-3.5 h-3.5" />
+          </button>
 
-              {/* Nút Mở Khung Chat */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(true);
-                  setLastActivity(Date.now());
-                  setIsEdgeHovered(false);
-                }}
-                className="relative flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer"
-                title="Mở TxMessenger Mở Rộng"
-              >
-                <div className="relative">
-                  <MessageCircle className="h-5 w-5" />
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white shadow">
-                    {messages.length > 99 ? "99+" : messages.length}
-                  </span>
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold leading-tight">TxMessenger</span>
-                  <span className="text-[10px] text-sky-200 font-medium">Bấm để trò chuyện</span>
-                </div>
-              </button>
+          {/* Nút Bong Bóng Chat Chính */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(true);
+              setLastActivity(Date.now());
+            }}
+            className="group flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:via-blue-500 hover:to-indigo-500 text-white shadow-xl shadow-blue-500/25 border border-white/20 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+            title="Bấm để mở khung chat TxMessenger"
+          >
+            <div className="relative">
+              <MessageCircle className="w-4 h-4 text-white" />
+              <span className="absolute -top-1 -right-1 flex h-2 w-2 rounded-full bg-emerald-400 ring-2 ring-blue-600 animate-pulse" />
             </div>
-          )}
+
+            <div className="flex items-center gap-1.5 text-left">
+              <span className="text-xs font-bold leading-tight">TxMessenger</span>
+              {messages.length > 0 && (
+                <span className="text-[10px] font-black text-white px-1.5 py-0.2 rounded-full bg-rose-500 shadow-sm font-mono">
+                  {messages.length > 99 ? "99+" : messages.length}
+                </span>
+              )}
+            </div>
+          </button>
         </div>
       )}
 

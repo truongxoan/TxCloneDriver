@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/modules/theme-engine/themeContext";
 import { AuthProvider } from "@/modules/auth/authContext";
@@ -11,12 +11,15 @@ import { FeedbackProvider } from "@/modules/feedback/feedbackContext";
 import { MusicPlayerProvider } from "@/modules/audio/musicPlayerContext";
 import { AppShell } from "@/components/layout/AppShell";
 
+export const viewport: Viewport = {
+  themeColor: "#0f172a",
+};
+
 export const metadata: Metadata = {
   title: "MêÂmĐạoSỹ — Hệ thống Quản trị & Đồng bộ Đám mây",
   description:
     "Nền tảng quản lý dữ liệu cá nhân cao cấp MêÂmĐạoSỹ tích hợp Google Drive, Telegram, Lịch âm dương Việt Nam và kiểm soát phân quyền thành viên.",
   manifest: "/manifest.json",
-  themeColor: "#0f172a",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

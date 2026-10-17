@@ -109,8 +109,10 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     try {
       const pinKey = `txclonedriver_vault_pin_${user.username}`;
       const savedPin = localStorage.getItem(pinKey);
+      let currentPin = DEFAULT_MASTER_PIN;
       if (savedPin && savedPin !== "123456") {
         setMasterPin(savedPin);
+        currentPin = savedPin;
       } else {
         setMasterPin(DEFAULT_MASTER_PIN);
         localStorage.setItem(pinKey, DEFAULT_MASTER_PIN);
@@ -119,7 +121,25 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const accKey = `txclonedriver_vault_accs_${user.username}`;
       const savedAccs = localStorage.getItem(accKey);
       if (savedAccs) {
-        setAccounts(JSON.parse(savedAccs));
+        if (savedAccs.startsWith("enc_v1:")) {
+          // Decrypt with master PIN
+          import("@/lib/cryptoVault").then(({ decryptData }) => {
+            decryptData(savedAccs, currentPin).then((decrypted) => {
+              try {
+                if (decrypted) {
+                  setAccounts(JSON.parse(decrypted));
+                } else {
+                  setAccounts(SAMPLE_VAULT_ACCOUNTS);
+                }
+              } catch {
+                setAccounts(SAMPLE_VAULT_ACCOUNTS);
+              }
+            });
+          });
+        } else {
+          // Legacy plain JSON
+          setAccounts(JSON.parse(savedAccs));
+        }
       } else {
         localStorage.setItem(accKey, JSON.stringify(SAMPLE_VAULT_ACCOUNTS));
         setAccounts(SAMPLE_VAULT_ACCOUNTS);
@@ -129,13 +149,16 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  const saveAccountsList = (updated: VaultAccount[]) => {
+  const saveAccountsList = async (updated: VaultAccount[]) => {
     setAccounts(updated);
     if (!user) return;
     try {
-      localStorage.setItem(`txclonedriver_vault_accs_${user.username}`, JSON.stringify(updated));
+      const { encryptData } = await import("@/lib/cryptoVault");
+      const encrypted = await encryptData(JSON.stringify(updated), masterPin);
+      localStorage.setItem(`txclonedriver_vault_accs_${user.username}`, encrypted);
     } catch {
-      // ignore
+      // Fallback
+      localStorage.setItem(`txclonedriver_vault_accs_${user.username}`, JSON.stringify(updated));
     }
   };
 

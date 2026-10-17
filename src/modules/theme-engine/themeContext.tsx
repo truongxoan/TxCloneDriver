@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { ThemeId, ThemeDefinition } from "./types";
+import { ThemeId, ThemeDefinition, EffectType, FlowerType } from "./types";
 import { THEMES } from "./themesData";
 
 interface ThemeContextType {
@@ -14,6 +14,10 @@ interface ThemeContextType {
   setIsAutoSeason: (auto: boolean) => void;
   intensity: "low" | "medium" | "high";
   setIntensity: (intensity: "low" | "medium" | "high") => void;
+  customEffectType: EffectType | "theme-default";
+  setCustomEffectType: (effect: EffectType | "theme-default") => void;
+  flowerType: FlowerType;
+  setFlowerType: (type: FlowerType) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -31,6 +35,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [effectsEnabled, setEffectsEnabledState] = useState<boolean>(true);
   const [isAutoSeason, setIsAutoSeasonState] = useState<boolean>(false);
   const [intensity, setIntensityState] = useState<"low" | "medium" | "high">("medium");
+  const [customEffectType, setCustomEffectTypeState] = useState<EffectType | "theme-default">("theme-default");
+  const [flowerType, setFlowerTypeState] = useState<FlowerType>("sakura");
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -39,6 +45,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const savedEffects = localStorage.getItem("datavault_effects");
       const savedAuto = localStorage.getItem("datavault_auto_season");
       const savedIntensity = localStorage.getItem("datavault_intensity") as "low" | "medium" | "high";
+      const savedCustomEffect = localStorage.getItem("datavault_custom_effect") as EffectType | "theme-default";
+      const savedFlowerType = localStorage.getItem("datavault_flower_type") as FlowerType;
 
       if (savedAuto === "true") {
         setIsAutoSeasonState(true);
@@ -54,6 +62,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       if (savedIntensity) {
         setIntensityState(savedIntensity);
       }
+
+      if (savedCustomEffect) {
+        setCustomEffectTypeState(savedCustomEffect);
+      }
+
+      if (savedFlowerType && ["sakura", "apricot", "rose", "maple"].includes(savedFlowerType)) {
+        setFlowerTypeState(savedFlowerType);
+      }
     } catch {
       // localStorage may fail in private mode
     }
@@ -62,11 +78,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setThemeId = (id: ThemeId) => {
     setThemeIdState(id);
     setIsAutoSeasonState(false);
+    // CRITICAL FIX: Reset custom effect so the newly selected theme's unique effects (rain, fireworks, blossom, etc.) activate immediately!
+    setCustomEffectTypeState("theme-default");
     try {
       localStorage.setItem("datavault_theme", id);
       localStorage.setItem("datavault_auto_season", "false");
+      localStorage.setItem("datavault_custom_effect", "theme-default");
     } catch {
       // ignore
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tx_theme_changed", { detail: { id } }));
     }
   };
 
@@ -106,6 +128,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setCustomEffectType = (effect: EffectType | "theme-default") => {
+    setCustomEffectTypeState(effect);
+    try {
+      localStorage.setItem("datavault_custom_effect", effect);
+    } catch {
+      // ignore
+    }
+  };
+
+  const setFlowerType = (type: FlowerType) => {
+    setFlowerTypeState(type);
+    try {
+      localStorage.setItem("datavault_flower_type", type);
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tx_flower_changed", { detail: { type } }));
+    }
+  };
+
   const currentTheme = THEMES.find((t) => t.id === themeId) || THEMES[0];
 
   // Apply CSS variables to root
@@ -131,6 +174,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setIsAutoSeason,
         intensity,
         setIntensity,
+        customEffectType,
+        setCustomEffectType,
+        flowerType,
+        setFlowerType,
       }}
     >
       {children}

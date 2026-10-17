@@ -244,7 +244,10 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
             onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
             className="flex items-center gap-2 h-9 px-3 rounded-2xl glass-pill hover:bg-white/10 text-xs font-semibold text-foreground transition-all"
           >
-            <span className="text-sm">🌸</span>
+            <span
+              className="h-2.5 w-2.5 rounded-full border border-white/40 shadow-sm"
+              style={{ backgroundColor: currentTheme.primaryColor }}
+            />
             <span className="hidden sm:inline">{currentTheme.nameVi}</span>
             <ChevronDown className="h-3 w-3 text-muted-foreground" />
           </button>
@@ -493,13 +496,18 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
         <div className="relative flex items-center">
           <button
             onClick={() => {
-              if (!isChatWidgetVisible) {
+              if (isChatWidgetVisible) {
+                // If visible -> hide completely and close window
+                toggleChatWidget(false);
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("close-floating-messenger"));
+                }
+              } else {
+                // If hidden -> show and open window
                 toggleChatWidget(true);
                 if (typeof window !== "undefined") {
                   window.dispatchEvent(new CustomEvent("open-floating-messenger"));
                 }
-              } else {
-                toggleChatWidget(false);
               }
             }}
             className={cn(
@@ -510,8 +518,8 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
             )}
             title={
               isChatWidgetVisible
-                ? "Khung chat đang BẬT. Bấm để TẮT/ẨN hoàn toàn khung chat."
-                : "Khung chat đang TẮT. Bấm để BẬT lại khung chat."
+                ? "Bấm để TẮT/ẨN hoàn toàn khung chat (không che các nút bên dưới)"
+                : "Bấm để BẬT và MỞ khung chat TxMessenger"
             }
           >
             <MessageCircle className="h-4 w-4" />

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
-import { StormOverlay } from "@/modules/seasonal-effects/StormOverlay";
+import { AtmosphereMasterOverlay } from "@/modules/seasonal-effects/AtmosphereMasterOverlay";
 import { QuickSearchModal } from "./QuickSearchModal";
 import { FloatingMessenger } from "@/modules/chat/FloatingMessenger";
 import { DynamicIsland } from "./DynamicIsland";
@@ -38,23 +38,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <MouseEffectsProvider>
       <div className="relative min-h-screen text-foreground flex overflow-hidden">
-      {/* Layer 0: Scenic Fullscreen Wallpaper */}
+      {/* Layer 0: Scenic Fullscreen Deep Wallpaper */}
       {currentTheme.bgImage ? (
         <div
           className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-100"
           style={{ backgroundImage: `url('${currentTheme.bgImage}')` }}
         >
-          {/* Subtle dark vignette overlay for readability */}
-          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-[2px]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/50" />
+          {/* Deep cinematic vignette overlay for sublime depth */}
+          <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-[1.5px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_30%,rgba(2,6,23,0.85)_100%)]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/70" />
         </div>
       ) : (
-        <div className="fixed inset-0 z-0 bg-gradient-to-br from-slate-950 via-zinc-950 to-black" />
+        <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black" />
       )}
 
-      {/* Layer 1: Seasonal Particle Canvas */}
+      {/* Layer 1: Seasonal Particle Canvas & Master 4D Atmospheric Overlay */}
       <SeasonalCanvas />
-      <StormOverlay />
+      <AtmosphereMasterOverlay />
 
       {/* Layer 2: Main Layout UI */}
       <div className="relative z-10 flex w-full min-h-screen" data-storm-target>

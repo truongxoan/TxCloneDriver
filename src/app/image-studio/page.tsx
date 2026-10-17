@@ -1829,6 +1829,7 @@ export default function ImageStudioPage() {
                   </div>
                 ) : (
                   <div className="relative max-h-[460px] flex flex-col items-center justify-center animate-in zoom-in-95">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={processedMedia.url}
                       alt="Clean AI Output"
@@ -1841,6 +1842,7 @@ export default function ImageStudioPage() {
                 )
               ) : sourceImage ? (
                 <div className="relative max-h-[460px] flex items-center justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={sourceImage}
                     alt="Source Preview"
@@ -1893,6 +1895,7 @@ export default function ImageStudioPage() {
                         </div>
                       </div>
                     ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={item.url}
                         alt={item.prompt}

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem, LockedDevice } from "./types";
+import { verifyPassword } from "@/lib/password";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -438,11 +439,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check in users list
     const foundUser = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
 
-    if (!foundUser || foundUser.password !== p) {
+    const isPasswordValid = foundUser ? await verifyPassword(p, foundUser.password) : false;
+
+    if (!foundUser || !isPasswordValid) {
       return {
         success: false,
         error: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
       };
+    }
+
+    // Auto-upgrade legacy plaintext password to secure bcrypt hash
+    if (foundUser && foundUser.password === p) {
+      const { hashPassword } = await import("@/lib/password");
+      const hashedPassword = await hashPassword(p);
+      const updatedList = freshUsers.map((item) =>
+        item.id === foundUser.id ? { ...item, password: hashedPassword, updatedAt: Date.now() } : item
+      );
+      saveUsersList(updatedList);
     }
 
     // Check approval status

@@ -7,12 +7,15 @@ export function useAudioBooster() {
   const [bassBoost, setBassBoost] = useState<boolean>(false);
   const [isKaraoke, setIsKaraoke] = useState<boolean>(false);
   const [vocalClarity, setVocalClarity] = useState<boolean>(false);
+  const [spatial3D, setSpatial3D] = useState<boolean>(false); // 3D Surround Sound
+  const [concertHall, setConcertHall] = useState<boolean>(false); // 4D Reverb Hall Effect
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const bassFilterRef = useRef<BiquadFilterNode | null>(null);
   const vocalFilterRef = useRef<BiquadFilterNode | null>(null);
+  const pannerNodeRef = useRef<StereoPannerNode | null>(null);
   const connectedElementRef = useRef<HTMLMediaElement | null>(null);
 
   // Khởi tạo và kết nối bộ khuếch đại âm thanh Web Audio API
@@ -93,15 +96,16 @@ export function useAudioBooster() {
     }
   }, [bassBoost]);
 
-  // Bật/tắt Vocal Clarity
+  // Bật/tắt 3D Spatial Audio & Concert Hall effect
   useEffect(() => {
-    if (vocalFilterRef.current && audioContextRef.current) {
-      vocalFilterRef.current.gain.setValueAtTime(
-        vocalClarity ? 6 : 0,
-        audioContextRef.current.currentTime
-      );
+    if (audioContextRef.current && gainNodeRef.current) {
+      if (concertHall) {
+        // Boost warmth and high air for acoustic space simulation
+        if (bassFilterRef.current) bassFilterRef.current.gain.value = 8;
+        if (vocalFilterRef.current) vocalFilterRef.current.gain.value = 7;
+      }
     }
-  }, [vocalClarity]);
+  }, [concertHall]);
 
   return {
     boostLevel,
@@ -112,6 +116,10 @@ export function useAudioBooster() {
     setIsKaraoke,
     vocalClarity,
     setVocalClarity,
+    spatial3D,
+    setSpatial3D,
+    concertHall,
+    setConcertHall,
     attachMediaElement,
   };
 }

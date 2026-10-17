@@ -267,97 +267,109 @@ export function DynamicIsland() {
     };
   }, []);
 
+  const [isMinimized, setIsMinimized] = useState(false);
+
   const ActiveNotifIcon = activeNotif.icon;
 
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={cn(
-          "bg-slate-950/95 backdrop-blur-2xl text-white border border-white/15 shadow-2xl transition-all duration-500 ease-out cursor-pointer overflow-hidden",
-          isExpanded
-            ? "w-[360px] sm:w-[480px] rounded-3xl p-4 ring-1 ring-primary/40 shadow-primary/20"
-            : "w-auto min-w-[290px] sm:min-w-[390px] h-9 rounded-full px-3.5 flex items-center justify-between gap-3 hover:scale-102 hover:border-white/30"
-        )}
-      >
-        {!isExpanded ? (
-          /* ========================================================= */
-          /* COMPACT ISLAND VIEW: MUSIC / CINEMA & NOTIFICATIONS        */
-          /* ========================================================= */
-          <div className="flex items-center justify-between w-full text-xs select-none gap-2">
-            {/* If Cinema Video is Active, display Cinema status */}
-            {cinemaData.isOpen && cinemaData.video ? (
-              <div className="flex items-center gap-2 min-w-0 pr-2">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-rose-500 to-pink-600 flex items-center justify-center shrink-0 shadow-sm shadow-rose-500/40">
-                  <Film className="w-2.5 h-2.5 text-white" />
-                </div>
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold shrink-0">
-                    Phim Drive
-                  </span>
-                  <span className="text-[11px] font-bold text-white truncate max-w-[120px] sm:max-w-[170px]" title={cinemaData.video.title}>
+    <div className="fixed top-2.5 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 pointer-events-auto select-none">
+      {/* If fully hidden by user, show an ultra-mini pill indicator to reopen */}
+      {isMinimized ? (
+        <button
+          onClick={() => setIsMinimized(false)}
+          className="h-6 px-2.5 rounded-full bg-slate-950/80 hover:bg-slate-900 border border-white/10 backdrop-blur-md shadow-lg text-[10px] text-slate-300 hover:text-white flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95"
+          title="Mở Dynamic Island"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-pink-400 animate-pulse" />
+          <span className="font-semibold text-sky-400">Island</span>
+          <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
+        </button>
+      ) : (
+        <div
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={cn(
+            "bg-slate-950/90 backdrop-blur-2xl text-white border border-white/15 shadow-xl transition-all duration-300 ease-out cursor-pointer overflow-hidden",
+            isExpanded
+              ? "w-[330px] sm:w-[420px] rounded-2xl p-3.5 ring-1 ring-primary/40 shadow-primary/20"
+              : "w-auto min-w-[210px] sm:min-w-[280px] max-w-[90vw] sm:max-w-[340px] h-7 sm:h-7.5 rounded-full px-2.5 flex items-center justify-between gap-2 hover:border-white/30 hover:scale-[1.01]"
+          )}
+        >
+          {!isExpanded ? (
+            /* ========================================================= */
+            /* ULTRA-COMPACT SLIM ISLAND VIEW                            */
+            /* ========================================================= */
+            <div className="flex items-center justify-between w-full text-[11px] select-none gap-1.5">
+              {/* Left: Music / Cinema Media Indicator */}
+              {cinemaData.isOpen && cinemaData.video ? (
+                <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-500 to-pink-600 flex items-center justify-center shrink-0 shadow-sm shadow-rose-500/40">
+                    <Film className="w-2 h-2 text-white" />
+                  </div>
+                  <span className="text-[10px] font-bold text-white truncate max-w-[90px] sm:max-w-[120px]" title={cinemaData.video.title}>
                     {cinemaData.video.title}
                   </span>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <span className={cn("w-0.5 h-1.5 bg-rose-400 rounded-full", cinemaData.isPlaying && "animate-pulse")} />
+                    <span className={cn("w-0.5 h-2.5 bg-rose-500 rounded-full", cinemaData.isPlaying && "animate-pulse delay-75")} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <span className={cn("w-0.5 h-2 bg-rose-400 rounded-full", cinemaData.isPlaying && "animate-pulse")} />
-                  <span className={cn("w-0.5 h-3 bg-rose-500 rounded-full", cinemaData.isPlaying && "animate-pulse delay-75")} />
-                  <span className={cn("w-0.5 h-1.5 bg-rose-400 rounded-full", cinemaData.isPlaying && "animate-pulse delay-150")} />
-                </div>
-              </div>
-            ) : (
-              /* Music Player Compact */
-              <div className="flex items-center gap-2 min-w-0 pr-2">
-                <div
-                  className={cn(
-                    "w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-all",
-                    isPlaying
-                      ? "bg-gradient-to-tr from-pink-500 to-rose-500 shadow-sm shadow-pink-500/50"
-                      : "bg-gradient-to-tr from-purple-600 to-pink-500"
-                  )}
-                >
-                  <Music className="w-2.5 h-2.5 text-white" />
-                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                  <div
+                    className={cn(
+                      "w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all",
+                      isPlaying
+                        ? "bg-gradient-to-tr from-pink-500 to-rose-500 shadow-sm shadow-pink-500/50"
+                        : "bg-gradient-to-tr from-purple-600 to-pink-500"
+                    )}
+                  >
+                    <Music className="w-2 h-2 text-white" />
+                  </div>
 
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[10px] px-1 py-0.2 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30 font-bold shrink-0">
-                    Nhạc
+                  <span className="text-[10px] font-bold text-slate-200 truncate max-w-[85px] sm:max-w-[115px]" title={activeTrackTitle}>
+                    {currentTrack ? currentTrack.title : "Drive Audio"}
                   </span>
-                  <span className="text-[11px] font-bold text-slate-200 truncate max-w-[105px] sm:max-w-[155px]" title={activeTrackTitle}>
-                    {currentTrack ? currentTrack.title : "Drive Audio (Sẵn sàng)"}
-                  </span>
-                </div>
 
-                {/* Animated Audio Equalizer Waves */}
-                <div className="flex items-center gap-0.5 shrink-0">
-                  <span className={cn("w-0.5 h-2 bg-pink-400 rounded-full", isPlaying && "animate-pulse")} />
-                  <span className={cn("w-0.5 h-3 bg-pink-500 rounded-full", isPlaying && "animate-pulse delay-75")} />
-                  <span className={cn("w-0.5 h-1.5 bg-pink-400 rounded-full", isPlaying && "animate-pulse delay-150")} />
-                </div>
+                  {/* Equalizer Wave */}
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <span className={cn("w-0.5 h-1.5 bg-pink-400 rounded-full", isPlaying && "animate-pulse")} />
+                    <span className={cn("w-0.5 h-2 bg-pink-500 rounded-full", isPlaying && "animate-pulse delay-75")} />
+                  </div>
 
-                {/* Mini Play / Pause */}
+                  {/* Mini Quick Play/Pause */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePlay();
+                    }}
+                    className="p-0.5 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 ml-0.5"
+                    title={isPlaying ? "Tạm dừng" : "Phát tiếp"}
+                  >
+                    {isPlaying ? <Pause className="w-2 h-2" /> : <Play className="w-2 h-2 fill-current" />}
+                  </button>
+                </div>
+              )}
+
+              {/* Right: Rotating Notification & Hide Button */}
+              <div className="flex items-center gap-1 pl-1.5 border-l border-white/10 shrink-0 text-[10px]">
+                <ActiveNotifIcon className={cn("w-3 h-3 shrink-0", activeNotif.iconColor)} />
+                <span className="text-slate-300 font-medium truncate max-w-[65px] sm:max-w-[90px] hidden xs:inline">
+                  {activeNotif.title}
+                </span>
+
+                {/* Hide Pill Button */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    togglePlay();
+                    setIsMinimized(true);
                   }}
-                  className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white shrink-0 ml-0.5"
-                  title={isPlaying ? "Tạm dừng" : "Phát tiếp"}
+                  className="p-0.5 rounded text-slate-400 hover:text-white hover:bg-white/10 ml-0.5"
+                  title="Thu nhỏ thành nút nhỏ"
                 >
-                  {isPlaying ? <Pause className="w-2.5 h-2.5" /> : <Play className="w-2.5 h-2.5 fill-current" />}
+                  <ChevronUp className="w-2.5 h-2.5" />
                 </button>
               </div>
-            )}
-
-            {/* Right: Rotating Notification Pill */}
-            <div className="flex items-center gap-1.5 pl-2 border-l border-white/10 shrink-0 text-[10px]">
-              <ActiveNotifIcon className={cn("w-3.5 h-3.5 shrink-0", activeNotif.iconColor)} />
-              <span className="text-slate-300 font-medium truncate max-w-[80px] sm:max-w-[110px]">
-                {activeNotif.title}
-              </span>
-              <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
             </div>
-          </div>
         ) : (
           /* ========================================================= */
           /* EXPANDED ISLAND VIEW                                      */
@@ -638,12 +650,14 @@ export function DynamicIsland() {
                 </span>
                 <span className="text-[10px] text-primary font-bold">{currentTheme.nameVi}</span>
               </div>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                 {[
+                  { id: "tet-fireworks", label: "🎆 Tết Pháo Hoa" },
+                  { id: "deep-space", label: "🌌 Vũ Trụ Sâu" },
                   { id: "bento-grid", label: "🍱 Bento 2.0" },
                   { id: "vision-os", label: "🥽 VisionOS" },
                   { id: "cyber-hud", label: "🌐 Cyber HUD" },
-                  { id: "neo-brutalism", label: "⚡ Neo-Brutalist" },
+                  { id: "thunderstorm", label: "⛈️ Sấm Sét" },
                 ].map((th) => (
                   <button
                     key={th.id}
@@ -663,6 +677,7 @@ export function DynamicIsland() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

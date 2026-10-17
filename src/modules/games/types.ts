@@ -9,7 +9,10 @@ export type GameId =
   | "wordchain"
   | "pvp_arena"
   | "lucky_wheel"
-  | "reward_shop";
+  | "reward_shop"
+  | "game2048"
+  | "snake"
+  | "minesweeper";
 
 export interface GameInfo {
   id: GameId;

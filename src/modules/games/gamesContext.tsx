@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { GameId, GameRoom, PlayerInRoom } from "./types";
 import { useAuth } from "@/modules/auth/authContext";
 
@@ -57,9 +57,14 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
   const [caroGodHint, setCaroGodHint] = useState<boolean>(false);
   const [coTuongGodHint, setCoTuongGodHint] = useState<boolean>(false);
 
+  const adjustUserCoinsRef = useRef(adjustUserCoins);
+  adjustUserCoinsRef.current = adjustUserCoins;
+  const userRef = useRef(user);
+  userRef.current = user;
+
   // Synchronize with user's account coins from auth context
   useEffect(() => {
-    if (user && user.coins !== undefined) {
+    if (user?.coins !== undefined) {
       setCoins(user.coins);
       try {
         localStorage.setItem(COINS_KEY, user.coins.toString());
@@ -73,9 +78,10 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
       const todayStr = new Date().toISOString().split("T")[0];
       const lastReset = localStorage.getItem(RESET_DATE_KEY);
 
-      let currentCoins = user?.coins !== undefined ? user.coins : 50000;
+      const currentUser = userRef.current;
+      let currentCoins = currentUser?.coins !== undefined ? currentUser.coins : 50000;
       const savedCoins = localStorage.getItem(COINS_KEY);
-      if (savedCoins !== null && !user?.coins) {
+      if (savedCoins !== null && !currentUser?.coins) {
         currentCoins = parseInt(savedCoins, 10);
       }
 
@@ -84,8 +90,8 @@ export function GamesProvider({ children }: { children: React.ReactNode }) {
         if (currentCoins < 50000) {
           currentCoins = 50000;
           localStorage.setItem(COINS_KEY, "50000");
-          if (user?.id && adjustUserCoins) {
-            adjustUserCoins(user.id, 50000 - (user.coins || 0));
+          if (currentUser?.id && adjustUserCoinsRef.current) {
+            adjustUserCoinsRef.current(currentUser.id, 50000 - (currentUser.coins || 0));
           }
         }
         localStorage.setItem(RESET_DATE_KEY, todayStr);

@@ -280,3 +280,220 @@ export function playThunderSound(isClose = true) {
     noise.stop(now + dur);
   } catch {}
 }
+
+/**
+ * Procedural festive firework explosion sound with whistle and crackles
+ */
+export function playFireworkSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+
+    // 1. Low-end concussive thud / boom (45Hz - 80Hz)
+    const boomOsc = ctx.createOscillator();
+    const boomGain = ctx.createGain();
+    boomOsc.type = "sine";
+    boomOsc.frequency.setValueAtTime(110, now);
+    boomOsc.frequency.exponentialRampToValueAtTime(35, now + 0.6);
+
+    boomGain.gain.setValueAtTime(0.28, now);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+    boomOsc.connect(boomGain);
+    boomGain.connect(ctx.destination);
+    boomOsc.start(now);
+    boomOsc.stop(now + 0.9);
+
+    // 2. High frequency crackle noise burst
+    const dur = 1.1;
+    const bufferSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+      // Periodic crackle density
+      data[i] = (Math.random() * 2 - 1) * (Math.random() > 0.82 ? 1.0 : 0.08);
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(800, now);
+
+    const crackleGain = ctx.createGain();
+    crackleGain.gain.setValueAtTime(0.01, now);
+    crackleGain.gain.linearRampToValueAtTime(0.18, now + 0.05);
+    crackleGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    noise.connect(filter);
+    filter.connect(crackleGain);
+    crackleGain.connect(ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + dur);
+  } catch {}
+}
+
+/**
+ * High-speed cosmic shooting star celestial shimmer sweep
+ */
+export function playShootingStarSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    [1318.51, 1567.98, 2093.0].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = now + idx * 0.04;
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * 1.5, start);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.6, start + 0.5);
+
+      gain.gain.setValueAtTime(0.04, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.55);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + 0.6);
+    });
+  } catch {}
+}
+
+/**
+ * Delicate winter / christmas bell sparkle chime
+ */
+export function playCrystalChimeSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    const notes = [1046.5, 1318.51, 1567.98, 2093.0];
+    const n = notes[Math.floor(Math.random() * notes.length)];
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(n, now);
+    osc.frequency.exponentialRampToValueAtTime(n * 1.01, now + 0.4);
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.75);
+  } catch {}
+}
+
+/**
+ * Underwater oceanic bubble resonant pop
+ */
+export function playWaterBubbleSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(320 + Math.random() * 150, now);
+    osc.frequency.exponentialRampToValueAtTime(850 + Math.random() * 200, now + 0.08);
+
+    gain.gain.setValueAtTime(0.08, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.1);
+  } catch {}
+}
+
+/**
+ * Sci-Fi Cyber radar / laser telemetry blip
+ */
+export function playCyberSweepSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.linearRampToValueAtTime(1600, now + 0.06);
+    osc.frequency.linearRampToValueAtTime(400, now + 0.12);
+
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.14);
+  } catch {}
+}
+
+/**
+ * Organic wind rustle breeze for cherry blossom and autumn leaves
+ */
+export function playGentleWindSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    const dur = 1.6;
+    const bufferSize = Math.floor(ctx.sampleRate * dur);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    let lastOut = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      data[i] = (lastOut + 0.02 * white) / 1.02;
+      lastOut = data[i];
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(350, now);
+    filter.frequency.linearRampToValueAtTime(650, now + 0.8);
+    filter.frequency.linearRampToValueAtTime(250, now + dur);
+    filter.Q.setValueAtTime(1.5, now);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.07, now + 0.5);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + dur);
+  } catch {}
+}

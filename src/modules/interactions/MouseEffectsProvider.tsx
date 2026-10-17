@@ -32,9 +32,43 @@ interface Particle {
   alpha: number;
 }
 
+export type CursorStyle = "default" | "neon-cross" | "cyber-dot" | "heart" | "sword" | "star";
+
 export function MouseEffectsProvider({ children }: { children: React.ReactNode }) {
   const { currentTheme, setThemeId, themeId } = useTheme();
   const { isMaintenanceMode, toggleMaintenanceMode, isAdmin } = useAuth();
+
+  // Custom Cursor Style State (stored in localStorage)
+  const [cursorStyle, setCursorStyle] = useState<CursorStyle>("default");
+  const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
+  const [isClicking, setIsClicking] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedCursor = localStorage.getItem("txclonedriver_cursor_style") as CursorStyle;
+      if (savedCursor && ["default", "neon-cross", "cyber-dot", "heart", "sword", "star"].includes(savedCursor)) {
+        setCursorStyle(savedCursor);
+      }
+    } catch {}
+
+    const handleCursorChange = (e: any) => {
+      if (e.detail?.style) {
+        setCursorStyle(e.detail.style);
+      }
+    };
+    window.addEventListener("tx_cursor_style_change", handleCursorChange);
+    return () => window.removeEventListener("tx_cursor_style_change", handleCursorChange);
+  }, []);
+
+  const changeCursorStyle = (style: CursorStyle) => {
+    setCursorStyle(style);
+    try {
+      localStorage.setItem("txclonedriver_cursor_style", style);
+    } catch {}
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tx_cursor_style_change", { detail: { style } }));
+    }
+  };
 
   // Context Menu State
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -101,6 +135,7 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
 
     const handleMouseMove = (e: MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
+      setMousePos({ x: e.clientX, y: e.clientY });
 
       // Spawn 1-2 stardust particles on move
       if (Math.random() < 0.45) {
@@ -115,6 +150,9 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
         });
       }
     };
+
+    const handleMouseDown = () => setIsClicking(true);
+    const handleMouseUp = () => setIsClicking(false);
 
     const handleClick = (e: MouseEvent) => {
       // Spawn ripple particle shockwave on click
@@ -134,6 +172,8 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
     };
 
     window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mouseup", handleMouseUp);
     window.addEventListener("click", handleClick);
 
     const render = () => {
@@ -211,6 +251,53 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
         className="fixed inset-0 pointer-events-none z-50 overflow-hidden"
       />
 
+      {/* ========================================================= */}
+      {/* CUSTOM CURSOR FOLLOWER & ANIMATED SHAPES                  */}
+      {/* ========================================================= */}
+      {cursorStyle !== "default" && (
+        <div
+          className="fixed pointer-events-none z-[99999] transition-transform duration-75 ease-out select-none"
+          style={{
+            transform: `translate3d(${mousePos.x}px, ${mousePos.y}px, 0) translate(-50%, -50%) scale(${
+              isClicking ? 0.8 : 1
+            })`,
+          }}
+        >
+          {cursorStyle === "neon-cross" && (
+            <div className="relative w-7 h-7 flex items-center justify-center">
+              <div className="absolute w-full h-[2px] bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+              <div className="absolute h-full w-[2px] bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+              <div className="w-2 h-2 rounded-full border border-white bg-cyan-300 shadow-[0_0_10px_#67e8f9] animate-ping" />
+            </div>
+          )}
+
+          {cursorStyle === "cyber-dot" && (
+            <div className="relative w-6 h-6 flex items-center justify-center">
+              <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 shadow-[0_0_12px_#ec4899] animate-pulse" />
+              <div className="absolute inset-0 rounded-full border border-pink-400/60 animate-spin" />
+            </div>
+          )}
+
+          {cursorStyle === "heart" && (
+            <div className="text-xl filter drop-shadow-[0_0_10px_rgba(244,63,94,0.9)] animate-bounce select-none">
+              💖
+            </div>
+          )}
+
+          {cursorStyle === "sword" && (
+            <div className="text-2xl filter drop-shadow-[0_0_8px_rgba(59,130,246,0.9)] -rotate-45 select-none">
+              🗡️
+            </div>
+          )}
+
+          {cursorStyle === "star" && (
+            <div className="text-xl filter drop-shadow-[0_0_12px_rgba(250,204,21,0.95)] animate-spin select-none">
+              ⭐
+            </div>
+          )}
+        </div>
+      )}
+
       {children}
 
       {/* ========================================================= */}
@@ -260,10 +347,12 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
               </div>
               <div className="grid grid-cols-2 gap-1 px-1">
                 {[
+                  { id: "tet-fireworks", label: "🎆 Tết Pháo Hoa" },
+                  { id: "deep-space", label: "🌌 Vũ Trụ Sâu" },
+                  { id: "mid-autumn", label: "🏮 Trung Thu" },
+                  { id: "christmas-magic", label: "🎄 Giáng Sinh" },
                   { id: "bento-grid", label: "🍱 Bento 2.0" },
                   { id: "vision-os", label: "🥽 VisionOS" },
-                  { id: "cyber-hud", label: "🌐 Cyber HUD" },
-                  { id: "neo-brutalism", label: "⚡ Neo-Brutal" },
                 ].map((th) => (
                   <button
                     key={th.id}
@@ -279,6 +368,40 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
                     )}
                   >
                     {th.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Mouse Cursor Selector */}
+            <div className="pt-1 mt-1 border-t border-white/10">
+              <div className="px-3 py-1 text-[10px] text-slate-400 font-bold uppercase flex items-center justify-between">
+                <span>Con Trỏ Chuột Tùy Biến:</span>
+                <span className="text-[9px] text-primary font-mono">{cursorStyle}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1 px-1">
+                {[
+                  { id: "default", label: "Mặc định" },
+                  { id: "neon-cross", label: "⚡ Tâm Ngắm" },
+                  { id: "cyber-dot", label: "💎 Cyber" },
+                  { id: "heart", label: "💖 Trái Tim" },
+                  { id: "sword", label: "🗡️ Kiếm" },
+                  { id: "star", label: "⭐ Ngôi Sao" },
+                ].map((cur) => (
+                  <button
+                    key={cur.id}
+                    onClick={() => {
+                      changeCursorStyle(cur.id as CursorStyle);
+                      setContextMenuPos(null);
+                    }}
+                    className={cn(
+                      "px-1.5 py-1 rounded-lg text-[9px] font-bold text-center transition-all truncate",
+                      cursorStyle === cur.id
+                        ? "bg-accent/30 text-accent border border-accent/40 shadow-sm"
+                        : "bg-white/5 hover:bg-white/15 text-slate-300"
+                    )}
+                  >
+                    {cur.label}
                   </button>
                 ))}
               </div>

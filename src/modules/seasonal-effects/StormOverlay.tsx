@@ -49,7 +49,7 @@ interface Spark {
 }
 
 export function StormOverlay() {
-  const { currentTheme, effectsEnabled, intensity } = useTheme();
+  const { currentTheme, effectsEnabled, intensity, customEffectType } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const flashOverlayRef = useRef<HTMLDivElement | null>(null);
   const cloudGlowRef = useRef<HTMLDivElement | null>(null);
@@ -60,7 +60,11 @@ export function StormOverlay() {
   const sparksRef = useRef<Spark[]>([]);
   const nextStrikeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isStorm = currentTheme.effectType === "thunderstorm" && effectsEnabled;
+  const activeEffectType =
+    customEffectType && customEffectType !== "theme-default"
+      ? customEffectType
+      : currentTheme.effectType;
+  const isStorm = activeEffectType === "thunderstorm" && effectsEnabled;
 
   // ─── Procedural Fractal Bolt Generator ────────────────────────
   const generateFractalSegment = useCallback(
@@ -486,15 +490,22 @@ export function StormOverlay() {
       }, delay);
     };
 
-    // First strike soon after load
+    // First strike fast (within 250ms) so the user IMMEDIATELY sees and hears the dramatic thunderstorm!
     nextStrikeTimerRef.current = setTimeout(() => {
       triggerLightningStrike();
       scheduleNext();
-    }, 1500 + Math.random() * 1500);
+    }, 250);
+
+    // Support manual trigger from UI test button
+    const handleManualStrike = () => {
+      triggerLightningStrike();
+    };
+    window.addEventListener("tx_trigger_lightning", handleManualStrike);
 
     return () => {
       document.documentElement.classList.remove("storm-wind-active");
       window.removeEventListener("resize", handleResize);
+      window.removeEventListener("tx_trigger_lightning", handleManualStrike);
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       if (nextStrikeTimerRef.current) clearTimeout(nextStrikeTimerRef.current);
     };

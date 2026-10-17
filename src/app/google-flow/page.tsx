@@ -291,6 +291,7 @@ export default function GoogleFlowPage() {
                   </div>
                 ) : flowResult ? (
                   <div className="relative max-h-[480px] flex flex-col items-center justify-center animate-in zoom-in-95">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={flowResult.url}
                       alt="Google Flow Output"

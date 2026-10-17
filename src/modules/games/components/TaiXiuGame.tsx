@@ -147,13 +147,16 @@ export function TaiXiuGame() {
     }, 1200);
   };
 
+  const executeRollRef = React.useRef(executeRoll);
+  executeRollRef.current = executeRoll;
+
   // Continuous 10s auto-run loop with stable interval
   useEffect(() => {
     if (!autoRun) return;
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev === 4) {
-          executeRoll();
+          executeRollRef.current();
           return 3;
         }
         if (prev <= 1) {

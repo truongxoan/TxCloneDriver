@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useGames } from "../gamesContext";
 import { Play, Pause, RotateCcw, ArrowLeft, ArrowRight, ArrowDown, RotateCw } from "lucide-react";
 
@@ -121,15 +121,15 @@ export function TetrisGame() {
     }
   }, [checkCollision, currentPiece, gameOver, grid, isPlaying, mergePiece]);
 
-  const moveHoriz = (dir: -1 | 1) => {
+  const moveHoriz = useCallback((dir: -1 | 1) => {
     if (!currentPiece || !isPlaying || gameOver) return;
     const moved = { ...currentPiece, c: currentPiece.c + dir };
     if (!checkCollision(moved, grid)) {
       setCurrentPiece(moved);
     }
-  };
+  }, [checkCollision, currentPiece, gameOver, grid, isPlaying]);
 
-  const rotate = () => {
+  const rotate = useCallback(() => {
     if (!currentPiece || !isPlaying || gameOver) return;
     // Transpose and reverse
     const rotatedShape = currentPiece.shape[0].map((_, index) =>
@@ -139,16 +139,16 @@ export function TetrisGame() {
     if (!checkCollision(candidate, grid)) {
       setCurrentPiece(candidate);
     }
-  };
+  }, [checkCollision, currentPiece, gameOver, grid, isPlaying]);
 
-  const dropInstant = () => {
+  const dropInstant = useCallback(() => {
     if (!currentPiece || !isPlaying || gameOver) return;
     let curr = { ...currentPiece };
     while (!checkCollision({ ...curr, r: curr.r + 1 }, grid)) {
       curr.r += 1;
     }
     mergePiece(curr, grid);
-  };
+  }, [checkCollision, currentPiece, gameOver, grid, isPlaying, mergePiece]);
 
   // Game loop interval
   useEffect(() => {

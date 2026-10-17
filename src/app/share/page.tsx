@@ -483,6 +483,7 @@ export default function P2PSharePage() {
               {qrDataUrl && (
                 <div className="space-y-2">
                   <div className="p-3 bg-white rounded-2xl w-40 h-40 mx-auto shadow-xl flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={qrDataUrl} alt="Connect QR Code" className="w-full h-full object-contain" />
                   </div>
                   <p className="text-[11px] text-slate-400">Quét mã QR trên điện thoại để nhận tệp ngay</p>

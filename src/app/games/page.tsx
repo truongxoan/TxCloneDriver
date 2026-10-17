@@ -11,6 +11,8 @@ import { BauCuaGame } from "@/modules/games/components/BauCuaGame";
 import { CaroGame } from "@/modules/games/components/CaroGame";
 import { CoTuongGame } from "@/modules/games/components/CoTuongGame";
 import { TetrisGame } from "@/modules/games/components/TetrisGame";
+import { Game2048 } from "@/modules/games/components/Game2048";
+import { SnakeGame } from "@/modules/games/components/SnakeGame";
 import { WordChainGame } from "@/modules/games/components/WordChainGame";
 import { PvPArenaGame } from "@/modules/games/components/PvPArenaGame";
 import { LuckyWheelGame } from "@/modules/games/components/LuckyWheelGame";
@@ -32,6 +34,8 @@ const GAME_TABS: Array<{ id: GameId; label: string; icon: string; category: stri
   { id: "reward_shop", label: "🛍️ Chợ Đổi Quà & Danh Hiệu", icon: "🛍️", category: "Kinh Tế & Xu" },
   { id: "pvp_arena", label: "⚔️ Đấu Trường PvP", icon: "⚔️", category: "Đối Kháng Cược Xu" },
   { id: "lucky_wheel", label: "🎰 Vòng Quay & Xổ Số", icon: "🎰", category: "May Mắn & Jackpot" },
+  { id: "game2048", label: "✨ Siêu Phẩm 2048", icon: "✨", category: "Trí Tuệ & Kỷ Lục" },
+  { id: "snake", label: "🐍 Rắn Săn Mồi Neon", icon: "🐍", category: "Arcade & Nhanh Tay" },
   { id: "taixiu", label: "Tài Xỉu", icon: "🎲", category: "Dân Gian & Casino" },
   { id: "xocdia", label: "Xóc Đĩa", icon: "⚪🔴", category: "Dân Gian & Casino" },
   { id: "baccarat", label: "Baccarat", icon: "♠️", category: "Dân Gian & Casino" },
@@ -193,6 +197,8 @@ function GamesContent() {
         {activeGameId === "reward_shop" && <RewardShop />}
         {activeGameId === "pvp_arena" && <PvPArenaGame />}
         {activeGameId === "lucky_wheel" && <LuckyWheelGame />}
+        {activeGameId === "game2048" && <Game2048 />}
+        {activeGameId === "snake" && <SnakeGame />}
         {activeGameId === "taixiu" && <TaiXiuGame />}
         {activeGameId === "xocdia" && <XocDiaGame />}
         {activeGameId === "baccarat" && <BaccaratGame />}
