@@ -24,10 +24,20 @@ import {
   CheckCircle2,
   Smile,
   ChevronRight,
+  Flame,
+  Ghost,
+  ShieldCheck,
+  Bomb,
 } from "lucide-react";
 import { useChat } from "./chatContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { cn } from "@/lib/utils";
+import {
+  SAMPLE_COVER_TEXTS,
+  decodeSteganography,
+  hasSteganography,
+  cleanVisibleText,
+} from "./cryptoHelper";
 
 const MASTER_PIN = "080497";
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes inactivity lock
@@ -37,7 +47,18 @@ const UNBLUR_SESSION_MS = 60 * 1000; // 60 seconds unblur session expiry
 type SizeMode = "compact" | "expanded" | "fullscreen";
 
 export function FloatingMessenger() {
-  const { messages, isChatWidgetVisible, toggleChatWidget, sendMessage, clearChat, decryptMessage } = useChat();
+  const {
+    messages,
+    isChatWidgetVisible,
+    toggleChatWidget,
+    sendMessage,
+    clearChat,
+    decryptMessage,
+    destroyMessage,
+    markMessageRead,
+    isIncognitoMode,
+    setIsIncognitoMode,
+  } = useChat();
   const { user, isAdmin, managedUsers } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -48,6 +69,21 @@ export function FloatingMessenger() {
   const [inputText, setInputText] = useState("");
   const [encryptToggle, setEncryptToggle] = useState(false);
   const [encryptKey, setEncryptKey] = useState("");
+
+  // Self-Destruct Timers (0 = off, 5, 10, 20, 30s)
+  const [selfDestructSec, setSelfDestructSec] = useState<number>(0);
+
+  // Steganography invisible message state
+  const [stegoToggle, setStegoToggle] = useState<boolean>(false);
+  const [stegoKey, setStegoKey] = useState<string>("");
+  const [selectedCover, setSelectedCover] = useState<string>(SAMPLE_COVER_TEXTS[0]);
+  const [customCover, setCustomCover] = useState<string>("");
+
+  // Steganography decrypt modal state
+  const [stegoModalMsgId, setStegoModalMsgId] = useState<string | null>(null);
+  const [stegoGuessKey, setStegoGuessKey] = useState<string>("");
+  const [revealedStego, setRevealedStego] = useState<Record<string, string>>({});
+  const [stegoError, setStegoError] = useState<string | null>(null);
 
   // Load size mode preference from localStorage
   useEffect(() => {
@@ -257,12 +293,34 @@ export function FloatingMessenger() {
     registerActivity();
 
     const target = activeTab === "public" ? "public" : selectedPeer;
-    sendMessage(inputText.trim(), target, encryptToggle, encryptKey);
+    sendMessage(inputText.trim(), target, encryptToggle, encryptKey, {
+      selfDestructSeconds: selfDestructSec > 0 ? selfDestructSec : undefined,
+      isSteganography: stegoToggle,
+      coverText: customCover.trim() || selectedCover,
+    });
 
     setInputText("");
     if (encryptToggle) {
       setEncryptToggle(false);
       setEncryptKey("");
+    }
+    if (stegoToggle) {
+      setStegoToggle(false);
+      setStegoKey("");
+      setCustomCover("");
+    }
+  };
+
+  // Handle Steganography invisible message reveal
+  const handleStegoDecrypt = (msgId: string, fullText: string, expectedHash?: string) => {
+    const res = decodeSteganography(fullText, stegoGuessKey, expectedHash);
+    if (res.success) {
+      setRevealedStego((prev) => ({ ...prev, [msgId]: res.secret }));
+      setStegoModalMsgId(null);
+      setStegoGuessKey("");
+      setStegoError(null);
+    } else {
+      setStegoError(res.secret || "Mật mã ngụy trang không chính xác!");
     }
   };
 
@@ -424,6 +482,28 @@ export function FloatingMessenger() {
 
             {/* Action Buttons: Size Toggle, Lock Now, Close */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Incognito / RAM-Only toggle */}
+              <button
+                type="button"
+                onClick={() => setIsIncognitoMode(!isIncognitoMode)}
+                className={cn(
+                  "px-2.5 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border",
+                  isIncognitoMode
+                    ? "bg-purple-600 border-purple-400 text-white shadow-md shadow-purple-500/25"
+                    : "bg-white/5 border-white/10 text-slate-300 hover:text-white"
+                )}
+                title={
+                  isIncognitoMode
+                    ? "Đang BẬT Chế độ Ẩn danh RAM-Only: Tin nhắn không lưu ổ cứng/server, đóng tab là mất sạch!"
+                    : "Bấm để bật Chế độ Ẩn danh RAM-Only (Không lưu lịch sử)"
+                }
+              >
+                <Ghost className="w-3 h-3 text-purple-300" />
+                <span className="hidden sm:inline">
+                  {isIncognitoMode ? "RAM-Only" : "Lưu trữ"}
+                </span>
+              </button>
+
               {/* Unblur status / Manual Re-blur button */}
               {isContentUnblurred && (
                 <button
@@ -841,33 +921,122 @@ export function FloatingMessenger() {
                             isMe
                               ? "bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-tr-none shadow-md"
                               : "bg-slate-800/90 text-slate-100 rounded-tl-none border border-white/10 shadow-sm",
+                            msg.selfDestructSeconds && "border-2 border-rose-500/50 shadow-rose-950/40",
                             isBlurred &&
                               "blur-[6px] select-none opacity-40 cursor-pointer hover:opacity-60"
                           )}
                         >
-                          {/* Decrypted or normal text */}
-                          {decryptedCache[msg.id] ? (
-                            <div className="text-emerald-300 font-mono">
-                              🔓 {decryptedCache[msg.id]}
-                            </div>
-                          ) : (
-                            <div className="whitespace-pre-wrap break-words leading-relaxed">
-                              {msg.text}
-                            </div>
-                          )}
-
-                          {/* If encrypted, show prompt */}
-                          {msg.isEncrypted && !decryptedCache[msg.id] && (
+                          {/* Case A: Self-destruct message not opened yet */}
+                          {msg.selfDestructSeconds && !msg.readAt && !isMe ? (
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setDecryptModalMsgId(msg.id);
+                                markMessageRead(msg.id);
                               }}
-                              className="mt-2 px-2.5 py-1 rounded-xl bg-black/50 hover:bg-black/70 text-amber-300 text-[11px] font-bold flex items-center gap-1.5 border border-amber-500/40 cursor-pointer"
+                              className="w-full p-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-red-500/20 hover:from-amber-500/30 hover:to-rose-500/30 border border-rose-500/40 text-rose-200 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all animate-pulse"
                             >
-                              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                              <span>Nhập mật khẩu giải mã</span>
+                              <Flame className="w-4 h-4 text-rose-400 animate-bounce" />
+                              <span>🔥 Bấm vào đọc (Tự hủy sau {msg.selfDestructSeconds}s)</span>
                             </button>
+                          ) : (
+                            <>
+                              {/* Decrypted or normal or steganography cover text */}
+                              {decryptedCache[msg.id] ? (
+                                <div className="text-emerald-300 font-mono">
+                                  🔓 {decryptedCache[msg.id]}
+                                </div>
+                              ) : msg.isSteganography ? (
+                                <div className="space-y-1.5">
+                                  {/* Visible 100% normal decoy sentence */}
+                                  <div className="whitespace-pre-wrap break-words leading-relaxed text-slate-200">
+                                    {cleanVisibleText(msg.text) || msg.coverText}
+                                  </div>
+
+                                  {/* Revealed secret if decoded */}
+                                  {revealedStego[msg.id] ? (
+                                    <div className="p-2.5 rounded-xl bg-emerald-950/70 border border-emerald-400/50 text-emerald-300 text-xs font-mono animate-in zoom-in-95">
+                                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
+                                        🕵️ NỘI DUNG TÀNG HÌNH BÍ MẬT:
+                                      </span>
+                                      <p className="whitespace-pre-wrap break-words">{revealedStego[msg.id]}</p>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setStegoModalMsgId(msg.id);
+                                        setStegoGuessKey("");
+                                        setStegoError(null);
+                                      }}
+                                      className="mt-1.5 px-2.5 py-1 rounded-xl bg-black/60 hover:bg-black/80 text-sky-300 text-[11px] font-bold flex items-center gap-1.5 border border-sky-400/30 cursor-pointer transition-all"
+                                      title="Tin nhắn ngụy trang vô hình. Bấm để bóc tách nội dung thật."
+                                    >
+                                      <Ghost className="w-3.5 h-3.5 text-sky-400" />
+                                      <span>🕵️ Bóc tách tin tàng hình</span>
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap break-words leading-relaxed">
+                                  {msg.text}
+                                </div>
+                              )}
+
+                              {/* Standard Cipher Decrypt Prompt */}
+                              {msg.isEncrypted && !decryptedCache[msg.id] && !msg.isSteganography && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDecryptModalMsgId(msg.id);
+                                  }}
+                                  className="mt-2 px-2.5 py-1 rounded-xl bg-black/50 hover:bg-black/70 text-amber-300 text-[11px] font-bold flex items-center gap-1.5 border border-amber-500/40 cursor-pointer"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Nhập mật khẩu giải mã</span>
+                                </button>
+                              )}
+
+                              {/* Self-Destruct Countdown Timer & Burning Bar */}
+                              {msg.selfDestructSeconds && msg.readAt && (
+                                <div className="mt-2.5 pt-2 border-t border-white/10 space-y-1">
+                                  {(() => {
+                                    const elapsed = Math.floor((Date.now() - msg.readAt) / 1000);
+                                    const remaining = Math.max(0, msg.selfDestructSeconds - elapsed);
+                                    return (
+                                      <>
+                                        <div className="flex items-center justify-between gap-2 text-[10px]">
+                                          <span className="text-rose-400 font-bold flex items-center gap-1 font-mono">
+                                            <Flame className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                                            Tự hủy sau: <strong className="text-white text-xs">{remaining}s</strong>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              destroyMessage(msg.id);
+                                            }}
+                                            className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-[9px] cursor-pointer shadow-sm"
+                                            title="Xóa tin nhắn này ngay lập tức"
+                                          >
+                                            Xóa ngay 💥
+                                          </button>
+                                        </div>
+                                        <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
+                                          <div
+                                            className="h-full bg-gradient-to-r from-amber-400 via-rose-500 to-red-600 transition-all duration-1000 rounded-full"
+                                            style={{
+                                              width: `${(remaining / msg.selfDestructSeconds) * 100}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
 
@@ -893,11 +1062,11 @@ export function FloatingMessenger() {
                 onSubmit={handleSend}
                 className="p-3 sm:p-3.5 bg-slate-900/95 border-t border-white/10 space-y-2.5 shrink-0"
               >
-                {/* Top Quick Bar: Emoji bar & Encryption toggle */}
+                {/* Top Quick Bar: Emoji bar & Security Controls */}
                 <div className="flex items-center justify-between gap-2 text-xs flex-wrap">
                   {/* Quick Emojis */}
                   <div className="flex items-center gap-1">
-                    {["👍", "❤️", "🔥", "👏", "😂", "🚀", "🎯", "🔒"].map((emoji) => (
+                    {["👍", "❤️", "🔥", "👏", "😂", "🚀", "🎯"].map((emoji) => (
                       <button
                         key={emoji}
                         type="button"
@@ -909,31 +1078,135 @@ export function FloatingMessenger() {
                     ))}
                   </div>
 
-                  {/* Encryption Toggle */}
-                  <div className="flex items-center gap-2">
-                    <label className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white select-none">
+                  {/* Security options (Self-destruct timer & Steganography) */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Self-Destruct Timers: 0 (Off), 5s, 10s, 20s, 30s */}
+                    <div className="flex items-center gap-1 bg-black/40 px-2 py-0.5 rounded-xl border border-white/10">
+                      <Flame
+                        className={cn(
+                          "w-3.5 h-3.5 transition-colors",
+                          selfDestructSec > 0 ? "text-rose-500 animate-pulse" : "text-slate-500"
+                        )}
+                      />
+                      <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline">
+                        Tự hủy:
+                      </span>
+                      {[
+                        { sec: 0, label: "Tắt" },
+                        { sec: 5, label: "5s" },
+                        { sec: 10, label: "10s" },
+                        { sec: 20, label: "20s" },
+                        { sec: 30, label: "30s" },
+                      ].map((item) => (
+                        <button
+                          key={item.sec}
+                          type="button"
+                          onClick={() => setSelfDestructSec(item.sec)}
+                          className={cn(
+                            "px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer",
+                            selfDestructSec === item.sec
+                              ? "bg-rose-500 text-white shadow-sm shadow-rose-500/30 scale-105"
+                              : "text-slate-400 hover:text-white hover:bg-white/5"
+                          )}
+                          title={
+                            item.sec === 0
+                              ? "Lưu bình thường"
+                              : `Người nhận bấm mở đọc sẽ đếm ngược ${item.sec}s rồi tự hủy vĩnh viễn trên mọi thiết bị`
+                          }
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Steganography Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setStegoToggle((prev) => !prev)}
+                      className={cn(
+                        "px-2 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 border transition-all cursor-pointer",
+                        stegoToggle
+                          ? "bg-purple-600/30 text-purple-300 border-purple-500/50 shadow-sm shadow-purple-500/20"
+                          : "bg-black/40 text-slate-400 border-white/10 hover:text-white"
+                      )}
+                      title="Mã hóa tàng hình (Steganography): Giấu tin mật vào khoảng trắng của câu nói bình thường, người ngoài không thể nhận biết là có mã hóa!"
+                    >
+                      <Ghost className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Ngụy trang tàng hình</span>
+                    </button>
+
+                    {/* Standard Encrypt Toggle */}
+                    <label className="flex items-center gap-1 cursor-pointer text-slate-400 hover:text-white select-none text-[10px]">
                       <input
                         type="checkbox"
                         checked={encryptToggle}
                         onChange={(e) => setEncryptToggle(e.target.checked)}
-                        className="rounded border-white/20 bg-black/40 text-blue-500 focus:ring-0 cursor-pointer"
+                        className="rounded border-white/20 bg-black/40 text-blue-500 focus:ring-0 cursor-pointer w-3 h-3"
                       />
-                      <span className="text-[11px] font-bold flex items-center gap-1">
-                        🔒 Mã hóa tin nhắn
-                      </span>
+                      <span>Mã hóa thường</span>
                     </label>
-
-                    {encryptToggle && (
-                      <input
-                        type="text"
-                        placeholder="Mật khẩu mã hóa..."
-                        value={encryptKey}
-                        onChange={(e) => setEncryptKey(e.target.value)}
-                        className="w-32 sm:w-40 bg-black/60 border border-amber-500/40 rounded-xl px-2.5 py-0.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
-                      />
-                    )}
                   </div>
                 </div>
+
+                {/* Steganography Configuration Drawer */}
+                {stegoToggle && (
+                  <div className="p-2.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-xs space-y-2 animate-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-purple-300 flex items-center gap-1.5">
+                        <Ghost className="w-3.5 h-3.5 text-purple-400" />
+                        Chế độ Ngụy trang vô hình (Zero-Width Steganography)
+                      </span>
+                      <span className="text-[10px] text-purple-400/80">Không để lại dấu vết</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-300 block">
+                        Chọn câu che mắt người ngoài (vỏ bọc hoàn hảo):
+                      </label>
+                      <select
+                        value={selectedCover}
+                        onChange={(e) => setSelectedCover(e.target.value)}
+                        className="w-full bg-black/60 border border-purple-400/30 rounded-xl px-2.5 py-1 text-[11px] text-purple-200 focus:outline-none focus:border-purple-400 cursor-pointer"
+                      >
+                        {SAMPLE_COVER_TEXTS.map((t, idx) => (
+                          <option key={idx} value={t} className="bg-slate-900 text-white">
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Hoặc tự gõ câu vỏ bọc riêng (nếu muốn)..."
+                        value={customCover}
+                        onChange={(e) => setCustomCover(e.target.value)}
+                        className="flex-1 bg-black/60 border border-white/10 rounded-xl px-2.5 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Mật mã khóa (tùy chọn)..."
+                        value={stegoKey}
+                        onChange={(e) => setStegoKey(e.target.value)}
+                        className="w-36 bg-black/60 border border-purple-400/30 rounded-xl px-2.5 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Standard Encryption Key input if active */}
+                {encryptToggle && (
+                  <div className="flex items-center gap-2 animate-in slide-in-from-top-1">
+                    <input
+                      type="text"
+                      placeholder="Nhập mật khẩu mã hóa tin nhắn..."
+                      value={encryptKey}
+                      onChange={(e) => setEncryptKey(e.target.value)}
+                      className="w-full bg-black/60 border border-amber-500/40 rounded-xl px-3 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
+                    />
+                  </div>
+                )}
 
                 {/* Main Text Input Area */}
                 <div className="flex items-end gap-2">
@@ -1061,6 +1334,62 @@ export function FloatingMessenger() {
                     className="flex-1 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-xs font-bold text-white shadow cursor-pointer"
                   >
                     Giải Mã Ngay
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: STEGANOGRAPHY DECRYPT / REVEAL */}
+          {stegoModalMsgId && (
+            <div className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-5 animate-in fade-in">
+              <div className="w-full max-w-[340px] p-5 rounded-3xl glass-card border border-purple-500/40 shadow-2xl text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 mx-auto">
+                  <Ghost className="w-6 h-6 animate-pulse" />
+                </div>
+                <h4 className="text-sm font-black text-white">BÓC TÁCH TIN TÀNG HÌNH</h4>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Tin nhắn này chứa mã nhị phân ẩn sâu trong khoảng trắng Zero-Width. Nhập mật mã bí mật (nếu người gửi không đặt mật mã thì để trống):
+                </p>
+                <input
+                  type="password"
+                  placeholder="Mật mã bí mật (để trống nếu không có)..."
+                  value={stegoGuessKey}
+                  onChange={(e) => setStegoGuessKey(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const msg = messages.find((m) => m.id === stegoModalMsgId);
+                      if (msg) handleStegoDecrypt(msg.id, msg.text, msg.stegoHash);
+                    }
+                  }}
+                  className="w-full text-center text-xs px-3 py-2 rounded-xl bg-black/60 border border-purple-400/40 text-white focus:outline-none focus:border-purple-400 font-mono"
+                />
+                {stegoError && (
+                  <p className="text-[11px] font-bold text-rose-400">{stegoError}</p>
+                )}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStegoModalMsgId(null);
+                      setStegoGuessKey("");
+                      setStegoError(null);
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-400 cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = messages.find((m) => m.id === stegoModalMsgId);
+                      if (msg) {
+                        handleStegoDecrypt(msg.id, msg.text, msg.stegoHash);
+                      }
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-bold text-white shadow-lg shadow-purple-500/20 cursor-pointer"
+                  >
+                    Bóc Tách Ngay 🕵️
                   </button>
                 </div>
               </div>

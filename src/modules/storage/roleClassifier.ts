@@ -2,9 +2,12 @@ import { DriveFileItem } from "./driveEndpointsContext";
 import { getJunkDetail } from "./junkFilter";
 
 export type FileRoleType =
+  | "course_study"
   | "os_installer"
   | "software"
   | "automation_tool"
+  | "game_mod"
+  | "private_vault"
   | "license_key"
   | "movie_video"
   | "music_audio"
@@ -19,7 +22,7 @@ export interface FileRoleInfo {
   groupLabel: string;
   badgeColor: string;
   textColor: string;
-  iconType: "disc" | "software" | "zap" | "key" | "film" | "music" | "doc" | "image" | "archive" | "junk";
+  iconType: "disc" | "software" | "zap" | "key" | "film" | "music" | "doc" | "image" | "archive" | "junk" | "graduation" | "game" | "lock";
   description: string;
 }
 
@@ -31,6 +34,62 @@ export type StorageSortOption =
   | "date-desc"
   | "date-asc"
   | "role";
+
+export type MusicSubGenre = "all" | "bay_phong" | "viet_mix" | "china_co_phong";
+
+/**
+ * Detects specific vibe/genre of DJ Nonstop / Vinahouse tracks
+ */
+export function detectMusicSubGenre(name: string): MusicSubGenre {
+  const lower = name.toLowerCase();
+  if (
+    lower.includes("vietmix") ||
+    lower.includes("việt mix") ||
+    lower.includes("that tinh") ||
+    lower.includes("thất tình") ||
+    lower.includes("nho em") ||
+    lower.includes("nhớ em") ||
+    lower.includes("tinh dang") ||
+    lower.includes("tình dang") ||
+    lower.includes("nhac vang") ||
+    lower.includes("nhạc vàng") ||
+    lower.includes("chot roi xa") ||
+    lower.includes("chợt rời xa") ||
+    lower.includes("em va noi nho") ||
+    lower.includes("em và nỗi nhớ")
+  ) {
+    return "viet_mix";
+  }
+  if (
+    lower.includes("china") ||
+    lower.includes("xich linh") ||
+    lower.includes("xích linh") ||
+    lower.includes("tay trai chi trang") ||
+    lower.includes("tay trái chỉ trăng")
+  ) {
+    return "china_co_phong";
+  }
+  if (
+    lower.includes("ke") ||
+    lower.includes("kẹo") ||
+    lower.includes("trôi") ||
+    lower.includes("kem") ||
+    lower.includes("bay") ||
+    lower.includes("cảnh") ||
+    lower.includes("bồng lai") ||
+    lower.includes("tiên") ||
+    lower.includes("bố đời") ||
+    lower.includes("phòng") ||
+    lower.includes("ép đi") ||
+    lower.includes("sập") ||
+    lower.includes("cực phẩm") ||
+    lower.includes("hái sao") ||
+    lower.includes("dòng chảy")
+  ) {
+    return "bay_phong";
+  }
+  return "all";
+}
 
 /**
  * Classifies any drive item into a distinct, human-understandable role.
@@ -131,6 +190,115 @@ export function classifyFileRole(item: {
       textColor: "text-amber-400",
       iconType: "key",
       description: desc,
+    };
+  }
+
+  // 4. Private Vault & Confidential Archives (Discreetly protected)
+  if (
+    lower.includes("jav") ||
+    lower.includes("vlxx") ||
+    lower.includes("18+") ||
+    lower.includes("phim_set") ||
+    lower.includes("nhay_cam")
+  ) {
+    return {
+      role: "private_vault",
+      label: "Kho Tệp Riêng Tư (Mật khẩu)",
+      groupLabel: "Dữ liệu Riêng tư & Bảo mật",
+      badgeColor: "bg-purple-500/20 text-purple-300 border-purple-400/40",
+      textColor: "text-purple-400",
+      iconType: "lock",
+      description: "Tệp lưu trữ riêng tư, khuyến nghị quản lý trong Két sắt số bí mật.",
+    };
+  }
+
+  // 5. Courses, Study Materials, Textbooks & Educational Resources
+  if (
+    lower.includes("khoa hoc") ||
+    lower.includes("khóa học") ||
+    lower.includes("khoahoc") ||
+    lower.includes("course") ||
+    lower.includes("tutorial") ||
+    lower.includes("bai giang") ||
+    lower.includes("bài giảng") ||
+    lower.includes("giao trinh") ||
+    lower.includes("giáo trình") ||
+    lower.includes("tieng trung") ||
+    lower.includes("tiếng trung") ||
+    lower.includes("hsk") ||
+    lower.includes("lap trinh") ||
+    lower.includes("lập trình") ||
+    lower.includes("python") ||
+    lower.includes("javascript") ||
+    lower.includes("typescript") ||
+    lower.includes("react") ||
+    lower.includes("fullstack") ||
+    lower.includes("frontend") ||
+    lower.includes("backend") ||
+    lower.includes("hoc tap") ||
+    lower.includes("học tập") ||
+    lower.includes("sach") ||
+    lower.includes("sách") ||
+    lower.includes("ebook") ||
+    lower.includes("tailieu") ||
+    lower.includes("tài liệu") ||
+    lower.includes("de thi") ||
+    lower.includes("đề thi") ||
+    lower.includes("flashcard") ||
+    lower.includes("tieng anh") ||
+    lower.includes("english") ||
+    lower.includes("toeic") ||
+    lower.includes("ielts")
+  ) {
+    let specificLabel = "Khóa học & Tài liệu học tập";
+    let desc = "Tài liệu học tập, giáo trình hoặc video bài giảng chuyên sâu.";
+
+    if (lower.includes("tieng trung") || lower.includes("tiếng trung") || lower.includes("hsk")) {
+      specificLabel = "Giáo trình / Khóa học Tiếng Trung";
+      desc = "Bộ tài liệu, bài giảng và từ vựng tiếng Trung chuẩn HSK.";
+    } else if (
+      lower.includes("lap trinh") ||
+      lower.includes("python") ||
+      lower.includes("react") ||
+      lower.includes("javascript") ||
+      lower.includes("fullstack")
+    ) {
+      specificLabel = "Khóa học Lập trình & CNTT";
+      desc = "Video bài giảng và mã nguồn thực hành lập trình phần mềm.";
+    } else if (lower.includes("sach") || lower.includes("sách") || lower.includes("ebook")) {
+      specificLabel = "Sách & Ebook Điện tử";
+      desc = "Sách điện tử, cẩm nang kiến thức tra cứu học tập.";
+    } else if (lower.includes("tieng anh") || lower.includes("english") || lower.includes("toeic") || lower.includes("ielts")) {
+      specificLabel = "Khóa học Tiếng Anh";
+      desc = "Tài liệu và giáo trình luyện thi tiếng Anh.";
+    }
+
+    return {
+      role: "course_study",
+      label: specificLabel,
+      groupLabel: "Khóa học & Giáo trình",
+      badgeColor: "bg-indigo-500/20 text-indigo-300 border-indigo-400/40",
+      textColor: "text-indigo-400",
+      iconType: "graduation",
+      description: desc,
+    };
+  }
+
+  // 6. Game Mods & Game Tools
+  if (
+    lower.includes("autocf") ||
+    lower.includes("dot kich") ||
+    lower.includes("đột kích") ||
+    lower.includes("crossfire")
+  ) {
+    return {
+      role: "game_mod",
+      label: "Mã nguồn Auto Game CF",
+      groupLabel: "Game & Giải trí",
+      badgeColor: "bg-cyan-500/20 text-cyan-300 border-cyan-400/40",
+      textColor: "text-cyan-400",
+      iconType: "game",
+      description: "Bộ mã nguồn kịch bản tự động cho game Đột Kích.",
     };
   }
 
@@ -458,18 +626,21 @@ export function sortDriveItems(items: DriveFileItem[], sortBy: StorageSortOption
       return cloned.sort((a, b) => parseDateToTimestamp(a.updatedAt) - parseDateToTimestamp(b.updatedAt));
 
     case "role": {
-      // Role priority: OS -> Software -> Tools -> Video -> Audio -> Key -> Doc -> Image -> Archive -> Junk
+      // Role priority: Course -> OS -> Software -> Tools -> Video -> Audio -> Key -> Doc -> Image -> Game -> Vault -> Archive -> Junk
       const roleWeight: Record<FileRoleType, number> = {
-        os_installer: 1,
-        software: 2,
-        automation_tool: 3,
-        movie_video: 4,
-        music_audio: 5,
-        license_key: 6,
-        document: 7,
-        image: 8,
-        archive_misc: 9,
-        junk_ghost: 10,
+        course_study: 1,
+        os_installer: 2,
+        software: 3,
+        automation_tool: 4,
+        movie_video: 5,
+        music_audio: 6,
+        license_key: 7,
+        document: 8,
+        image: 9,
+        game_mod: 10,
+        private_vault: 11,
+        archive_misc: 12,
+        junk_ghost: 13,
       };
 
       return cloned.sort((a, b) => {

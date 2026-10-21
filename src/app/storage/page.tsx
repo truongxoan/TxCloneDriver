@@ -47,7 +47,12 @@ import {
   Zap,
   KeyRound,
   Package,
+  GraduationCap,
+  Gamepad2,
+  Lock,
+  BookOpen,
 } from "lucide-react";
+import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -65,6 +70,8 @@ import {
   sortDriveItems,
   StorageSortOption,
   FileRoleType,
+  detectMusicSubGenre,
+  MusicSubGenre,
 } from "@/modules/storage/roleClassifier";
 
 // Default demo junk & system files to demonstrate smart junk filtering
@@ -164,6 +171,7 @@ export default function StoragePage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [musicGenreFilter, setMusicGenreFilter] = useState<MusicSubGenre>("all");
   const [sortBy, setSortBy] = useState<StorageSortOption>("size-desc");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [showToast, setShowToast] = useState<string | null>(null);
@@ -222,12 +230,15 @@ export default function StoragePage() {
   const roleStats = useMemo(() => {
     const list = autoFilterJunk ? junkScan.cleanItems : allDisplayFiles;
     const stats: Record<string, { count: number; totalBytes: number }> = {
+      course_study: { count: 0, totalBytes: 0 },
       os_installer: { count: 0, totalBytes: 0 },
       software: { count: 0, totalBytes: 0 },
       automation_tool: { count: 0, totalBytes: 0 },
+      game_mod: { count: 0, totalBytes: 0 },
       movie_video: { count: 0, totalBytes: 0 },
       music_audio: { count: 0, totalBytes: 0 },
       license_key: { count: 0, totalBytes: 0 },
+      private_vault: { count: 0, totalBytes: 0 },
       document: { count: 0, totalBytes: 0 },
       image: { count: 0, totalBytes: 0 },
       archive_misc: { count: 0, totalBytes: 0 },
@@ -310,6 +321,9 @@ export default function StoragePage() {
       }
 
       const roleInfo = classifyFileRole(item);
+      if (selectedCategory === "course_study") {
+        return roleInfo.role === "course_study";
+      }
       if (selectedCategory === "os_installer") {
         return roleInfo.role === "os_installer";
       }
@@ -319,14 +333,24 @@ export default function StoragePage() {
       if (selectedCategory === "automation_tool") {
         return roleInfo.role === "automation_tool";
       }
+      if (selectedCategory === "game_mod") {
+        return roleInfo.role === "game_mod";
+      }
       if (selectedCategory === "license_key") {
         return roleInfo.role === "license_key";
+      }
+      if (selectedCategory === "private_vault") {
+        return roleInfo.role === "private_vault";
       }
       if (selectedCategory === "movie_video") {
         return roleInfo.role === "movie_video";
       }
       if (selectedCategory === "music_audio" || selectedCategory === "audio") {
-        return roleInfo.role === "music_audio";
+        if (roleInfo.role !== "music_audio") return false;
+        if (musicGenreFilter !== "all") {
+          return detectMusicSubGenre(item.name) === musicGenreFilter;
+        }
+        return true;
       }
       if (selectedCategory === "document") {
         return roleInfo.role === "document";
@@ -340,7 +364,7 @@ export default function StoragePage() {
 
       return true;
     });
-  }, [allDisplayFiles, searchTerm, selectedCategory, duplicateScan, autoFilterJunk, junkScan]);
+  }, [allDisplayFiles, searchTerm, selectedCategory, duplicateScan, autoFilterJunk, junkScan, musicGenreFilter]);
 
   // Sort filtered files according to the chosen sort strategy
   const sortedFiles = useMemo(() => {
@@ -496,14 +520,20 @@ export default function StoragePage() {
     if (item) {
       const roleInfo = classifyFileRole(item);
       switch (roleInfo.role) {
+        case "course_study":
+          return <GraduationCap className="h-5 w-5 text-indigo-400" />;
         case "os_installer":
           return <Disc className="h-5 w-5 text-blue-400" />;
         case "software":
           return <Cpu className="h-5 w-5 text-violet-400" />;
         case "automation_tool":
           return <Zap className="h-5 w-5 text-emerald-400" />;
+        case "game_mod":
+          return <Gamepad2 className="h-5 w-5 text-cyan-400" />;
         case "license_key":
           return <KeyRound className="h-5 w-5 text-amber-400" />;
+        case "private_vault":
+          return <Lock className="h-5 w-5 text-purple-400" />;
         case "movie_video":
           return <Film className="h-5 w-5 text-rose-400" />;
         case "music_audio":
@@ -669,8 +699,17 @@ export default function StoragePage() {
       </div>
 
       {/* Quick Role Overview Showcase Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
         {[
+          {
+            id: "course_study",
+            title: "Khóa học & Giáo trình",
+            count: roleStats.course_study.count,
+            size: formatBytes(roleStats.course_study.totalBytes),
+            icon: <GraduationCap className="h-4 w-4 text-indigo-400" />,
+            border: "hover:border-indigo-500/50 hover:bg-indigo-500/10",
+            activeBorder: "border-indigo-500/60 bg-indigo-500/15 shadow-sm shadow-indigo-500/20",
+          },
           {
             id: "os_installer",
             title: "Bộ cài Windows",
@@ -699,15 +738,6 @@ export default function StoragePage() {
             activeBorder: "border-emerald-500/60 bg-emerald-500/15 shadow-sm shadow-emerald-500/20",
           },
           {
-            id: "movie_video",
-            title: "Video & Phim Rạp",
-            count: roleStats.movie_video.count,
-            size: formatBytes(roleStats.movie_video.totalBytes),
-            icon: <Film className="h-4 w-4 text-rose-400" />,
-            border: "hover:border-rose-500/50 hover:bg-rose-500/10",
-            activeBorder: "border-rose-500/60 bg-rose-500/15 shadow-sm shadow-rose-500/20",
-          },
-          {
             id: "music_audio",
             title: "Nhạc DJ Nonstop",
             count: roleStats.music_audio.count,
@@ -717,33 +747,51 @@ export default function StoragePage() {
             activeBorder: "border-pink-500/60 bg-pink-500/15 shadow-sm shadow-pink-500/20",
           },
           {
-            id: "license_key",
-            title: "Key & Bản quyền",
-            count: roleStats.license_key.count,
-            size: formatBytes(roleStats.license_key.totalBytes),
-            icon: <KeyRound className="h-4 w-4 text-amber-400" />,
-            border: "hover:border-amber-500/50 hover:bg-amber-500/10",
-            activeBorder: "border-amber-500/60 bg-amber-500/15 shadow-sm shadow-amber-500/20",
+            id: "movie_video",
+            title: "Video & Phim Rạp",
+            count: roleStats.movie_video.count,
+            size: formatBytes(roleStats.movie_video.totalBytes),
+            icon: <Film className="h-4 w-4 text-rose-400" />,
+            border: "hover:border-rose-500/50 hover:bg-rose-500/10",
+            activeBorder: "border-rose-500/60 bg-rose-500/15 shadow-sm shadow-rose-500/20",
+          },
+          {
+            id: "game_mod",
+            title: "Game & Auto CF",
+            count: roleStats.game_mod.count,
+            size: formatBytes(roleStats.game_mod.totalBytes),
+            icon: <Gamepad2 className="h-4 w-4 text-cyan-400" />,
+            border: "hover:border-cyan-500/50 hover:bg-cyan-500/10",
+            activeBorder: "border-cyan-500/60 bg-cyan-500/15 shadow-sm shadow-cyan-500/20",
+          },
+          {
+            id: "private_vault",
+            title: "Kho Tệp Riêng Tư",
+            count: roleStats.private_vault.count,
+            size: formatBytes(roleStats.private_vault.totalBytes),
+            icon: <Lock className="h-4 w-4 text-purple-400" />,
+            border: "hover:border-purple-500/50 hover:bg-purple-500/10",
+            activeBorder: "border-purple-500/60 bg-purple-500/15 shadow-sm shadow-purple-500/20",
           },
         ].map((stat) => (
           <button
             key={stat.id}
             onClick={() => setSelectedCategory(selectedCategory === stat.id ? "all" : stat.id)}
             className={cn(
-              "p-3 rounded-2xl glass-panel border transition-all text-left flex flex-col justify-between cursor-pointer group",
+              "p-2.5 rounded-2xl glass-panel border transition-all text-left flex flex-col justify-between cursor-pointer group",
               selectedCategory === stat.id ? stat.activeBorder : "border-white/10 " + stat.border
             )}
             title={`Lọc theo nhóm: ${stat.title}`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="p-1.5 rounded-lg bg-surface-elevated border border-surface-border group-hover:scale-105 transition-transform">
+            <div className="flex items-center justify-between mb-1">
+              <span className="p-1 rounded-lg bg-surface-elevated border border-surface-border group-hover:scale-105 transition-transform">
                 {stat.icon}
               </span>
-              <span className="text-xs font-bold text-white font-mono">{stat.count}</span>
+              <span className="text-[11px] font-bold text-white font-mono">{stat.count}</span>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-slate-200 truncate">{stat.title}</p>
-              <p className="text-[10px] text-muted-foreground font-mono">{stat.size}</p>
+              <p className="text-[10px] font-semibold text-slate-200 truncate">{stat.title}</p>
+              <p className="text-[9px] text-muted-foreground font-mono">{stat.size}</p>
             </div>
           </button>
         ))}
@@ -861,12 +909,15 @@ export default function StoragePage() {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs border-t border-white/10 pt-2.5">
           {[
             { id: "all", label: "Tất cả tệp", count: autoFilterJunk ? junkScan.cleanItems.length : allDisplayFiles.length },
+            { id: "course_study", label: "Khóa học & Học tập 🎓", count: roleStats.course_study.count },
             { id: "os_installer", label: "Bộ cài Windows 💿", count: roleStats.os_installer.count },
             { id: "software", label: "Phần mềm & Tiện ích 💻", count: roleStats.software.count },
             { id: "automation_tool", label: "Tool Tự động hóa ⚡", count: roleStats.automation_tool.count },
+            { id: "game_mod", label: "Game & Auto CF 🎮", count: roleStats.game_mod.count },
             { id: "movie_video", label: "Video & Phim 🎬", count: roleStats.movie_video.count },
             { id: "music_audio", label: "Âm nhạc & Audio 🎵", count: roleStats.music_audio.count },
             { id: "license_key", label: "Key & Bản quyền 🔑", count: roleStats.license_key.count },
+            { id: "private_vault", label: "Kho Riêng Tư 🔒", count: roleStats.private_vault.count },
             {
               id: "duplicates",
               label: "Tệp trùng lặp ⚠️",
@@ -905,6 +956,54 @@ export default function StoragePage() {
             </button>
           ))}
         </div>
+
+        {/* Music Nonstop Sub-genre Quick Filter Pills */}
+        {(selectedCategory === "music_audio" || selectedCategory === "all") && (
+          <div className="flex items-center gap-2 overflow-x-auto pt-2 border-t border-white/5 text-xs animate-in fade-in">
+            <span className="text-[11px] font-semibold text-pink-300 flex items-center gap-1 shrink-0">
+              <Music className="h-3.5 w-3.5" />
+              Tâm trạng Nhạc:
+            </span>
+            {[
+              { id: "all", label: "Tất cả bản nhạc" },
+              { id: "bay_phong", label: "🚀 Bay Phòng & Ép Đi Cảnh" },
+              { id: "viet_mix", label: "💔 Việt Mix & Thất Tình" },
+              { id: "china_co_phong", label: "🪕 China Cổ Phong" },
+            ].map((genre) => (
+              <button
+                key={genre.id}
+                onClick={() => setMusicGenreFilter(genre.id as MusicSubGenre)}
+                className={cn(
+                  "px-2.5 py-1 rounded-xl text-[11px] font-medium transition-all whitespace-nowrap cursor-pointer",
+                  musicGenreFilter === genre.id
+                    ? "bg-pink-500/20 text-pink-300 border border-pink-500/40 font-bold"
+                    : "bg-slate-900/60 text-slate-400 hover:text-white border border-white/10"
+                )}
+              >
+                {genre.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Quick Link Banner for Course Study */}
+        {selectedCategory === "course_study" && (
+          <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between gap-3 text-xs animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-indigo-400 shrink-0" />
+              <span className="text-slate-200">
+                Bạn đang xem <strong>Khóa học & Tài liệu học tập</strong>. Hệ thống hỗ trợ Flashcard, Quiz trắc nghiệm và Luyện thi HSK chuyên sâu.
+              </span>
+            </div>
+            <Link
+              href="/study"
+              className="px-3 py-1 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-semibold text-xs shrink-0 flex items-center gap-1"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Vào Không Gian Học Tập ➔
+            </Link>
+          </div>
+        )}
       </Card>
 
       {/* TAB: DUPLICATES MANAGEMENT PANEL (When selectedCategory === 'duplicates') */}

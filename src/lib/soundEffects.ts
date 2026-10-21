@@ -497,3 +497,36 @@ export function playGentleWindSound() {
     noise.stop(now + dur);
   } catch {}
 }
+
+/**
+ * Modern iOS / Messenger style double-tone incoming message chime
+ */
+export function playMessageChime() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const now = ctx.currentTime;
+    // Fast uplifting ding-dong chord (F5 -> A5)
+    const tones = [698.46, 880.0];
+    tones.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      const start = now + idx * 0.08;
+      const dur = 0.25;
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0.12, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(start);
+      osc.stop(start + dur + 0.02);
+    });
+  } catch {}
+}
