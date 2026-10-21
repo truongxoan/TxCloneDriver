@@ -19,6 +19,7 @@ import {
   ShieldX,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
+import { useTelegram } from "@/modules/telegram/telegramContext";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, register, managedUsers, recordDeviceAttempt } = useAuth();
   const { currentTheme } = useTheme();
+  const { sendSecurityRadarAlert } = useTelegram();
 
   // Mode: "login" | "register"
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -145,6 +147,13 @@ export default function LoginPage() {
           localStorage.setItem(STORAGE_LOCK_TIMESTAMP, nowStr);
           setIsLocked(true);
           setLockTime(nowStr);
+
+          // 🚨 Trigger Telegram Intrusion Radar Alert
+          sendSecurityRadarAlert(
+            "Cảnh Báo Khóa Thiết Bị",
+            `Phát hiện đăng nhập thất bại 3 lần liên tiếp với tài khoản '${username.trim()}'. Thiết bị đã bị khóa cứng vĩnh viễn.`,
+            machineId
+          ).catch(() => {});
         } else {
           setErrorMessage(result.error || "Tài khoản hoặc mật khẩu không chính xác.");
           setWarningMessage(

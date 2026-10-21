@@ -137,3 +137,57 @@ function crawlFolder(folder, currentPath, resultList, depth) {
     }
   }
 }
+
+/**
+ * ==============================================================================
+ * TỰ ĐỘNG ĐỒNG BỘ: Thiết lập Trigger chạy ngầm tự động quét định kỳ mỗi 6 giờ
+ * ==============================================================================
+ * Hướng dẫn:
+ * 1. Mở dự án Google Apps Script (https://script.google.com/)
+ * 2. Chọn hàm 'setupAutoSyncTrigger' ở thanh công cụ phía trên và bấm 'Chạy' (Run).
+ * 3. Apps Script sẽ tự động lập lịch quét định kỳ mỗi 6 tiếng, giữ cho cache
+ *    của trang webadmin luôn mới nhất mà bạn không cần phải bấm quét tay!
+ */
+function setupAutoSyncTrigger() {
+  // Xóa các trigger cũ cùng tên nếu có để tránh trùng lặp
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "autoSyncBackground") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  
+  // Tạo trigger mới chạy định kỳ mỗi 6 tiếng
+  ScriptApp.newTrigger("autoSyncBackground")
+    .timeBased()
+    .everyHours(6)
+    .create();
+    
+  Logger.log("✅ Đã kích hoạt tự động quét Google Drive mỗi 6 giờ thành công!");
+}
+
+function autoSyncBackground() {
+  try {
+    var rootFolder = ROOT_FOLDER_ID ? DriveApp.getFolderById(ROOT_FOLDER_ID.trim()) : DriveApp.getRootFolder();
+    var allItems = [];
+    crawlFolder(rootFolder, "", allItems, 0);
+    
+    var cache = CacheService.getScriptCache();
+    var cacheKey = "tx_drive_cache_" + (ROOT_FOLDER_ID || "root");
+    var jsonOutput = JSON.stringify({
+      success: true,
+      folderName: rootFolder.getName(),
+      totalItems: allItems.length,
+      files: allItems,
+      autoSyncTime: Utilities.formatDate(new Date(), "GMT+7", "dd/MM/yyyy HH:mm:ss")
+    });
+    
+    if (jsonOutput.length < 100000) {
+      cache.put(cacheKey, jsonOutput, 21600); // Lưu cache 6 giờ
+    }
+    Logger.log("✅ Đã tự động cập nhật " + allItems.length + " tệp vào cache lúc " + new Date());
+  } catch (err) {
+    Logger.log("❌ Lỗi autoSyncBackground: " + err.toString());
+  }
+}
+

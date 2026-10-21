@@ -22,6 +22,7 @@ import {
   Dice5,
   GraduationCap,
   Wallet,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -57,6 +58,7 @@ export default function TelegramPage() {
     saveConfig,
     testConnection,
     sendTestMessage,
+    sendSecurityRadarAlert,
     autoDetectChatId,
   } = useTelegram();
 
@@ -430,6 +432,42 @@ export default function TelegramPage() {
                   </Button>
                 </div>
               </form>
+            </div>
+
+            {/* Intrusion Radar Widget */}
+            <div className="rounded-3xl glass-card p-5 border border-rose-500/30 bg-rose-950/20 space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-rose-500/20">
+                <h4 className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-rose-400" />
+                  <span>Radar An Ninh Xâm Nhập (24/7)</span>
+                </h4>
+                <Badge variant="danger" size="sm">Đang bảo vệ</Badge>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Tự động gửi cảnh báo khẩn cấp tới Telegram của bạn khi có ai đó nhập sai mật khẩu 3 lần liên tiếp, cố tình dò PIN két sắt hoặc truy cập trái phép.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  setStatusMessage({ type: "success", text: "Đang phát tín hiệu thử nghiệm Radar an ninh tới Telegram..." });
+                  const res = await sendSecurityRadarAlert(
+                    "Thử Nghiệm Radar An Ninh Thành Công",
+                    "Hệ thống cảnh báo xâm nhập của bạn đang hoạt động 100% hoàn hảo."
+                  );
+                  if (res.success) {
+                    setStatusMessage({ type: "success", text: "Tín hiệu Radar đã được gửi thành công tới Telegram của bạn!" });
+                  } else {
+                    setStatusMessage({ type: "error", text: res.error || "Không thể gửi cảnh báo." });
+                  }
+                }}
+                disabled={!isConnected}
+                className="w-full text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-200 border-rose-500/30 gap-1.5 cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-rose-400" />
+                <span>Bắn Thử Nghiệm Tín Hiệu Radar An Ninh</span>
+              </Button>
             </div>
 
             {/* Supported Commands Reference */}

@@ -16,6 +16,7 @@ interface TelegramContextType {
   saveConfig: (token: string, chatId: string) => void;
   testConnection: (tokenToTest?: string) => Promise<{ success: boolean; bot?: TelegramBotInfo; error?: string }>;
   sendTestMessage: (customText?: string) => Promise<{ success: boolean; error?: string }>;
+  sendSecurityRadarAlert: (title: string, details: string, machineId?: string) => Promise<{ success: boolean; error?: string }>;
   autoDetectChatId: () => Promise<{ success: boolean; chatId?: string; error?: string }>;
   disconnect: () => void;
 }
@@ -116,6 +117,48 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const sendSecurityRadarAlert = async (title: string, details: string, machineId?: string) => {
+    let t = botToken.trim();
+    let c = chatId.trim();
+    if (!t || !c) {
+      try {
+        const saved = localStorage.getItem("datavault_telegram_config");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.botToken) t = parsed.botToken.trim();
+          if (parsed.chatId) c = parsed.chatId.trim();
+        }
+      } catch {}
+    }
+    if (!t || !c) return { success: false, error: "Telegram Bot chưa được cấu hình." };
+
+    const nowStr = new Date().toLocaleString("vi-VN");
+    const alertHtml = `🚨 <b>[TXCLONEDRIVER INTRUSION RADAR]</b>\n` +
+      `⚠️ <b>Cảnh báo:</b> ${title}\n` +
+      `📝 <b>Chi tiết:</b> ${details}\n` +
+      `💻 <b>Mã Thiết Bị:</b> <code>${machineId || "TX-UNKNOWN"}</code>\n` +
+      `⏱️ <b>Thời gian:</b> <code>${nowStr}</code>\n` +
+      `🛡️ <i>Hệ thống tự động kích hoạt bảo vệ an ninh.</i>`;
+
+    try {
+      const res = await fetch("/api/telegram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_message",
+          token: t,
+          chatId: c,
+          text: alertHtml,
+        }),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi gửi cảnh báo Telegram.";
+      return { success: false, error: msg };
+    }
+  };
+
   const autoDetectChatId = async () => {
     if (!botToken.trim()) return { success: false, error: "Chưa nhập Bot Token." };
 
@@ -163,6 +206,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         saveConfig,
         testConnection,
         sendTestMessage,
+        sendSecurityRadarAlert,
         autoDetectChatId,
         disconnect,
       }}

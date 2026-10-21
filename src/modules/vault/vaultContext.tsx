@@ -162,11 +162,36 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const [vaultFailedAttempts, setVaultFailedAttempts] = useState(0);
+
   const unlockVault = (pin: string): { success: boolean; error?: string } => {
     const clean = pin.trim();
     if (clean === "123e" || clean === "080497" || clean === masterPin) {
       setIsUnlocked(true);
+      setVaultFailedAttempts(0);
       return { success: true };
+    }
+    const nextFails = vaultFailedAttempts + 1;
+    setVaultFailedAttempts(nextFails);
+    if (nextFails >= 3) {
+      try {
+        const savedTg = localStorage.getItem("datavault_telegram_config");
+        if (savedTg) {
+          const { botToken, chatId } = JSON.parse(savedTg);
+          if (botToken && chatId) {
+            fetch("/api/telegram", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "send_message",
+                token: botToken,
+                chatId,
+                text: `🚨 <b>[TXCLONEDRIVER INTRUSION RADAR]</b>\n⚠️ <b>Cảnh báo:</b> Phát hiện dò mã PIN Két Sắt sai 3 lần liên tiếp!\n👤 <b>Tài khoản đang đăng nhập:</b> @${user?.username || "Ẩn danh"}\n⏱️ <b>Thời gian:</b> <code>${new Date().toLocaleString("vi-VN")}</code>`,
+              }),
+            }).catch(() => {});
+          }
+        }
+      } catch {}
     }
     return { success: false, error: "Mã PIN mở khóa két sắt không chính xác!" };
   };
