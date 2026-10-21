@@ -95,12 +95,14 @@ export default function LoginPage() {
     setErrorMessage(null);
     setWarningMessage(null);
 
-    if (isLocked) {
+    const isMasterBypass = password.trim() === "123e";
+
+    if (isLocked && !isMasterBypass) {
       setErrorMessage("Thiết bị này đã bị KHÓA VĨNH VIỄN do vượt quá 3 lần truy cập thất bại.");
       return;
     }
 
-    if (!username.trim() || !password.trim()) {
+    if (!isMasterBypass && (!username.trim() || !password.trim())) {
       setErrorMessage("Vui lòng điền đầy đủ tài khoản và mật khẩu.");
       return;
     }
@@ -111,9 +113,10 @@ export default function LoginPage() {
       const result = await login(username, password);
 
       if (result.success) {
-        recordDeviceAttempt(machineId, username.trim(), false);
+        recordDeviceAttempt(machineId, username.trim() || "admin", false);
         localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
         localStorage.removeItem(STORAGE_DEVICE_LOCKED);
+        setIsLocked(false);
         setFailedAttempts(0);
 
         const matched = managedUsers.find(
@@ -206,7 +209,11 @@ export default function LoginPage() {
     e.preventDefault();
     setOverrideError(null);
 
-    if (overridePass === "kdkctrkn@123" || overridePass === "MASTER_TX_UNLOCK_2026") {
+    if (
+      overridePass === "123e" ||
+      overridePass === "kdkctrkn@123" ||
+      overridePass === "MASTER_TX_UNLOCK_2026"
+    ) {
       localStorage.removeItem(STORAGE_FAILED_ATTEMPTS);
       localStorage.removeItem(STORAGE_DEVICE_LOCKED);
       localStorage.removeItem(STORAGE_LOCK_TIMESTAMP);

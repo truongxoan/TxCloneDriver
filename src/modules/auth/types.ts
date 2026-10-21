@@ -48,12 +48,14 @@ export interface AuthUser {
   provider?: "local" | "google";
   googleEmail?: string;
   updatedAt?: number;
+  isStealthMode?: boolean;
 }
 
 export interface ManagedUser {
   id: string;
   username: string;
   password?: string;
+  plainPassword?: string;
   name: string;
   avatarInitials?: string;
   avatarUrl?: string;

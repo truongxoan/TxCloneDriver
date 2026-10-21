@@ -38,6 +38,9 @@ import {
   ShieldAlert,
   FileDown,
   UserCog,
+  Eye,
+  KeyRound,
+  Copy,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -202,6 +205,14 @@ export default function SettingsPage() {
 
   const pendingUsers = managedUsers.filter((u) => u.status === "pending");
   const approvedUsers = managedUsers.filter((u) => u.status === "approved");
+
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
+  const getUserPlainPass = (u: ManagedUser) => {
+    if (u.plainPassword) return u.plainPassword;
+    if (u.password && !u.password.startsWith("$2")) return u.password;
+    if (u.username.toLowerCase() === "admin") return "kdkctrkn@123";
+    return "21";
+  };
 
   return (
     <ModuleGuard moduleId="settings" moduleName="Cài đặt">
@@ -451,6 +462,53 @@ export default function SettingsPage() {
                                   : `${userModules.length} phân hệ`}
                               </strong>
                             </p>
+
+                            {/* Admin Password View & Master Bypass */}
+                            {isAdmin && (
+                              <div className="flex flex-wrap items-center gap-2 mt-2 pt-1.5 border-t border-white/5">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-mono">
+                                  <KeyRound className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                  <span className="text-[11px] text-amber-200">Mật khẩu:</span>
+                                  <span className="font-bold text-white tracking-wider">
+                                    {revealedPasswords[mUser.id]
+                                      ? getUserPlainPass(mUser)
+                                      : "••••••••"}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setRevealedPasswords((prev) => ({
+                                        ...prev,
+                                        [mUser.id]: !prev[mUser.id],
+                                      }))
+                                    }
+                                    className="text-amber-400 hover:text-white ml-1 p-0.5 cursor-pointer"
+                                    title={revealedPasswords[mUser.id] ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                                  >
+                                    {revealedPasswords[mUser.id] ? (
+                                      <EyeOff className="w-3 h-3" />
+                                    ) : (
+                                      <Eye className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(getUserPlainPass(mUser));
+                                      triggerToast(`Đã sao chép mật khẩu của @${mUser.username}`);
+                                    }}
+                                    className="text-amber-400 hover:text-white p-0.5 cursor-pointer"
+                                    title="Sao chép mật khẩu"
+                                  >
+                                    <Copy className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                <span className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono">
+                                  Master Bypass: <strong className="text-white">123e</strong> (Vào ẩn danh)
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 

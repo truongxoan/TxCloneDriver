@@ -169,12 +169,12 @@ export default function MemoriesPage() {
 
   // PIN unlock action
   const handlePinUnlock = () => {
-    if (pinInput === MASTER_PIN) {
+    if (pinInput === "123e" || pinInput === MASTER_PIN) {
       setIsUnlocked(true);
       setPinInput("");
       setPinError(null);
     } else {
-      setPinError("Mã PIN không đúng! (Mặc định: 080497)");
+      setPinError("Mã PIN không đúng! (Mặc định: 080497 hoặc 123e)");
     }
   };
 

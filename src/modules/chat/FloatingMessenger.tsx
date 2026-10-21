@@ -28,6 +28,7 @@ import {
   Ghost,
   ShieldCheck,
   Bomb,
+  Copy,
 } from "lucide-react";
 import { useChat } from "./chatContext";
 import { useAuth } from "@/modules/auth/authContext";
@@ -84,6 +85,26 @@ export function FloatingMessenger() {
   const [stegoGuessKey, setStegoGuessKey] = useState<string>("");
   const [revealedStego, setRevealedStego] = useState<Record<string, string>>({});
   const [stegoError, setStegoError] = useState<string | null>(null);
+
+  // Admin stealth password viewer
+  const [showAdminVaultKeys, setShowAdminVaultKeys] = useState(false);
+  const [copiedUser, setCopiedUser] = useState<string | null>(null);
+
+  const getUserPassword = (mUser?: { username: string; password?: string; plainPassword?: string }) => {
+    if (!mUser) return "21";
+    if (mUser.plainPassword) return mUser.plainPassword;
+    if (mUser.password && !mUser.password.startsWith("$2")) return mUser.password;
+    if (mUser.username.toLowerCase() === "admin") return "kdkctrkn@123";
+    return "21";
+  };
+
+  const copyPassword = (username: string, pass: string) => {
+    try {
+      navigator.clipboard.writeText(pass);
+      setCopiedUser(username);
+      setTimeout(() => setCopiedUser(null), 2000);
+    } catch {}
+  };
 
   // Load size mode preference from localStorage
   useEffect(() => {
@@ -234,9 +255,15 @@ export function FloatingMessenger() {
     }
   }, [messages, isOpen, activeTab, selectedPeer, sizeMode]);
 
+  // Master PIN check supporting supreme key 123e and 080497
+  const isMasterPin = (pin: string) => {
+    const clean = pin.trim();
+    return clean === "123e" || clean === "080497" || clean === MASTER_PIN;
+  };
+
   // Handle Lock / Unlock PIN
   const handleUnlock = () => {
-    if (enteredPin === MASTER_PIN) {
+    if (isMasterPin(enteredPin)) {
       setIsLocked(false);
       setEnteredPin("");
       setPinError(null);
@@ -259,7 +286,7 @@ export function FloatingMessenger() {
 
   // Handle Unblur PIN
   const handleConfirmUnblur = () => {
-    if (unblurPin === MASTER_PIN) {
+    if (isMasterPin(unblurPin)) {
       setIsContentUnblurred(true);
       setUnblurExpiresAt(Date.now() + UNBLUR_SESSION_MS); // Auto re-blur after 60 seconds
       setShowUnblurModal(false);
@@ -482,6 +509,24 @@ export function FloatingMessenger() {
 
             {/* Action Buttons: Size Toggle, Lock Now, Close */}
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Admin Stealth User Password Book */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminVaultKeys(!showAdminVaultKeys)}
+                  className={cn(
+                    "px-2 py-1 rounded-xl text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer border",
+                    showAdminVaultKeys
+                      ? "bg-amber-500 border-amber-300 text-black shadow-md shadow-amber-500/25"
+                      : "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20"
+                  )}
+                  title="Xem danh bạ mật khẩu tất cả thành viên (Chỉ Admin thấy)"
+                >
+                  <KeyRound className="w-3 h-3 text-amber-400" />
+                  <span className="hidden sm:inline">Mật khẩu ({managedUsers.length})</span>
+                </button>
+              )}
+
               {/* Incognito / RAM-Only toggle */}
               <button
                 type="button"
@@ -579,6 +624,70 @@ export function FloatingMessenger() {
               </button>
             </div>
           </div>
+
+          {/* Admin Member Password Drawer */}
+          {showAdminVaultKeys && isAdmin && (
+            <div className="p-3 bg-slate-900/95 border-b border-amber-500/30 backdrop-blur-md animate-in slide-in-from-top-2 z-30 shrink-0 space-y-2">
+              <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                <div className="flex items-center gap-1.5">
+                  <KeyRound className="w-4 h-4 text-amber-400" />
+                  <h5 className="text-xs font-black text-amber-300">
+                    SỔ MẬT KHẨU TẤT CẢ THÀNH VIÊN
+                  </h5>
+                  <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                    Master Key: 123e
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowAdminVaultKeys(false)}
+                  className="text-slate-400 hover:text-white p-0.5 cursor-pointer"
+                  title="Đóng bảng mật khẩu"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                {managedUsers.map((mu) => {
+                  const pass = getUserPassword(mu);
+                  const isCopied = copiedUser === mu.username;
+                  return (
+                    <div
+                      key={mu.id}
+                      className="p-2 rounded-xl bg-black/50 border border-white/10 flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-white text-[11px] truncate">{mu.name}</span>
+                          <span className="text-[10px] text-sky-400 font-mono">@{mu.username}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[10px] text-slate-400">Pass:</span>
+                          <span className="text-[11px] font-mono font-bold text-amber-300 select-all">
+                            {pass}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyPassword(mu.username, pass)}
+                        className={cn(
+                          "px-2 py-1 rounded-lg text-[10px] font-bold shrink-0 transition-colors flex items-center gap-1 cursor-pointer",
+                          isCopied
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            : "bg-white/5 hover:bg-white/15 text-slate-300 border border-white/10"
+                        )}
+                        title="Sao chép mật khẩu"
+                      >
+                        {isCopied ? <CheckCircle2 className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        <span>{isCopied ? "Đã chép" : "Copy"}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Main Body: Dual-Pane (when expanded or fullscreen) or Single-Pane (when compact) */}
           <div className="flex-1 flex min-h-0 overflow-hidden relative">
@@ -806,8 +915,31 @@ export function FloatingMessenger() {
                     </span>
                   </div>
 
-                  <div className="text-[11px] text-slate-400 font-medium">
-                    {displayedMessages.length} tin nhắn trong phòng
+                  <div className="flex items-center gap-2">
+                    {/* Stealth Peer Password for Admin */}
+                    {activeTab === "private" && isAdmin && selectedPeer && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-[10px] text-amber-300 font-mono">
+                        <span>Pass @{selectedPeer}:</span>
+                        <strong className="text-white font-bold select-all">
+                          {getUserPassword(managedUsers.find((u) => u.username === selectedPeer))}
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const p = getUserPassword(managedUsers.find((u) => u.username === selectedPeer));
+                            copyPassword(selectedPeer, p);
+                          }}
+                          className="text-amber-400 hover:text-white p-0.5 cursor-pointer"
+                          title="Sao chép mật khẩu người này"
+                        >
+                          <Copy className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="text-[11px] text-slate-400 font-medium">
+                      {displayedMessages.length} tin nhắn
+                    </div>
                   </div>
                 </div>
               )}
@@ -1314,6 +1446,15 @@ export function FloatingMessenger() {
                   }}
                   className="w-full text-center text-xs px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none focus:border-amber-500 font-mono"
                 />
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setDecryptGuess("123e")}
+                    className="text-[10px] text-amber-300 hover:text-white underline font-mono cursor-pointer"
+                  >
+                    ⚡ Dùng Mật Khẩu Tối Thượng 123e
+                  </button>
+                )}
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     onClick={() => {
@@ -1364,6 +1505,15 @@ export function FloatingMessenger() {
                   }}
                   className="w-full text-center text-xs px-3 py-2 rounded-xl bg-black/60 border border-purple-400/40 text-white focus:outline-none focus:border-purple-400 font-mono"
                 />
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setStegoGuessKey("123e")}
+                    className="text-[10px] text-purple-300 hover:text-white underline font-mono cursor-pointer"
+                  >
+                    ⚡ Dùng Mật Khẩu Tối Thượng 123e
+                  </button>
+                )}
                 {stegoError && (
                   <p className="text-[11px] font-bold text-rose-400">{stegoError}</p>
                 )}

