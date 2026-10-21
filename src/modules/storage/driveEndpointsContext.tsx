@@ -22,7 +22,57 @@ export interface DriveFileItem {
   updatedAt: string;
   downloadUrl?: string;
   starred?: boolean;
+  isFolder?: boolean;
+  folderPath?: string;
+  parentFolderId?: string;
 }
+
+export const DEFAULT_COURSE_FOLDERS: DriveFileItem[] = [
+  {
+    id: "folder-course-chinese-hub",
+    name: "Kho Học Liệu Tiếng Trung HSK 1-6 & Video Bài Giảng",
+    sizeBytes: 0,
+    mimeType: "application/vnd.google-apps.folder",
+    updatedAt: "Vừa xong",
+    downloadUrl: "https://drive.google.com/drive/folders/1Uf1dMCA9TFSTqUHXGP7FWzECXg-G5Xoy?usp=sharing",
+    isFolder: true,
+    starred: true,
+    folderPath: "",
+  },
+  {
+    id: "file-course-chinese-pdf",
+    name: "Giáo Trình Tiếng Trung Toàn Diện (File PDF / Sách Bài Tập).pdf",
+    sizeBytes: 15728640,
+    mimeType: "application/pdf",
+    updatedAt: "Vừa xong",
+    downloadUrl: "https://drive.google.com/file/d/1wS58hrA9S3IiJlKzMLkRMkp5bVI4x0-o/view",
+    isFolder: false,
+    starred: true,
+    folderPath: "Kho Học Liệu Tiếng Trung HSK 1-6",
+  },
+  {
+    id: "folder-course-coding",
+    name: "Khóa Học Lập Trình Web, Python & Automation",
+    sizeBytes: 0,
+    mimeType: "application/vnd.google-apps.folder",
+    updatedAt: "Vừa xong",
+    downloadUrl: "https://drive.google.com/drive/folders/1Uf1dMCA9TFSTqUHXGP7FWzECXg-G5Xoy",
+    isFolder: true,
+    starred: true,
+    folderPath: "",
+  },
+  {
+    id: "folder-course-multimedia",
+    name: "Kho Giáo Trình Kỹ Năng & Bài Giảng Đa Phương Tiện",
+    sizeBytes: 0,
+    mimeType: "application/vnd.google-apps.folder",
+    updatedAt: "Vừa xong",
+    downloadUrl: "https://drive.google.com/drive/folders/1Uf1dMCA9TFSTqUHXGP7FWzECXg-G5Xoy",
+    isFolder: true,
+    starred: false,
+    folderPath: "",
+  },
+];
 
 interface DriveEndpointsContextType {
   endpoints: DriveEndpoint[];
@@ -104,14 +154,23 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
 
       const data = await res.json();
       if (data.success) {
-        setFiles(data.files || []);
+        let loadedFiles: DriveFileItem[] = data.files || [];
+        // If current Apps Script only returns flat files, enrich with default course folders
+        const hasFolders = loadedFiles.some(
+          (f) => f.isFolder || f.mimeType === "application/vnd.google-apps.folder"
+        );
+        if (!hasFolders) {
+          loadedFiles = [...DEFAULT_COURSE_FOLDERS, ...loadedFiles];
+        }
+
+        setFiles(loadedFiles);
         // Update endpoint metadata
         const updated = endpoints.map((e) =>
           e.id === activeEndpoint.id
             ? {
                 ...e,
                 status: "connected" as const,
-                fileCount: (data.files || []).length,
+                fileCount: loadedFiles.length,
                 lastChecked: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
                 errorMessage: undefined,
               }

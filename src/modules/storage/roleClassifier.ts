@@ -14,7 +14,8 @@ export type FileRoleType =
   | "document"
   | "image"
   | "archive_misc"
-  | "junk_ghost";
+  | "junk_ghost"
+  | "folder";
 
 export interface FileRoleInfo {
   role: FileRoleType;
@@ -22,7 +23,7 @@ export interface FileRoleInfo {
   groupLabel: string;
   badgeColor: string;
   textColor: string;
-  iconType: "disc" | "software" | "zap" | "key" | "film" | "music" | "doc" | "image" | "archive" | "junk" | "graduation" | "game" | "lock";
+  iconType: "disc" | "software" | "zap" | "key" | "film" | "music" | "doc" | "image" | "archive" | "junk" | "graduation" | "game" | "lock" | "folder";
   description: string;
 }
 
@@ -98,11 +99,13 @@ export function classifyFileRole(item: {
   name: string;
   sizeBytes?: number;
   mimeType?: string;
+  isFolder?: boolean;
 }): FileRoleInfo {
   const name = item.name.trim();
   const lower = name.toLowerCase();
   const size = item.sizeBytes ?? 0;
   const mime = item.mimeType?.toLowerCase() || "";
+  const isFolder = !!item.isFolder || mime.includes("folder") || mime === "application/vnd.google-apps.folder";
 
   // 1. Check if it is a known system / ghost junk file
   const junkDetail = getJunkDetail(item);
@@ -115,6 +118,88 @@ export function classifyFileRole(item: {
       textColor: "text-rose-400",
       iconType: "junk",
       description: junkDetail.reason,
+    };
+  }
+
+  // 1.1 Special handling for Folders (Categories by folder topic)
+  if (isFolder) {
+    if (
+      lower.includes("khoa hoc") ||
+      lower.includes("khóa học") ||
+      lower.includes("khoahoc") ||
+      lower.includes("course") ||
+      lower.includes("tutorial") ||
+      lower.includes("bai giang") ||
+      lower.includes("bài giảng") ||
+      lower.includes("giao trinh") ||
+      lower.includes("giáo trình") ||
+      lower.includes("tieng trung") ||
+      lower.includes("tiếng trung") ||
+      lower.includes("hsk") ||
+      lower.includes("lap trinh") ||
+      lower.includes("lập trình") ||
+      lower.includes("python") ||
+      lower.includes("study") ||
+      lower.includes("hoc tap") ||
+      lower.includes("học tập") ||
+      lower.includes("tailieu") ||
+      lower.includes("tài liệu")
+    ) {
+      let specificLabel = "📁 Thư mục Khóa học & Bài giảng";
+      let desc = "Thư mục chứa video bài giảng, tài liệu giáo trình và tài nguyên học tập.";
+
+      if (lower.includes("tieng trung") || lower.includes("tiếng trung") || lower.includes("hsk")) {
+        specificLabel = "📁 Thư mục Học Tiếng Trung HSK";
+        desc = "Thư mục bài giảng, tài liệu luyện thi và file nghe tiếng Trung chuẩn HSK.";
+      } else if (lower.includes("lap trinh") || lower.includes("lập trình") || lower.includes("python")) {
+        specificLabel = "📁 Thư mục Khóa học Lập trình";
+        desc = "Thư mục bài giảng, tài liệu kỹ thuật và mã nguồn học lập trình.";
+      }
+
+      return {
+        role: "course_study",
+        label: specificLabel,
+        groupLabel: "Khóa học & Học tập",
+        badgeColor: "bg-indigo-500/25 text-indigo-200 border-indigo-400/50 shadow-sm",
+        textColor: "text-indigo-300",
+        iconType: "folder",
+        description: desc,
+      };
+    }
+
+    if (lower.includes("game") || lower.includes("mod") || lower.includes("rom")) {
+      return {
+        role: "game_mod",
+        label: "📁 Thư mục Game & Mods",
+        groupLabel: "Game & Auto CF",
+        badgeColor: "bg-cyan-500/20 text-cyan-300 border-cyan-400/40",
+        textColor: "text-cyan-400",
+        iconType: "folder",
+        description: "Thư mục lưu trữ bộ cài game, tiện ích mod và ROMs giả lập.",
+      };
+    }
+
+    if (lower.includes("nhac") || lower.includes("nhạc") || lower.includes("audio") || lower.includes("music")) {
+      return {
+        role: "music_audio",
+        label: "📁 Thư mục Âm nhạc & DJ",
+        groupLabel: "Âm nhạc & Audio",
+        badgeColor: "bg-pink-500/20 text-pink-300 border-pink-400/40",
+        textColor: "text-pink-400",
+        iconType: "folder",
+        description: "Thư mục tuyển tập bài hát, album nhạc Nonstop và Vinahouse.",
+      };
+    }
+
+    // Default general folder
+    return {
+      role: "folder",
+      label: "📁 Thư mục Google Drive",
+      groupLabel: "Thư mục Drive",
+      badgeColor: "bg-amber-500/20 text-amber-300 border-amber-400/40",
+      textColor: "text-amber-400",
+      iconType: "folder",
+      description: "Thư mục lưu trữ trên Google Drive. Bấm để mở hoặc khám phá nội dung bên trong.",
     };
   }
 
@@ -626,8 +711,9 @@ export function sortDriveItems(items: DriveFileItem[], sortBy: StorageSortOption
       return cloned.sort((a, b) => parseDateToTimestamp(a.updatedAt) - parseDateToTimestamp(b.updatedAt));
 
     case "role": {
-      // Role priority: Course -> OS -> Software -> Tools -> Video -> Audio -> Key -> Doc -> Image -> Game -> Vault -> Archive -> Junk
+      // Role priority: Folder -> Course -> OS -> Software -> Tools -> Video -> Audio -> Key -> Doc -> Image -> Game -> Vault -> Archive -> Junk
       const roleWeight: Record<FileRoleType, number> = {
+        folder: 0,
         course_study: 1,
         os_installer: 2,
         software: 3,

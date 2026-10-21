@@ -58,7 +58,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatBytes, cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
-import { useDriveEndpoints, DriveFileItem } from "@/modules/storage/driveEndpointsContext";
+import { useDriveEndpoints, DriveFileItem, DEFAULT_COURSE_FOLDERS } from "@/modules/storage/driveEndpointsContext";
 import { MusicPlayerBar, AudioTrack } from "@/modules/storage/MusicPlayerBar";
 import CinemaVideoModal, { VideoItem } from "@/modules/storage/CinemaVideoModal";
 import { detectDuplicates } from "@/modules/storage/duplicateDetector";
@@ -211,7 +211,12 @@ export default function StoragePage() {
     let baseList =
       files.length > 0
         ? files
-        : [...DEFAULT_DRIVE_AUDIO_TRACKS, ...DEFAULT_DRIVE_VIDEO_ITEMS, ...DEFAULT_DEMO_JUNK_FILES];
+        : [
+            ...DEFAULT_COURSE_FOLDERS,
+            ...DEFAULT_DRIVE_AUDIO_TRACKS,
+            ...DEFAULT_DRIVE_VIDEO_ITEMS,
+            ...DEFAULT_DEMO_JUNK_FILES,
+          ];
     return baseList.filter((item) => !deletedIds.has(item.id));
   }, [files, deletedIds]);
 
@@ -239,6 +244,7 @@ export default function StoragePage() {
       music_audio: { count: 0, totalBytes: 0 },
       license_key: { count: 0, totalBytes: 0 },
       private_vault: { count: 0, totalBytes: 0 },
+      folder: { count: 0, totalBytes: 0 },
       document: { count: 0, totalBytes: 0 },
       image: { count: 0, totalBytes: 0 },
       archive_misc: { count: 0, totalBytes: 0 },
@@ -354,6 +360,9 @@ export default function StoragePage() {
       }
       if (selectedCategory === "document") {
         return roleInfo.role === "document";
+      }
+      if (selectedCategory === "folder") {
+        return roleInfo.role === "folder" || item.isFolder || item.mimeType?.includes("folder");
       }
       if (selectedCategory === "image") {
         return roleInfo.role === "image";
@@ -520,8 +529,14 @@ export default function StoragePage() {
     if (item) {
       const roleInfo = classifyFileRole(item);
       switch (roleInfo.role) {
+        case "folder":
+          return <Folder className="h-5 w-5 text-amber-400" />;
         case "course_study":
-          return <GraduationCap className="h-5 w-5 text-indigo-400" />;
+          return (item.isFolder || item.mimeType?.includes("folder")) ? (
+            <Folder className="h-5 w-5 text-indigo-400" />
+          ) : (
+            <GraduationCap className="h-5 w-5 text-indigo-400" />
+          );
         case "os_installer":
           return <Disc className="h-5 w-5 text-blue-400" />;
         case "software":
@@ -918,6 +933,7 @@ export default function StoragePage() {
             { id: "music_audio", label: "Âm nhạc & Audio 🎵", count: roleStats.music_audio.count },
             { id: "license_key", label: "Key & Bản quyền 🔑", count: roleStats.license_key.count },
             { id: "private_vault", label: "Kho Riêng Tư 🔒", count: roleStats.private_vault.count },
+            { id: "folder", label: "Thư mục Drive 📁", count: roleStats.folder.count },
             {
               id: "duplicates",
               label: "Tệp trùng lặp ⚠️",
@@ -1443,9 +1459,14 @@ export default function StoragePage() {
                                 </span>
                               )}
                             </div>
-                            {/* Role functional description subtitle */}
-                            <p className="text-[10px] text-slate-400 truncate max-w-lg mt-0.5">
-                              {roleInfo.description}
+                            {/* Role functional description subtitle & folder path */}
+                            <p className="text-[10px] text-slate-400 truncate max-w-lg mt-0.5 flex items-center gap-1.5 flex-wrap">
+                              {item.folderPath && (
+                                <span className="text-amber-300 font-mono font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/25">
+                                  📁 /{item.folderPath}
+                                </span>
+                              )}
+                              <span>{roleInfo.description}</span>
                             </p>
                             {audio && (
                               <span className="text-[10px] text-pink-400 font-medium mt-0.5 block">
@@ -1455,6 +1476,11 @@ export default function StoragePage() {
                             {video && (
                               <span className="text-[10px] text-rose-400 font-medium mt-0.5 block">
                                 🎬 Video rạp chiếu • Nhấn để xem phim Cinema
+                              </span>
+                            )}
+                            {(item.isFolder || item.mimeType === "application/vnd.google-apps.folder") && (
+                              <span className="text-[10px] text-amber-300 font-medium mt-0.5 block">
+                                📁 Thư mục Google Drive • Nhấn Mở Thư Mục để xem toàn bộ tệp bên trong
                               </span>
                             )}
                           </div>
@@ -1499,26 +1525,41 @@ export default function StoragePage() {
                               </button>
                             )}
 
-                            {/* Download Button */}
-                            {item.downloadUrl ? (
+                            {/* Folder Open Button */}
+                            {(item.isFolder || item.mimeType === "application/vnd.google-apps.folder") ? (
                               <a
-                                href={item.downloadUrl}
+                                href={item.downloadUrl || `https://drive.google.com/drive/folders/${item.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-xs border border-emerald-500/40 transition-all"
-                                title="Tải xuống tệp tin từ Google Drive"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-xs border border-amber-500/40 transition-all cursor-pointer shadow-sm"
+                                title="Mở thư mục này trên Google Drive"
                               >
-                                <Download className="h-3.5 w-3.5" />
-                                <span className="hidden sm:inline">Tải xuống</span>
+                                <Folder className="h-3.5 w-3.5" />
+                                <span>Mở Thư Mục</span>
+                                <ExternalLink className="h-3 w-3" />
                               </a>
                             ) : (
-                              <button
-                                onClick={() => triggerAction(`Tải xuống "${item.name}"`)}
-                                className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20"
-                                title="Tải xuống"
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
+                              /* Download Button */
+                              item.downloadUrl ? (
+                                <a
+                                  href={item.downloadUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold text-xs border border-emerald-500/40 transition-all"
+                                  title="Tải xuống tệp tin từ Google Drive"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Tải xuống</span>
+                                </a>
+                              ) : (
+                                <button
+                                  onClick={() => triggerAction(`Tải xuống "${item.name}"`)}
+                                  className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20"
+                                  title="Tải xuống"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </button>
+                              )
                             )}
                           </div>
                         </td>
@@ -1581,10 +1622,17 @@ export default function StoragePage() {
                     <h4 className="font-bold text-xs text-foreground truncate mb-1" title={item.name}>
                       {item.name}
                     </h4>
-                    {/* Role description subtitle */}
-                    <p className="text-[10px] text-slate-400 line-clamp-2 mb-2 leading-relaxed" title={roleInfo.description}>
-                      {roleInfo.description}
-                    </p>
+                    {/* Role description subtitle & folder path */}
+                    <div className="space-y-1 mb-2">
+                      {item.folderPath && (
+                        <span className="text-[9px] text-amber-300 font-mono font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/25 inline-block truncate max-w-full">
+                          📁 /{item.folderPath}
+                        </span>
+                      )}
+                      <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed" title={roleInfo.description}>
+                        {roleInfo.description}
+                      </p>
+                    </div>
                     <p className="text-[11px] text-muted-foreground font-mono">
                       <strong className="text-white">{formatBytes(item.sizeBytes)}</strong> &bull; {item.updatedAt}
                     </p>
@@ -1613,16 +1661,30 @@ export default function StoragePage() {
                           <Film className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      {item.downloadUrl && (
+                      {(item.isFolder || item.mimeType === "application/vnd.google-apps.folder") ? (
                         <a
-                          href={item.downloadUrl}
+                          href={item.downloadUrl || `https://drive.google.com/drive/folders/${item.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors"
-                          title="Tải xuống tệp tin"
+                          className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-semibold flex items-center gap-1 transition-all"
+                          title="Mở thư mục trên Google Drive"
                         >
-                          <Download className="h-3.5 w-3.5" />
+                          <Folder className="h-3.5 w-3.5" />
+                          <span>Mở</span>
+                          <ExternalLink className="h-3 w-3" />
                         </a>
+                      ) : (
+                        item.downloadUrl && (
+                          <a
+                            href={item.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                            title="Tải xuống tệp tin"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                        )
                       )}
                     </div>
                   </div>
