@@ -91,8 +91,8 @@ interface DriveEndpointsContextType {
 const DEFAULT_ENDPOINTS: DriveEndpoint[] = [
   {
     id: "ep-primary",
-    name: "Thư mục Drive Chính (Apps Script)",
-    url: "https://script.google.com/macros/s/AKfycbwrV8cCwa5zJxeNJp3ezGS75dYbYK5u6-TCRpWJbg6SCiahOWzqywDmLwSYrnT-20Mp8Q/exec",
+    name: "Thư mục Drive Chính (Apps Script 2.0)",
+    url: "https://script.google.com/macros/s/AKfycbwzAuEs2os1eZyntbyJ4RwXAvOemyXTO0wWsA47Uc3IQkDF71bvKr8rsEyzsppoE2yJ6w/exec",
     isActive: true,
     status: "connected",
     lastChecked: "Vừa xong",
@@ -107,20 +107,26 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load from localStorage
+  // Load from localStorage & auto-upgrade old endpoint URL to new Apps Script
   useEffect(() => {
     try {
       const saved = localStorage.getItem("datavault_drive_endpoints");
       if (saved) {
         const parsed = JSON.parse(saved) as DriveEndpoint[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Guarantee default endpoint is retained if not present
-          const hasPrimary = parsed.some((e) => e.url === DEFAULT_ENDPOINTS[0].url);
-          if (!hasPrimary) {
-            setEndpoints([...parsed, DEFAULT_ENDPOINTS[0]]);
-          } else {
-            setEndpoints(parsed);
-          }
+          // Auto-upgrade any old endpoint URL to the new recursive crawler URL
+          const upgraded = parsed.map((e) =>
+            e.url.includes("AKfycbwrV8cCwa5zJxeNJp3ezGS75dYbYK5u6")
+              ? { ...e, url: DEFAULT_ENDPOINTS[0].url, name: "Thư mục Drive Chính (Apps Script 2.0)" }
+              : e
+          );
+          const hasPrimary = upgraded.some((e) => e.url === DEFAULT_ENDPOINTS[0].url);
+          const finalList = hasPrimary ? upgraded : [DEFAULT_ENDPOINTS[0], ...upgraded];
+          setEndpoints(finalList);
+          try {
+            localStorage.setItem("datavault_drive_endpoints", JSON.stringify(finalList));
+          } catch {}
+          return;
         }
       }
     } catch {
