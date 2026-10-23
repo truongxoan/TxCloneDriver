@@ -530,3 +530,228 @@ export function playMessageChime() {
     });
   } catch {}
 }
+
+/**
+ * Sweet bubble heart pop (Reaction ❤️)
+ */
+export function playHeartPopSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  } catch {}
+}
+
+/**
+ * Crowd applause & cheer burst (Reaction 👏)
+ */
+export function playApplauseSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    // Multiple quick claps synthesized via noise bursts
+    for (let i = 0; i < 6; i++) {
+      const clapTime = now + i * 0.07 + Math.random() * 0.02;
+      const bufferSize = ctx.sampleRate * 0.05;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let j = 0; j < bufferSize; j++) {
+        data[j] = Math.random() * 2 - 1;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(1000 + Math.random() * 400, clapTime);
+      filter.Q.setValueAtTime(2.5, clapTime);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.12, clapTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, clapTime + 0.05);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      noise.start(clapTime);
+      noise.stop(clapTime + 0.06);
+    }
+  } catch {}
+}
+
+/**
+ * Bubbly crisp popcorn pop (Reaction 🍿)
+ */
+export function playPopcornSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    [0, 0.08, 0.16].forEach((offset, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const t = now + offset;
+
+      osc.type = "sine";
+      const baseFreq = 500 + idx * 150 + Math.random() * 80;
+      osc.frequency.setValueAtTime(baseFreq, t);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.2, t + 0.04);
+
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.06);
+    });
+  } catch {}
+}
+
+/**
+ * Iconic DJ Airhorn / celebration fanfare (Reaction 🚀 / 🎉)
+ */
+export function playAirHornSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const hornPitches = [466.16, 466.16, 466.16, 622.25]; // Bb4 Bb4 Bb4 Eb5
+    const timings = [0, 0.11, 0.22, 0.35];
+    const durations = [0.08, 0.08, 0.08, 0.25];
+
+    hornPitches.forEach((freq, idx) => {
+      const t = now + timings[idx];
+      const dur = durations[idx];
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, t);
+
+      // Lowpass for punchy brass tone
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(1800, t);
+
+      gain.gain.setValueAtTime(0.14, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+    });
+  } catch {}
+}
+
+/**
+ * Energetic synth cheer / triumph (Reaction 🔥 / ✨)
+ */
+export function playCheerSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    // Uplifting arpeggio (C5 -> E5 -> G5 -> C6)
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.06;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.28);
+    });
+  } catch {}
+}
+
+/**
+ * Playful bouncy giggle / synth laugh (Reaction 😂)
+ */
+export function playLaughSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    // 3 bouncy descending / ascending tone pulses
+    const bursts = [650, 520, 680, 560];
+    bursts.forEach((freq, i) => {
+      const t = now + i * 0.09;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq - 80, t + 0.07);
+
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.09);
+    });
+  } catch {}
+}
+
+/**
+ * Automatically dispatches the matching sound effect for any reaction emoji
+ */
+export function playReactionSound(emoji: string) {
+  switch (emoji) {
+    case "❤️":
+      playHeartPopSound();
+      break;
+    case "👏":
+      playApplauseSound();
+      break;
+    case "🍿":
+      playPopcornSound();
+      break;
+    case "🚀":
+    case "🎉":
+      playAirHornSound();
+      break;
+    case "🔥":
+    case "✨":
+    case "🎵":
+      playCheerSound();
+      break;
+    case "😂":
+      playLaughSound();
+      break;
+    default:
+      playClickSound();
+      break;
+  }
+}

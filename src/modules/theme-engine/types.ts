@@ -15,7 +15,11 @@ export type ThemeId =
   | "vision-os"
   | "cyber-hud"
   | "neo-brutalism"
-  | "thunderstorm";
+  | "thunderstorm"
+  | "synthwave-80s"
+  | "matrix-rain"
+  | "aurora-borealis"
+  | "sunset-glow";
 
 export type EffectType =
   | "blossom"
@@ -32,6 +36,10 @@ export type EffectType =
   | "hud-grid"
   | "particles"
   | "thunderstorm"
+  | "synthwave"
+  | "matrix"
+  | "aurora"
+  | "sunset"
   | "none";
 
 export interface ThemeDefinition {

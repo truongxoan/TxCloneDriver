@@ -340,6 +340,10 @@ export default function ThemesPage() {
             { id: "bubbles", label: "🫧 Bong Bóng Thủy Cung" },
             { id: "particles", label: "🥽 Hạt Phân Tử VisionOS" },
             { id: "hud-grid", label: "🌐 Lưới Radar Sci-Fi HUD" },
+            { id: "synthwave", label: "🕹️ Neon Hạt Retro 80s" },
+            { id: "matrix", label: "💻 Mưa Ký Tự Số Ma Trận" },
+            { id: "aurora", label: "🌌 Cực Quang Bắc Cực" },
+            { id: "sunset", label: "🌅 Đốm Lửa Hoàng Hôn" },
           ].map((item) => (
             <button
               key={item.id}

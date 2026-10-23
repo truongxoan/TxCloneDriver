@@ -56,7 +56,14 @@ import {
   getYouTubeEmbedUrl,
   detectMediaSource,
   resolveEmbedUrl,
+  parseBatchUrls,
 } from "@/modules/watch-party/youtubeHelper";
+import {
+  playReactionSound,
+  playAirHornSound,
+  playApplauseSound,
+  toggleSoundMute,
+} from "@/lib/soundEffects";
 import { useAudioBooster } from "@/modules/watch-party/useAudioBooster";
 import { LofiCyberRoomWidget } from "@/modules/exotic/LofiCyberRoomWidget";
 import { TarotDreamWidget } from "@/modules/exotic/TarotDreamWidget";
@@ -81,6 +88,7 @@ export default function WatchTogetherPage() {
     kickMember,
     sendChatMessage,
     sendReaction,
+    orderBatchSongs,
     togglePlayPause,
     saveBookmark,
     deleteBookmark,
@@ -102,11 +110,38 @@ export default function WatchTogetherPage() {
 
   // Order media modal
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [orderModalTab, setOrderModalTab] = useState<"url" | "drive" | "telegram" | "queue">("url");
+  const [orderModalTab, setOrderModalTab] = useState<"url" | "batch" | "drive" | "telegram" | "queue">("url");
   const [orderUrl, setOrderUrl] = useState("");
   const [orderTitle, setOrderTitle] = useState("");
   const [orderIsVideo, setOrderIsVideo] = useState(true);
+  const [batchUrlsText, setBatchUrlsText] = useState("");
   const [driveSearch, setDriveSearch] = useState("");
+  const [sfxMuted, setSfxMuted] = useState(false);
+
+  const triggerReaction = (emoji: string) => {
+    sendReaction(emoji);
+    if (!sfxMuted) {
+      playReactionSound(emoji);
+    }
+  };
+
+  const handleBatchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const urls = parseBatchUrls(batchUrlsText);
+    if (urls.length === 0) {
+      triggerToast("Vui lòng nhập ít nhất 1 đường link hợp lệ (YouTube, Spotify, v.v.).");
+      return;
+    }
+    const result = orderBatchSongs(urls);
+    if (result.addedCount > 0) {
+      triggerToast(`Đã thêm thành công ${result.addedCount} bài hát vào hàng đợi!`);
+      setBatchUrlsText("");
+      setShowOrderModal(false);
+      if (!sfxMuted) playAirHornSound();
+    } else {
+      triggerToast(result.errors[0] || "Không thể thêm danh sách này.");
+    }
+  };
 
   // Telegram @HiFiAudiobot State
   const [tgSearchTerm, setTgSearchTerm] = useState("");
@@ -503,16 +538,25 @@ export default function WatchTogetherPage() {
                     </div>
                   )}
 
-                  {/* Floating Live Reactions Layer */}
-                  <div className="absolute bottom-4 right-4 pointer-events-none flex flex-col gap-2 items-end">
-                    {reactions.map((rx) => (
-                      <div
-                        key={rx.id}
-                        className="text-2xl animate-in slide-in-from-bottom fade-out zoom-out-50 duration-1000"
-                      >
-                        {rx.emoji}
-                      </div>
-                    ))}
+                  {/* Floating Live Reactions Barrage Layer */}
+                  <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
+                    {reactions.map((rx, idx) => {
+                      const leftPercent = ((rx.timestamp * 17 + idx * 23) % 75) + 12;
+                      return (
+                        <div
+                          key={rx.id}
+                          style={{ left: `${leftPercent}%` }}
+                          className="absolute bottom-4 flex flex-col items-center animate-reaction-float pointer-events-none"
+                        >
+                          <span className="text-3xl drop-shadow-[0_0_12px_rgba(255,255,255,0.7)] select-none">
+                            {rx.emoji}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-md text-white/95 border border-white/20 -mt-1 shadow-lg whitespace-nowrap">
+                            @{rx.username}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -724,19 +768,75 @@ export default function WatchTogetherPage() {
                   </div>
                 )}
 
-                {/* Floating Reaction Emojis Bar */}
-                <div className="p-2.5 rounded-2xl glass-panel border border-white/10 bg-slate-900/40 flex items-center justify-between gap-2 overflow-x-auto">
-                  <span className="text-xs font-semibold text-slate-400 shrink-0 ml-2">Thả biểu cảm:</span>
-                  <div className="flex items-center gap-1.5">
-                    {["❤️", "🔥", "👏", "🍿", "🎵", "🚀", "😂", "✨"].map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => sendReaction(emoji)}
-                        className="h-9 w-9 rounded-xl hover:bg-white/10 flex items-center justify-center text-lg hover:scale-125 active:scale-95 transition-transform"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
+                {/* Floating Reaction Emojis & DJ Soundboard Bar */}
+                <div className="p-3 rounded-2xl glass-panel border border-white/10 bg-slate-900/60 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+                  <div className="flex items-center gap-2 overflow-x-auto">
+                    <span className="text-xs font-semibold text-slate-400 shrink-0 ml-1">Thả biểu cảm:</span>
+                    <div className="flex items-center gap-1.5">
+                      {[
+                        { emoji: "❤️", label: "Tim yêu" },
+                        { emoji: "🔥", label: "Cháy quá" },
+                        { emoji: "👏", label: "Vỗ tay" },
+                        { emoji: "🍿", label: "Bắp rang" },
+                        { emoji: "🎵", label: "Phiêu nhạc" },
+                        { emoji: "🚀", label: "Lên nóc" },
+                        { emoji: "😂", label: "Cười bể bụng" },
+                        { emoji: "✨", label: "Lấp lánh" },
+                      ].map(({ emoji, label }) => (
+                        <button
+                          key={emoji}
+                          title={label}
+                          onClick={() => triggerReaction(emoji)}
+                          className="h-9 w-9 rounded-xl hover:bg-white/10 flex items-center justify-center text-xl hover:scale-135 active:scale-95 transition-all shadow-sm active:rotate-12"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* DJ Soundboard Quick Triggers & Mute Toggle */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => {
+                        if (!sfxMuted) playAirHornSound();
+                        triggerReaction("🚀");
+                      }}
+                      title="DJ Airhorn Fanfare"
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-transform"
+                    >
+                      <span>🎺</span>
+                      <span className="hidden sm:inline">Còi DJ</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (!sfxMuted) playApplauseSound();
+                        triggerReaction("👏");
+                      }}
+                      title="Tràng vỗ tay cổ vũ"
+                      className="px-2.5 py-1.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-transform"
+                    >
+                      <span>👏</span>
+                      <span className="hidden sm:inline">Vỗ tay</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const next = !sfxMuted;
+                        setSfxMuted(next);
+                        toggleSoundMute();
+                        triggerToast(next ? "Đã tắt âm thanh hiệu ứng reaction" : "Đã bật âm thanh hiệu ứng reaction");
+                      }}
+                      className={`h-8 w-8 rounded-xl flex items-center justify-center text-xs transition-colors border ${
+                        sfxMuted
+                          ? "bg-rose-500/20 border-rose-500/40 text-rose-300"
+                          : "bg-slate-800/80 border-white/10 text-slate-300 hover:text-white"
+                      }`}
+                      title={sfxMuted ? "Bật âm thanh reaction" : "Tắt âm thanh reaction"}
+                    >
+                      {sfxMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1285,19 +1385,31 @@ export default function WatchTogetherPage() {
                 </div>
               </div>
 
-              {/* Sub-tabs: Link ngoài vs Google Drive vs Telegram @HiFiAudiobot vs Hàng Đợi */}
-              <div className="grid grid-cols-4 gap-1.5 p-1 rounded-2xl bg-slate-900 border border-white/10 text-[11px] font-semibold">
+              {/* Sub-tabs: Link ngoài vs Playlist / Nhiều link vs Google Drive vs Telegram vs Hàng Đợi */}
+              <div className="grid grid-cols-5 gap-1 p-1 rounded-2xl bg-slate-900 border border-white/10 text-[10px] font-semibold">
                 <button
                   type="button"
                   onClick={() => setOrderModalTab("url")}
-                  className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 ${
                     orderModalTab === "url"
                       ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
                   <Globe className="w-3.5 h-3.5" />
-                  <span className="truncate">Link Ngoài</span>
+                  <span className="truncate">Link Đơn</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderModalTab("batch")}
+                  className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1 ${
+                    orderModalTab === "batch"
+                      ? "bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <ListMusic className="w-3.5 h-3.5" />
+                  <span className="truncate">Playlist</span>
                 </button>
                 <button
                   type="button"
@@ -1408,6 +1520,88 @@ export default function WatchTogetherPage() {
                     </Button>
                     <Button type="submit" variant="primary" size="sm">
                       + Thêm vào hàng đợi
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* TAB PLAYLIST & MULTI-TRACK BATCH ORDER */}
+              {orderModalTab === "batch" && (
+                <form onSubmit={handleBatchSubmit} className="space-y-3.5">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-200">
+                        Danh sách link bài hát hoặc Playlist YouTube
+                      </label>
+                      <span className="text-[10px] text-fuchsia-400 font-mono">
+                        {parseBatchUrls(batchUrlsText).length} link phát hiện
+                      </span>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={batchUrlsText}
+                      onChange={(e) => setBatchUrlsText(e.target.value)}
+                      placeholder="Dán link Playlist YouTube (chứa list=...) hoặc nhiều link YouTube/Spotify mỗi dòng một bài..."
+                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white font-mono leading-relaxed"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Hệ thống tự động tách từng dòng và xếp theo thứ tự vào Hàng Đợi Phát Theo Lượt.
+                    </p>
+                  </div>
+
+                  {/* Playlist Quick Presets */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-slate-300">Playlist gợi ý nhanh:</span>
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                      {[
+                        {
+                          name: "☕ Lofi Chill Coding",
+                          url: "https://www.youtube.com/watch?v=jfKfPfyJRdk\nhttps://www.youtube.com/watch?v=5qap5aO4i9A",
+                        },
+                        {
+                          name: "🕹️ Synthwave 80s Cyber",
+                          url: "https://www.youtube.com/watch?v=4xDzrJKXOOY\nhttps://www.youtube.com/watch?v=1u_uL78n2rQ",
+                        },
+                        {
+                          name: "🎶 V-Pop Ballad Chill",
+                          url: "https://www.youtube.com/watch?v=kYg82k_5nZ0\nhttps://www.youtube.com/watch?v=kJQP7kiw5Fk",
+                        },
+                        {
+                          name: "🌌 Deep Space Cosmic",
+                          url: "https://www.youtube.com/watch?v=WPni755-Krg\nhttps://www.youtube.com/watch?v=b4jSfZhZt9c",
+                        },
+                      ].map((preset) => (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => {
+                            setBatchUrlsText((prev) => (prev ? prev + "\n" + preset.url : preset.url));
+                          }}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 hover:border-fuchsia-500/40 text-slate-300 hover:text-white text-left truncate transition-colors"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setShowOrderModal(false)}
+                    >
+                      Hủy
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white shadow-lg shadow-fuchsia-500/20"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Thêm tất cả vào Hàng Đợi
                     </Button>
                   </div>
                 </form>

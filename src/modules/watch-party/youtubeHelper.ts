@@ -110,6 +110,49 @@ export function detectMediaSource(url: string): MediaSourceType {
  * - ZingMP3 / NhacCuaTui / Web links: direct embed or iframe
  * - Google Drive: direct stream / export URL
  */
+
+/**
+ * Extracts YouTube Playlist ID:
+ * https://www.youtube.com/playlist?list=PL4fGSIvMGkUVD_e9p25Zp9m_lY5iQWp5J
+ * https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PL4fGSIvMGkUVD_e9p25Zp9m_lY5iQWp5J
+ */
+export function extractYouTubePlaylistId(url: string): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const match = trimmed.match(/[?&]list=([a-zA-Z0-9_-]+)/i);
+  if (match && match[1]) {
+    return match[1];
+  }
+  return null;
+}
+
+/**
+ * Returns embed URL for YouTube Playlist
+ */
+export function getYouTubePlaylistEmbedUrl(playlistId: string, autoplay = true): string {
+  const params = new URLSearchParams({
+    autoplay: autoplay ? "1" : "0",
+    enablejsapi: "1",
+    listType: "playlist",
+    list: playlistId,
+    rel: "0",
+    modestbranding: "1",
+  });
+  return `https://www.youtube-nocookie.com/embed/videoseries?${params.toString()}`;
+}
+
+/**
+ * Parses batch multi-line or comma-separated URLs for bulk ordering
+ */
+export function parseBatchUrls(text: string): string[] {
+  if (!text) return [];
+  const lines = text
+    .split(/[\n,]+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 5 && (line.startsWith("http://") || line.startsWith("https://") || line.includes("youtube.com") || line.includes("youtu.be")));
+  return Array.from(new Set(lines));
+}
+
 export function resolveEmbedUrl(url: string, source: MediaSourceType, autoplay = true): string {
   const trimmed = url.trim();
 

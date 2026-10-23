@@ -361,7 +361,7 @@ export function SeasonalCanvas() {
           if (p.y < -30 || p.y > height + 30 || p.x < -30 || p.x > width + 30) {
             particles[i] = initParticle();
           }
-        } else if (effect === "bubbles" || effect === "cyber" || effect === "lanterns" || effect === "fireworks") {
+        } else if (effect === "bubbles" || effect === "cyber" || effect === "lanterns" || effect === "fireworks" || effect === "synthwave" || effect === "sunset") {
           if (p.y < -30 || p.x < -30 || p.x > width + 30) {
             particles[i] = initParticle();
           }

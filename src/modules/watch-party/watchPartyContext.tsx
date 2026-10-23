@@ -41,6 +41,7 @@ interface WatchPartyContextType {
   kickMember: (targetUsername: string) => { success: boolean; error?: string };
   sendChatMessage: (text: string) => void;
   sendReaction: (emoji: string) => void;
+  orderBatchSongs: (urls: string[]) => { addedCount: number; errors: string[] };
   togglePlayPause: () => void;
   seekMedia: (timeSeconds: number) => void;
   saveBookmark: (title: string, url: string, isVideo?: boolean, note?: string) => void;
@@ -131,6 +132,19 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
       refreshRoomsFromServer();
     }, 1000);
 
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === "tx_latest_reaction" && e.newValue) {
+        try {
+          const rx = JSON.parse(e.newValue);
+          setReactions((prev) => [...prev.slice(-25), rx]);
+          setTimeout(() => {
+            setReactions((prev) => prev.filter((r) => r.id !== rx.id));
+          }, 3500);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorageEvent);
+
     // Zero-Latency Real-Time WebSocket Push (< 50ms)
     let ws: WebSocket | null = null;
     try {
@@ -147,6 +161,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
 
     return () => {
       clearInterval(interval);
+      window.removeEventListener("storage", handleStorageEvent);
       if (ws) {
         try {
           ws.close();
@@ -584,18 +599,45 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     saveRoomsList(rooms.map((r) => (r.id === currentRoom.id ? updatedRoom : r)));
   };
 
-  // Send Floating Live Reaction
+  // Send Floating Live Reaction with cross-tab broadcast
   const sendReaction = (emoji: string) => {
     const newReaction: RoomReaction = {
-      id: `rx-${Date.now()}-${Math.random()}`,
+      id: `rx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       emoji,
       username: user?.username || "user",
       timestamp: Date.now(),
     };
-    setReactions((prev) => [...prev.slice(-20), newReaction]);
+    setReactions((prev) => [...prev.slice(-25), newReaction]);
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("tx_latest_reaction", JSON.stringify(newReaction));
+      } catch {}
+    }
+
     setTimeout(() => {
       setReactions((prev) => prev.filter((r) => r.id !== newReaction.id));
-    }, 3000);
+    }, 3500);
+  };
+
+  // Order Batch Songs / Playlist tracks
+  const orderBatchSongs = (urls: string[]): { addedCount: number; errors: string[] } => {
+    if (!currentRoom) {
+      return { addedCount: 0, errors: ["Chưa tham gia phòng nào."] };
+    }
+    let addedCount = 0;
+    const errors: string[] = [];
+
+    urls.forEach((url) => {
+      const res = orderSong(url, undefined, true, undefined, true, false);
+      if (res.success) {
+        addedCount++;
+      } else if (res.error) {
+        errors.push(res.error);
+      }
+    });
+
+    return { addedCount, errors };
   };
 
   // Toggle Play / Pause
@@ -681,6 +723,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
         currentRoom,
         savedBookmarks,
         reactions,
+        orderBatchSongs,
         createRoom,
         deleteRoom,
         clearAllRooms,
