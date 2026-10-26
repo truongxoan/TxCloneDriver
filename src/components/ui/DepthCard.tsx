@@ -11,7 +11,16 @@ import {
 } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface DepthCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface DepthCardProps
+  extends Omit<
+    React.HTMLAttributes<HTMLDivElement>,
+    | "onDrag"
+    | "onDragStart"
+    | "onDragEnd"
+    | "onAnimationStart"
+    | "onAnimationEnd"
+    | "onAnimationIteration"
+  > {
   /** Độ nghiêng tối đa theo độ, mặc định 8. Đặt 0 để tắt nghiêng. */
   tilt?: number;
   /** Bật/tắt lớp bóng sáng di theo chuột. */
