@@ -19,6 +19,7 @@ import {
   ShieldX,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
+import { validateRegistration } from "@/modules/auth/registrationValidation";
 import { useTelegram } from "@/modules/telegram/telegramContext";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
 import { useTheme } from "@/modules/theme-engine/themeContext";
@@ -60,6 +61,11 @@ export default function LoginPage() {
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [lockTime, setLockTime] = useState<string>("");
+  // When the device is locked, login stays locked, but registration must
+  // still be reachable (a locked device must not block creating a new
+  // pending account). Registration never counts as a login attempt and
+  // never unlocks the device.
+  const [showRegisterWhileLocked, setShowRegisterWhileLocked] = useState<boolean>(false);
 
   // Master Admin Emergency Override modal
   const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -170,26 +176,29 @@ export default function LoginPage() {
     }
   };
 
-  // Handle Registration submission
+  // Handle Registration submission. This deliberately does NOT touch
+  // the device lock state: registering is not a login attempt, and a
+  // successful registration must not unlock a locked device.
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setRegSuccessMessage(null);
 
-    if (!regName.trim() || !regUsername.trim() || !regPassword.trim()) {
-      setErrorMessage("Vui lòng điền đầy đủ thông tin đăng ký.");
-      return;
-    }
-
-    if (regPassword !== regConfirmPassword) {
-      setErrorMessage("Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.");
+    const validationError = validateRegistration({
+      username: regUsername,
+      password: regPassword,
+      name: regName,
+      confirmPassword: regConfirmPassword,
+    });
+    if (validationError) {
+      setErrorMessage(validationError);
       return;
     }
 
     setRegLoading(true);
 
     try {
-      const res = await register(regUsername, regPassword, regName);
+      const res = await register(regUsername, regPassword, regName, regConfirmPassword);
       if (res.success) {
         setRegSuccessMessage(
           "⏳ ĐĂNG KÝ THÀNH CÔNG! Tài khoản đã được chuyển lên Quản trị viên (Admin). Vui lòng chờ Admin phê duyệt và cấp quyền truy cập từng phân hệ trước khi đăng nhập."
@@ -200,9 +209,13 @@ export default function LoginPage() {
         setRegPassword("");
         setRegConfirmPassword("");
         setUsername(savedU);
-        setTimeout(() => {
-          setMode("login");
-        }, 3500);
+        // While locked, stay on the register view so the success message
+        // remains visible; the login form itself stays locked.
+        if (!isLocked) {
+          setTimeout(() => {
+            setMode("login");
+          }, 3500);
+        }
       } else {
         setErrorMessage(res.error || "Không thể đăng ký tài khoản.");
       }
@@ -317,6 +330,118 @@ export default function LoginPage() {
                 <span>Mở khóa Khẩn cấp Dành cho Admin (Master Override)</span>
               </button>
             </div>
+
+            {/* Registration remains available while locked: login stays
+                locked, but a new pending account can still be created.
+                Registration is not a login attempt and does not unlock
+                the device; the new account still waits for admin approval. */}
+            {!showRegisterWhileLocked ? (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRegisterWhileLocked(true);
+                    setErrorMessage(null);
+                  }}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold border border-emerald-400/40 flex items-center justify-center gap-2 transition-all"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  <span>Đăng ký tài khoản mới</span>
+                </button>
+                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                  Đăng ký không mở khóa thiết bị và không tính là lần đăng nhập. Tài khoản mới vẫn phải chờ Admin phê duyệt.
+                </p>
+              </div>
+            ) : (
+              <div className="pt-2 text-left space-y-3.5">
+                <button
+                  type="button"
+                  onClick={() => setShowRegisterWhileLocked(false)}
+                  className="text-xs text-slate-400 hover:text-white font-semibold"
+                >
+                  ← Quay lại màn hình khóa
+                </button>
+                <h3 className="text-sm font-bold text-white">Đăng ký tài khoản mới</h3>
+                {errorMessage && (
+                  <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2.5">
+                    <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{errorMessage}</span>
+                  </div>
+                )}
+                {regSuccessMessage && (
+                  <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{regSuccessMessage}</span>
+                  </div>
+                )}
+                <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">Họ và tên của bạn</label>
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="Ví dụ: Nguyễn Văn An"
+                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">Tên tài khoản mong muốn</label>
+                    <input
+                      type="text"
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value)}
+                      placeholder="Ví dụ: thanhvien_moi"
+                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm font-mono"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">Mật khẩu khởi tạo (ít nhất 6 ký tự)</label>
+                    <input
+                      type="password"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu..."
+                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-200 block">Xác nhận lại mật khẩu</label>
+                    <input
+                      type="password"
+                      value={regConfirmPassword}
+                      onChange={(e) => setRegConfirmPassword(e.target.value)}
+                      placeholder="Nhập lại mật khẩu..."
+                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
+                      required
+                    />
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-[11px] text-slate-400">
+                    ⚠️ Tài khoản sau khi tạo sẽ ở trạng thái <span className="text-white font-medium">Chờ xét duyệt</span>. Admin sẽ cấp quyền trước khi bạn đăng nhập được. Việc đăng ký không mở khóa thiết bị này.
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={regLoading}
+                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 border border-emerald-400/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
+                  >
+                    {regLoading ? (
+                      <>
+                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Đang gửi thông tin đăng ký...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-4 w-4" />
+                        <span>Gửi Yêu Cầu Tạo Tài Khoản</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         ) : (
           /* CASE B: NORMAL LOGIN / REGISTER INTERFACE */

@@ -5,6 +5,7 @@ import os from "os";
 import { ManagedUser, LockedDevice, AuditLogItem } from "@/modules/auth/types";
 import { SyncRoom } from "@/modules/watch-party/types";
 import { hashPassword } from "@/lib/password";
+import { validateRegistration } from "@/modules/auth/registrationValidation";
 
 // Hỗ trợ cả môi trường serverless Vercel (/tmp) và máy chủ cục bộ / VPS (thư mục ./data)
 const IS_VERCEL = !!process.env.VERCEL;
@@ -13,6 +14,7 @@ const DATA_DIR = IS_VERCEL
   : path.join(process.cwd(), "data");
 
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+const DELETED_FILE = path.join(DATA_DIR, "deleted_users.json");
 const DEVICES_FILE = path.join(DATA_DIR, "locked_devices.json");
 const AUDIT_FILE = path.join(DATA_DIR, "audit_logs.json");
 const ROOMS_FILE = path.join(DATA_DIR, "rooms.json");
@@ -111,6 +113,51 @@ let memoryAuditLogs: AuditLogItem[] = [];
 let memoryRooms: SyncRoom[] = [];
 let lastCloudFetchTime = 0;
 let isCloudSyncInProgress = false;
+// Tombstones for deleted usernames (lowercased). A stale client syncing an
+// old user list must not resurrect a deleted user: mergeUserLists and
+// readUsersLocal both drop tombstoned usernames. A fresh registration with
+// the same username clears its tombstone (see the register action), so a
+// deleted username can be legitimately re-registered.
+let memoryDeletedUsernames: string[] = [];
+
+function readDeletedUsernamesLocal(): string[] {
+  if (!ensureDataDir()) return memoryDeletedUsernames;
+  try {
+    if (!fs.existsSync(DELETED_FILE)) return memoryDeletedUsernames;
+    const parsed = JSON.parse(fs.readFileSync(DELETED_FILE, "utf8"));
+    if (Array.isArray(parsed)) {
+      memoryDeletedUsernames = parsed
+        .map((v) => String(v).toLowerCase())
+        .filter(Boolean);
+      return memoryDeletedUsernames;
+    }
+    return memoryDeletedUsernames;
+  } catch {
+    return memoryDeletedUsernames;
+  }
+}
+
+function writeDeletedUsernamesLocal(list: string[]) {
+  memoryDeletedUsernames = Array.from(
+    new Set(list.map((v) => String(v).toLowerCase()).filter(Boolean))
+  );
+  if (!ensureDataDir()) return;
+  try {
+    fs.writeFileSync(DELETED_FILE, JSON.stringify(memoryDeletedUsernames, null, 2), "utf8");
+  } catch {
+    // ignore
+  }
+}
+
+function isDeletedUsername(username: string): boolean {
+  return readDeletedUsernamesLocal().includes(username.toLowerCase());
+}
+
+function filterDeletedUsers(users: ManagedUser[]): ManagedUser[] {
+  const deleted = readDeletedUsernamesLocal();
+  if (deleted.length === 0) return users;
+  return users.filter((u) => !deleted.includes(u.username.toLowerCase()));
+}
 
 function ensureDataDir() {
   try {
@@ -136,16 +183,19 @@ function readUsersLocal(): ManagedUser[] {
     const raw = fs.readFileSync(USERS_FILE, "utf8");
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      memoryUsers = parsed;
-      return parsed;
+      const filtered = filterDeletedUsers(parsed);
+      memoryUsers = filtered;
+      return filtered;
     }
-    return memoryUsers;
+    return filterDeletedUsers(memoryUsers);
   } catch {
     return memoryUsers;
   }
 }
 
 function writeUsersLocal(users: ManagedUser[]) {
+  // Never persist a tombstoned user, even if a stale sync carried it in.
+  users = filterDeletedUsers(users);
   memoryUsers = users;
   if (!ensureDataDir()) return;
   try {
@@ -234,6 +284,7 @@ function writeRoomsLocal(rooms: SyncRoom[]) {
 }
 
 // Khởi tạo đọc local ngay khi load module
+readDeletedUsernamesLocal();
 readUsersLocal();
 readDevicesLocal();
 readAuditLogsLocal();
@@ -245,45 +296,61 @@ readRoomsLocal();
 function mergeUserLists(primary: ManagedUser[], secondary: ManagedUser[]): ManagedUser[] {
   const map = new Map<string, ManagedUser>();
 
-  // Thêm danh sách ban đầu
+  // Newest-wins merge: the record with the newer updatedAt decides status
+  // and allowedModules, so a rejection can never be overwritten by an older
+  // approved record, and an older pending record can never downgrade a
+  // newer approval. Only on an exact updatedAt tie does the status
+  // priority approved > rejected > pending apply. Tombstoned (deleted)
+  // usernames are dropped from both sides.
+  const statusRank = (status: ManagedUser["status"]) =>
+    status === "approved" ? 2 : status === "rejected" ? 1 : 0;
+
+  // Thêm danh sách ban đầu (bỏ qua user đã bị xóa)
   for (const u of primary) {
+    if (isDeletedUsername(u.username)) continue;
     map.set(u.username.toLowerCase(), { ...u });
   }
 
-  // Hợp nhất thông minh với danh sách thứ 2
+  // Hợp nhất với danh sách thứ 2
   for (const s of secondary) {
     const key = s.username.toLowerCase();
+    if (isDeletedUsername(s.username)) continue;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, { ...s });
     } else {
-      // Nếu user đã tồn tại ở cả 2 nơi:
       const merged: ManagedUser = { ...existing };
+      const existingTime = existing.updatedAt || 0;
+      const secondaryTime = s.updatedAt || 0;
 
-      // 1. Nếu một bên đã approved, giữ nguyên approved (không bao giờ đảo ngược về pending)
-      if (existing.status === "approved" || s.status === "approved") {
-        merged.status = "approved";
-      } else if (existing.status === "rejected" || s.status === "rejected") {
-        merged.status = "rejected";
-      }
-
-      // 2. Bảo toàn allowedModules nếu một bên đã được cấu hình quyền
-      if (Array.isArray(s.allowedModules) && s.allowedModules.length > 0) {
-        if (!Array.isArray(existing.allowedModules) || existing.allowedModules.length === 0) {
-          merged.allowedModules = [...s.allowedModules];
-        } else if ((s.updatedAt || 0) > (existing.updatedAt || 0)) {
-          merged.allowedModules = [...s.allowedModules];
-        }
-      }
-
-      // 3. Sử dụng timestamp updatedAt nếu có
-      if ((s.updatedAt || 0) > (existing.updatedAt || 0)) {
+      if (secondaryTime > existingTime) {
+        // Secondary is newer: it wins status, modules and profile fields.
+        merged.status = s.status;
+        if (Array.isArray(s.allowedModules)) merged.allowedModules = [...s.allowedModules];
         merged.name = s.name || existing.name;
         merged.coins = s.coins !== undefined ? s.coins : existing.coins;
         merged.avatarUrl = s.avatarUrl || existing.avatarUrl;
         merged.role = s.role || existing.role;
         merged.updatedAt = s.updatedAt;
+      } else if (secondaryTime === existingTime) {
+        // Tie: status priority, modules from the winning side if set.
+        if (statusRank(s.status) > statusRank(existing.status)) {
+          merged.status = s.status;
+          if (Array.isArray(s.allowedModules) && s.allowedModules.length > 0) {
+            merged.allowedModules = [...s.allowedModules];
+          }
+        } else if (
+          statusRank(s.status) === statusRank(existing.status) &&
+          Array.isArray(s.allowedModules) &&
+          s.allowedModules.length > 0 &&
+          (!Array.isArray(existing.allowedModules) || existing.allowedModules.length === 0)
+        ) {
+          merged.allowedModules = [...s.allowedModules];
+        }
+        // Profile fields stay with the existing record on a tie.
       }
+      // If existing is newer, it wins outright: no downgrade, no module
+      // rollback, and no resurrection of an older status.
 
       map.set(key, merged);
     }
@@ -300,7 +367,15 @@ async function fetchFromCloudStore(): Promise<{
   devices?: LockedDevice[];
   logs?: AuditLogItem[];
   rooms?: SyncRoom[];
+  deletedUsernames?: string[];
 } | null> {
+  // Collect BOTH sources and merge them below. Previously this returned
+  // early as soon as the txlab instance answered, so users that only
+  // existed in the cloud object store were never seen.
+  let txlabUsers: ManagedUser[] | undefined;
+  let txlabRooms: SyncRoom[] | undefined;
+  let txlabDevices: LockedDevice[] | undefined;
+
   // 1. Thử kéo dữ liệu trực tiếp từ máy chủ online txlab.io.vn (Nguồn chính xác nhất)
   try {
     const controller = new AbortController();
@@ -324,35 +399,31 @@ async function fetchFromCloudStore(): Promise<{
     ]);
     clearTimeout(timeout);
 
-    let fetchedUsers: ManagedUser[] | undefined;
-    let fetchedRooms: SyncRoom[] | undefined;
-    let fetchedDevices: LockedDevice[] | undefined;
-
     if (uRes && uRes.ok) {
       const uData = await uRes.json().catch(() => null);
-      if (uData?.users && Array.isArray(uData.users)) fetchedUsers = uData.users;
+      if (uData?.users && Array.isArray(uData.users)) txlabUsers = uData.users;
     }
     if (rRes && rRes.ok) {
       const rData = await rRes.json().catch(() => null);
-      if (rData?.rooms && Array.isArray(rData.rooms)) fetchedRooms = rData.rooms;
+      if (rData?.rooms && Array.isArray(rData.rooms)) txlabRooms = rData.rooms;
     }
     if (dRes && dRes.ok) {
       const dData = await dRes.json().catch(() => null);
-      if (dData?.devices && Array.isArray(dData.devices)) fetchedDevices = dData.devices;
-    }
-
-    if (fetchedUsers || fetchedRooms || fetchedDevices) {
-      return {
-        users: fetchedUsers,
-        rooms: fetchedRooms,
-        devices: fetchedDevices,
-      };
+      if (dData?.devices && Array.isArray(dData.devices)) txlabDevices = dData.devices;
     }
   } catch {
-    // fallback
+    // fall through to the cloud object store below
   }
 
-  // 2. Fallback sang Cloud Object Store (restful-api.dev)
+  // 2. Cloud Object Store (restful-api.dev) — merged with, not replaced by,
+  // the txlab instance data above.
+  let cloudData: {
+    users?: ManagedUser[];
+    devices?: LockedDevice[];
+    logs?: AuditLogItem[];
+    rooms?: SyncRoom[];
+    deletedUsernames?: string[];
+  } | null = null;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
@@ -367,12 +438,30 @@ async function fetchFromCloudStore(): Promise<{
     clearTimeout(timeout);
     if (res.ok) {
       const data = await res.json();
-      if (data?.data) {
-        return data.data;
-      }
+      if (data?.data) cloudData = data.data;
     }
   } catch {
     // ignore
+  }
+
+  const mergedUsers =
+    txlabUsers && cloudData?.users
+      ? mergeUserLists(txlabUsers, cloudData.users)
+      : txlabUsers || cloudData?.users;
+  const deletedUsernames = Array.from(
+    new Set([
+      ...(cloudData?.deletedUsernames || []).map((v) => String(v).toLowerCase()),
+    ])
+  );
+
+  if (mergedUsers || txlabRooms || cloudData?.rooms || txlabDevices || cloudData?.devices || cloudData?.logs || deletedUsernames.length > 0) {
+    return {
+      users: mergedUsers,
+      rooms: txlabRooms || cloudData?.rooms,
+      devices: txlabDevices || cloudData?.devices,
+      logs: cloudData?.logs,
+      deletedUsernames: deletedUsernames.length > 0 ? deletedUsernames : undefined,
+    };
   }
   return null;
 }
@@ -389,6 +478,12 @@ async function triggerBackgroundCloudFetch() {
   try {
     const cloudData = await fetchFromCloudStore();
     if (cloudData) {
+      if (cloudData.deletedUsernames && cloudData.deletedUsernames.length > 0) {
+        writeDeletedUsernamesLocal([
+          ...readDeletedUsernamesLocal(),
+          ...cloudData.deletedUsernames,
+        ]);
+      }
       if (cloudData.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
         const local = readUsersLocal();
         const merged = mergeUserLists(local, cloudData.users);
@@ -416,6 +511,7 @@ async function saveToCloudStoreBackground(payload: {
   devices?: LockedDevice[];
   logs?: AuditLogItem[];
   rooms?: SyncRoom[];
+  deletedUsernames?: string[];
 }) {
   try {
     const controller = new AbortController();
@@ -425,6 +521,7 @@ async function saveToCloudStoreBackground(payload: {
     const currentDevices = payload.devices || memoryDevices;
     const currentLogs = payload.logs || memoryAuditLogs;
     const currentRooms = payload.rooms || memoryRooms;
+    const currentDeleted = payload.deletedUsernames || readDeletedUsernamesLocal();
 
     await fetch(CLOUD_API_URL, {
       method: "PUT",
@@ -439,6 +536,7 @@ async function saveToCloudStoreBackground(payload: {
           devices: currentDevices,
           logs: currentLogs.slice(0, 50),
           rooms: currentRooms,
+          deletedUsernames: currentDeleted,
         },
       }),
       signal: controller.signal,
@@ -479,34 +577,68 @@ const NO_CACHE_HEADERS = {
   Expires: "0",
 };
 
-// GET: Trả về kết quả tức thì từ In-Memory & Local Disk (0ms latency), kích hoạt sync nền
+// GET: for rooms/devices/audit, trả về local và kích hoạt sync nền như cũ.
+// For users, best-effort merge the cloud object store BEFORE returning, so
+// a registration saved on another serverless instance is visible to the
+// admin immediately. The merge is capped at 2 seconds and every failure is
+// ignored, so a slow/unreachable cloud store can never block the response.
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 
-    // Kích hoạt đồng bộ ngầm không chặn kết quả
-    triggerBackgroundCloudFetch().catch(() => {});
-
     if (type === "rooms") {
+      triggerBackgroundCloudFetch().catch(() => {});
       const rooms = readRoomsLocal();
       return NextResponse.json({ success: true, rooms }, { headers: NO_CACHE_HEADERS });
     }
 
     if (type === "devices") {
+      triggerBackgroundCloudFetch().catch(() => {});
       const devices = readDevicesLocal();
       return NextResponse.json({ success: true, devices }, { headers: NO_CACHE_HEADERS });
     }
 
     if (type === "audit") {
+      triggerBackgroundCloudFetch().catch(() => {});
       const logs = readAuditLogsLocal();
       return NextResponse.json({ success: true, logs }, { headers: NO_CACHE_HEADERS });
     }
 
-    const users = readUsersLocal();
-    return NextResponse.json({ success: true, users }, { headers: NO_CACHE_HEADERS });
+    let users = readUsersLocal();
+    try {
+      const cloudData = await Promise.race([
+        fetchFromCloudStore(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+      ]);
+      if (cloudData) {
+        if (cloudData.deletedUsernames && cloudData.deletedUsernames.length > 0) {
+          writeDeletedUsernamesLocal([
+            ...readDeletedUsernamesLocal(),
+            ...cloudData.deletedUsernames,
+          ]);
+        }
+        if (cloudData.users && Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+          users = mergeUserLists(users, cloudData.users);
+          writeUsersLocal(users);
+        }
+        // Mark the cloud as freshly fetched so the background trigger does
+        // not immediately repeat the same fetch.
+        lastCloudFetchTime = Date.now();
+      }
+    } catch {
+      // Cloud merge is best-effort: local users are still returned.
+    }
+
+    return NextResponse.json(
+      { success: true, users, deletedUsernames: readDeletedUsernamesLocal() },
+      { headers: NO_CACHE_HEADERS }
+    );
   } catch {
-    return NextResponse.json({ success: true, users: memoryUsers }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json(
+      { success: true, users: filterDeletedUsers(memoryUsers), deletedUsernames: readDeletedUsernamesLocal() },
+      { headers: NO_CACHE_HEADERS }
+    );
   }
 }
 
@@ -518,15 +650,29 @@ export async function POST(request: Request) {
 
     // 1. ĐĂNG KÝ TÀI KHOẢN MỚI
     if (action === "register") {
-      const { username, password, name } = body;
+      const { username, password, name, confirmPassword } = body;
       const u = (username || "").trim();
       const p = (password || "").trim();
       const n = (name || "").trim();
 
-      if (!u || !p || !n) {
+      const validationError = validateRegistration({
+        username: u,
+        password: p,
+        name: n,
+        confirmPassword: confirmPassword !== undefined ? confirmPassword : undefined,
+      });
+      if (validationError) {
         return NextResponse.json(
-          { success: false, error: "Vui lòng nhập đầy đủ thông tin đăng ký." },
+          { success: false, error: validationError },
           { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+
+      // A re-registration with a previously deleted username is legitimate:
+      // clear its tombstone so the new record is not filtered out.
+      if (isDeletedUsername(u)) {
+        writeDeletedUsernamesLocal(
+          readDeletedUsernamesLocal().filter((d) => d !== u.toLowerCase())
         );
       }
 
@@ -619,6 +765,53 @@ export async function POST(request: Request) {
       saveToCloudStoreBackground({ users: updated }).catch(() => {});
 
       return NextResponse.json({ success: true, users: updated }, { headers: NO_CACHE_HEADERS });
+    }
+
+    // 2b. XÓA TÀI KHOẢN (server-side, có tombstone để stale sync không
+    // khôi phục lại user đã xóa). Idempotent: xóa lại user đã xóa vẫn
+    // trả success với danh sách hiện tại.
+    if (action === "delete_user") {
+      const { userId, username } = body;
+      if (!userId && !username) {
+        return NextResponse.json(
+          { success: false, error: "Thiếu mã định danh người dùng (userId)" },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+
+      let users = readUsersLocal();
+      const target = users.find(
+        (u) =>
+          (userId && u.id === userId) ||
+          (username && u.username.toLowerCase() === String(username).toLowerCase())
+      );
+      if (!target) {
+        return NextResponse.json({ success: true, users }, { headers: NO_CACHE_HEADERS });
+      }
+      if (target.role === "admin") {
+        return NextResponse.json(
+          { success: false, error: "Không thể xóa tài khoản quản trị viên." },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+
+      const updated = users.filter((u) => u.id !== target.id);
+      // Record the tombstone BEFORE writing, so writeUsersLocal's filter
+      // and any concurrent merge drop the deleted user.
+      writeDeletedUsernamesLocal([
+        ...readDeletedUsernamesLocal(),
+        target.username.toLowerCase(),
+      ]);
+      writeUsersLocal(updated);
+      saveToCloudStoreBackground({
+        users: updated,
+        deletedUsernames: readDeletedUsernamesLocal(),
+      }).catch(() => {});
+
+      return NextResponse.json(
+        { success: true, users: updated, deletedUsernames: readDeletedUsernamesLocal() },
+        { headers: NO_CACHE_HEADERS }
+      );
     }
 
     // 3. ĐỒNG BỘ DANH SÁCH USERS
