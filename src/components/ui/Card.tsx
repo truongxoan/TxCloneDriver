@@ -9,7 +9,7 @@ export function Card({ className, glass = true, children, ...props }: CardProps)
   return (
     <div
       className={cn(
-        "rounded-2xl border p-5 relative overflow-hidden transition-all duration-200",
+        "rounded-2xl border p-5 relative overflow-hidden transition-all duration-200 tx-depth-card",
         glass ? "glass-card" : "bg-surface border-surface-border",
         className
       )}
