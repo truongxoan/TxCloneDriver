@@ -346,3 +346,84 @@ body {
   animation: reaction-float 3.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   will-change: transform, opacity;
 }
+
+/* ═══════════════════════════════════════════════
+   🧊 PHASE 1 — 3D SHELL
+   Lớp 3D dùng chung, không sửa logic module.
+   - .tx-depth-card: mọi Card cũ tự có chiều sâu khi hover.
+   - .tx-depth-child: nội dung nổi lên theo trục Z trong DepthCard.
+   - Sidebar: link hover trượt nhẹ + nổi lên, không đổi layout.
+   ═══════════════════════════════════════════════ */
+.tx-depth {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.tx-depth-child {
+  transform: translateZ(24px);
+}
+
+.tx-depth-card {
+  transform-style: preserve-3d;
+}
+
+.tx-depth-card:hover {
+  transform: translateY(-2px) translateZ(6px);
+  box-shadow:
+    0 20px 45px -18px rgba(0, 0, 0, 0.75),
+    0 0 24px -8px var(--primary-glow);
+}
+
+/* Sidebar nav: hover nổi nhẹ sang phải, giữ nguyên màu active */
+aside nav a {
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s, box-shadow 0.2s;
+}
+
+aside nav a:hover {
+  transform: translateX(2px) translateZ(4px);
+}
+
+/* Vùng nền sâu cho main: 2 quầng sáng mờ, không bắt chuột */
+.tx-scene-orbs {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.tx-scene-orbs::before,
+.tx-scene-orbs::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.35;
+}
+
+.tx-scene-orbs::before {
+  width: 420px;
+  height: 420px;
+  left: -120px;
+  top: -80px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.55), transparent 70%);
+}
+
+.tx-scene-orbs::after {
+  width: 380px;
+  height: 380px;
+  right: -100px;
+  top: 32%;
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.45), transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tx-depth-card:hover,
+  aside nav a:hover {
+    transform: none;
+  }
+
+  .tx-scene-orbs::before,
+  .tx-scene-orbs::after {
+    display: none;
+  }
+}
