@@ -12,14 +12,11 @@ import {
   AlertTriangle,
   AlertCircle,
   ArrowRight,
-  UserPlus,
   KeyRound,
-  CheckCircle2,
   Unlock,
   ShieldX,
 } from "lucide-react";
 import { useAuth } from "@/modules/auth/authContext";
-import { validateRegistration } from "@/modules/auth/registrationValidation";
 import { useTelegram } from "@/modules/telegram/telegramContext";
 import { SeasonalCanvas } from "@/modules/seasonal-effects/SeasonalCanvas";
 import { useTheme } from "@/modules/theme-engine/themeContext";
@@ -32,12 +29,9 @@ const STORAGE_LOCK_TIMESTAMP = "txclonedriver_lock_timestamp";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, register, managedUsers, recordDeviceAttempt } = useAuth();
+  const { login, managedUsers, recordDeviceAttempt } = useAuth();
   const { currentTheme } = useTheme();
   const { sendSecurityRadarAlert } = useTelegram();
-
-  // Mode: "login" | "register"
-  const [mode, setMode] = useState<"login" | "register">("login");
 
   // Login form state
   const [username, setUsername] = useState("");
@@ -48,25 +42,11 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
-  // Register form state
-  const [regName, setRegName] = useState("");
-  const [regUsername, setRegUsername] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regConfirmPassword, setRegConfirmPassword] = useState("");
-  const [regLoading, setRegLoading] = useState(false);
-  const [regSuccessMessage, setRegSuccessMessage] = useState<string | null>(null);
-
   // Machine ID & Hardware Lockout State
   const [machineId, setMachineId] = useState<string>("TX-DEV-INITIALIZING...");
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [lockTime, setLockTime] = useState<string>("");
-  // When the device is locked, login stays locked, but registration must
-  // still be reachable (a locked device must not block creating a new
-  // pending account). Registration never counts as a login attempt and
-  // never unlocks the device.
-  const [showRegisterWhileLocked, setShowRegisterWhileLocked] = useState<boolean>(false);
-
   // Master Admin Emergency Override modal
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [overridePass, setOverridePass] = useState("");
@@ -86,6 +66,14 @@ export default function LoginPage() {
 
       const fa = parseInt(localStorage.getItem(STORAGE_FAILED_ATTEMPTS) || "0", 10);
       setFailedAttempts(fa);
+
+      try {
+        const lockMsg = localStorage.getItem("txclonedriver_session_lock_message");
+        if (lockMsg) {
+          setErrorMessage(lockMsg);
+          localStorage.removeItem("txclonedriver_session_lock_message");
+        }
+      } catch {}
 
       const locked = localStorage.getItem(STORAGE_DEVICE_LOCKED) === "true";
       if (locked || fa >= 3) {
@@ -141,6 +129,10 @@ export default function LoginPage() {
         } else {
           router.push("/overview");
         }
+      } else if ((result.error || "").includes("máy khác")) {
+        // A one-device session lock is not a failed password attempt:
+        // it must not count toward the 3-attempt device lockout.
+        setErrorMessage(result.error || "Tài khoản này đang bị khóa vì phát hiện đăng nhập từ máy khác.");
       } else {
         const devStatus = recordDeviceAttempt(machineId, username.trim(), true);
         const newCount = devStatus.failedCount;
@@ -173,56 +165,6 @@ export default function LoginPage() {
       setErrorMessage("Có lỗi xảy ra khi xác thực. Vui lòng thử lại.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Handle Registration submission. This deliberately does NOT touch
-  // the device lock state: registering is not a login attempt, and a
-  // successful registration must not unlock a locked device.
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setRegSuccessMessage(null);
-
-    const validationError = validateRegistration({
-      username: regUsername,
-      password: regPassword,
-      name: regName,
-      confirmPassword: regConfirmPassword,
-    });
-    if (validationError) {
-      setErrorMessage(validationError);
-      return;
-    }
-
-    setRegLoading(true);
-
-    try {
-      const res = await register(regUsername, regPassword, regName, regConfirmPassword);
-      if (res.success) {
-        setRegSuccessMessage(
-          "⏳ ĐĂNG KÝ THÀNH CÔNG! Tài khoản đã được chuyển lên Quản trị viên (Admin). Vui lòng chờ Admin phê duyệt và cấp quyền truy cập từng phân hệ trước khi đăng nhập."
-        );
-        const savedU = regUsername.trim();
-        setRegName("");
-        setRegUsername("");
-        setRegPassword("");
-        setRegConfirmPassword("");
-        setUsername(savedU);
-        // While locked, stay on the register view so the success message
-        // remains visible; the login form itself stays locked.
-        if (!isLocked) {
-          setTimeout(() => {
-            setMode("login");
-          }, 3500);
-        }
-      } else {
-        setErrorMessage(res.error || "Không thể đăng ký tài khoản.");
-      }
-    } catch {
-      setErrorMessage("Có lỗi xảy ra khi đăng ký tài khoản.");
-    } finally {
-      setRegLoading(false);
     }
   };
 
@@ -331,117 +273,6 @@ export default function LoginPage() {
               </button>
             </div>
 
-            {/* Registration remains available while locked: login stays
-                locked, but a new pending account can still be created.
-                Registration is not a login attempt and does not unlock
-                the device; the new account still waits for admin approval. */}
-            {!showRegisterWhileLocked ? (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRegisterWhileLocked(true);
-                    setErrorMessage(null);
-                  }}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold border border-emerald-400/40 flex items-center justify-center gap-2 transition-all"
-                >
-                  <UserPlus className="h-3.5 w-3.5" />
-                  <span>Đăng ký tài khoản mới</span>
-                </button>
-                <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                  Đăng ký không mở khóa thiết bị và không tính là lần đăng nhập. Tài khoản mới vẫn phải chờ Admin phê duyệt.
-                </p>
-              </div>
-            ) : (
-              <div className="pt-2 text-left space-y-3.5">
-                <button
-                  type="button"
-                  onClick={() => setShowRegisterWhileLocked(false)}
-                  className="text-xs text-slate-400 hover:text-white font-semibold"
-                >
-                  ← Quay lại màn hình khóa
-                </button>
-                <h3 className="text-sm font-bold text-white">Đăng ký tài khoản mới</h3>
-                {errorMessage && (
-                  <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-start gap-2.5">
-                    <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed">{errorMessage}</span>
-                  </div>
-                )}
-                {regSuccessMessage && (
-                  <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2.5">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="leading-relaxed">{regSuccessMessage}</span>
-                  </div>
-                )}
-                <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-200 block">Họ và tên của bạn</label>
-                    <input
-                      type="text"
-                      value={regName}
-                      onChange={(e) => setRegName(e.target.value)}
-                      placeholder="Ví dụ: Nguyễn Văn An"
-                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-200 block">Tên tài khoản mong muốn</label>
-                    <input
-                      type="text"
-                      value={regUsername}
-                      onChange={(e) => setRegUsername(e.target.value)}
-                      placeholder="Ví dụ: thanhvien_moi"
-                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm font-mono"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-200 block">Mật khẩu khởi tạo (ít nhất 6 ký tự)</label>
-                    <input
-                      type="password"
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Nhập mật khẩu..."
-                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-200 block">Xác nhận lại mật khẩu</label>
-                    <input
-                      type="password"
-                      value={regConfirmPassword}
-                      onChange={(e) => setRegConfirmPassword(e.target.value)}
-                      placeholder="Nhập lại mật khẩu..."
-                      className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
-                      required
-                    />
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-[11px] text-slate-400">
-                    ⚠️ Tài khoản sau khi tạo sẽ ở trạng thái <span className="text-white font-medium">Chờ xét duyệt</span>. Admin sẽ cấp quyền trước khi bạn đăng nhập được. Việc đăng ký không mở khóa thiết bị này.
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={regLoading}
-                    className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 border border-emerald-400/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
-                  >
-                    {regLoading ? (
-                      <>
-                        <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Đang gửi thông tin đăng ký...</span>
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4" />
-                        <span>Gửi Yêu Cầu Tạo Tài Khoản</span>
-                      </>
-                    )}
-                  </button>
-                </form>
-              </div>
-            )}
           </div>
         ) : (
           /* CASE B: NORMAL LOGIN / REGISTER INTERFACE */
@@ -502,39 +333,16 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Navigation Tabs: Đăng nhập vs Đăng ký */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-900/80 border border-white/10 mb-4 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setErrorMessage(null);
-                }}
-                className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                  mode === "login"
-                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md font-bold"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Lock className="h-3.5 w-3.5" />
-                <span>Đăng nhập</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("register");
-                  setErrorMessage(null);
-                }}
-                className={`py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                  mode === "register"
-                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md font-bold"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-                <span>Đăng ký mới</span>
-              </button>
+            <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-400/30 text-left space-y-1.5 mb-4">
+              <p className="text-xs font-bold text-sky-300">
+                Đăng nhập bằng tên do admin tạo sẵn — không còn tạo tài khoản mới.
+              </p>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Thành viên: nhập tên của mình (11, 22, 33, 44, 55, 66, 77, 88 hoặc 99) và mật khẩu bất kỳ — mật khẩu không cần chính xác và không được lưu lại. Admin: nhập tên admin và mật khẩu admin.
+              </p>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Mỗi thành viên chỉ được đăng nhập ở 1 máy. Nếu có máy thứ hai đăng nhập cùng tên, thành viên đó sẽ bị khóa 5 phút.
+              </p>
             </div>
 
             {/* Error Message Alert */}
@@ -553,16 +361,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Success Registration Notification */}
-            {regSuccessMessage && (
-              <div className="mb-4 p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2.5 animate-in fade-in slide-in-from-top-1">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{regSuccessMessage}</span>
-              </div>
-            )}
-
-            {/* SUB-TAB 1: LOGIN FORM */}
-            {mode === "login" && (
+            {/* LOGIN FORM */}
+            {(
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 {/* Username */}
                 <div className="space-y-1.5">
@@ -576,7 +376,7 @@ export default function LoginPage() {
                       autoComplete="username"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="Nhập tên tài khoản của bạn..."
+                      placeholder="Ví dụ: 11, 22, ... hoặc admin"
                       className="w-full pl-10 pr-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
                       required
                     />
@@ -642,95 +442,6 @@ export default function LoginPage() {
                     <>
                       <span>Đăng nhập vào Hệ thống</span>
                       <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
-
-            {/* SUB-TAB 2: REGISTRATION FORM */}
-            {mode === "register" && (
-              <form onSubmit={handleRegisterSubmit} className="space-y-3.5 animate-in fade-in">
-                {/* Full Name */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">
-                    Họ và tên của bạn
-                  </label>
-                  <input
-                    type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="Ví dụ: Nguyễn Văn An"
-                    className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
-                    required
-                  />
-                </div>
-
-                {/* Username */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">
-                    Tên tài khoản mong muốn
-                  </label>
-                  <input
-                    type="text"
-                    value={regUsername}
-                    onChange={(e) => setRegUsername(e.target.value)}
-                    placeholder="Ví dụ: thanhvien_moi"
-                    className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm font-mono"
-                    required
-                  />
-                </div>
-
-                {/* Password */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">
-                    Mật khẩu khởi tạo
-                  </label>
-                  <input
-                    type="password"
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Nhập mật khẩu..."
-                    className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
-                    required
-                  />
-                </div>
-
-                {/* Confirm Password */}
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">
-                    Xác nhận lại mật khẩu
-                  </label>
-                  <input
-                    type="password"
-                    value={regConfirmPassword}
-                    onChange={(e) => setRegConfirmPassword(e.target.value)}
-                    placeholder="Nhập lại mật khẩu..."
-                    className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-xs text-white placeholder:text-slate-500 shadow-sm"
-                    required
-                  />
-                </div>
-
-                {/* Note about admin approval */}
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/10 text-[11px] text-slate-400">
-                  ⚠️ <strong className="text-amber-300">Lưu ý phê duyệt:</strong> Mọi tài khoản sau khi tạo sẽ được chuyển đến Admin ở trạng thái <span className="text-white font-medium">Chờ xét duyệt</span>. Admin sẽ cấp quyền các phân hệ tương ứng trước khi bạn đăng nhập được.
-                </div>
-
-                {/* Register Submit */}
-                <button
-                  type="submit"
-                  disabled={regLoading}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 border border-emerald-400/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none mt-2"
-                >
-                  {regLoading ? (
-                    <>
-                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Đang gửi thông tin đăng ký...</span>
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-4 w-4" />
-                      <span>Gửi Yêu Cầu Tạo Tài Khoản</span>
                     </>
                   )}
                 </button>

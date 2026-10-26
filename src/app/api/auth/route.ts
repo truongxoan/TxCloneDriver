@@ -5,7 +5,7 @@ import os from "os";
 import { ManagedUser, LockedDevice, AuditLogItem } from "@/modules/auth/types";
 import { SyncRoom } from "@/modules/watch-party/types";
 import { hashPassword } from "@/lib/password";
-import { validateRegistration } from "@/modules/auth/registrationValidation";
+import { PRESET_MEMBERS, PRESET_MEMBER_MODULES, isPresetMemberUsername, isAllowedUsername, presetMemberFor } from "@/modules/auth/presetMembers";
 
 // Hỗ trợ cả môi trường serverless Vercel (/tmp) và máy chủ cục bộ / VPS (thư mục ./data)
 const IS_VERCEL = !!process.env.VERCEL;
@@ -18,6 +18,7 @@ const DELETED_FILE = path.join(DATA_DIR, "deleted_users.json");
 const DEVICES_FILE = path.join(DATA_DIR, "locked_devices.json");
 const AUDIT_FILE = path.join(DATA_DIR, "audit_logs.json");
 const ROOMS_FILE = path.join(DATA_DIR, "rooms.json");
+const SESSIONS_FILE = path.join(DATA_DIR, "member_sessions.json");
 
 // Dedicated Cloud Storage ID on restful-api.dev for cross-device sync
 const CLOUD_STORE_ID = "ff808181a09d98f701a135d01243556c";
@@ -59,51 +60,7 @@ const INITIAL_USERS: ManagedUser[] = [
     provider: "local",
     updatedAt: 1728500000000,
   },
-  {
-    id: "u-member-a",
-    username: "11",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên A (Chỉ Google Drive)",
-    avatarInitials: "11",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage"],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
-  {
-    id: "u-member-b",
-    username: "userb",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên B (Google Drive & Dự án)",
-    avatarInitials: "UB",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage", "projects"],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
-  {
-    id: "u-member-pending",
-    username: "hocvien_moi",
-    password: "21",
-    plainPassword: "21",
-    name: "Học viên Đăng ký mới (Chờ duyệt)",
-    avatarInitials: "HV",
-    coins: 50000,
-    role: "user",
-    status: "pending",
-    allowedModules: [],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
+  ...PRESET_MEMBERS,
 ];
 
 // In-Memory Master Cache (Ultra-fast 0ms response)
@@ -111,13 +68,24 @@ let memoryUsers: ManagedUser[] = [...INITIAL_USERS];
 let memoryDevices: LockedDevice[] = [];
 let memoryAuditLogs: AuditLogItem[] = [];
 let memoryRooms: SyncRoom[] = [];
+
+// One-device-per-member sessions (preset members only, never admin).
+interface MemberSession {
+  username: string;
+  machineId: string | null;
+  lastSeen: number;
+  lockedUntil: number | null;
+  lockedMachineId?: string | null;
+}
+let memorySessions: MemberSession[] = [];
 let lastCloudFetchTime = 0;
 let isCloudSyncInProgress = false;
 // Tombstones for deleted usernames (lowercased). A stale client syncing an
 // old user list must not resurrect a deleted user: mergeUserLists and
 // readUsersLocal both drop tombstoned usernames. A fresh registration with
-// the same username clears its tombstone (see the register action), so a
-// deleted username can be legitimately re-registered.
+// Note: account creation is now disabled, so a tombstoned username
+// cannot be re-registered through the web UI; restoring a deleted
+// preset member requires clearing its tombstone server-side.
 let memoryDeletedUsernames: string[] = [];
 
 function readDeletedUsernamesLocal(): string[] {
@@ -157,6 +125,147 @@ function filterDeletedUsers(users: ManagedUser[]): ManagedUser[] {
   const deleted = readDeletedUsernamesLocal();
   if (deleted.length === 0) return users;
   return users.filter((u) => !deleted.includes(u.username.toLowerCase()));
+}
+
+
+// --- Name-only preset members: whitelist + session registry ---
+// Only "admin" and the 9 preset members may exist in the user list.
+// Old cloud/local users (e.g. sample members, pending samples) are
+// dropped, so they cannot bypass the whitelist.
+function normalizePresetUser(u: ManagedUser): ManagedUser {
+  const preset = presetMemberFor(u.username);
+  if (!preset) return u;
+  // Upgrade only the old sample record (modules ["storage"] with the old
+  // timestamp) to the new preset definition. A newer record is an
+  // admin change via the Settings matrix and must be kept as-is.
+  const oldSample =
+    (u.updatedAt || 0) <= 1728500000000 &&
+    Array.isArray(u.allowedModules) &&
+    !u.allowedModules.includes("watch_together");
+  if (oldSample) {
+    return { ...u, name: preset.name, allowedModules: [...PRESET_MEMBER_MODULES], status: "approved" };
+  }
+  return u;
+}
+
+function filterToAllowedUsers(users: ManagedUser[]): ManagedUser[] {
+  const deleted = readDeletedUsernamesLocal();
+  const map = new Map<string, ManagedUser>();
+  for (const u of users) {
+    const key = u.username.toLowerCase();
+    if (deleted.includes(key)) continue;
+    if (!isAllowedUsername(key)) continue;
+    map.set(key, normalizePresetUser({ ...u }));
+  }
+  // Every preset member must be present unless tombstoned (deleted by
+  // admin). This also repairs a list that lost a preset member.
+  for (const preset of PRESET_MEMBERS) {
+    const key = preset.username.toLowerCase();
+    if (!deleted.includes(key) && !map.has(key)) {
+      map.set(key, { ...preset });
+    }
+  }
+  return Array.from(map.values());
+}
+
+function readSessionsLocal(): MemberSession[] {
+  if (!ensureDataDir()) return memorySessions;
+  try {
+    if (!fs.existsSync(SESSIONS_FILE)) return memorySessions;
+    const parsed = JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf8"));
+    if (Array.isArray(parsed)) {
+      memorySessions = parsed.filter(
+        (s: MemberSession) => s && isPresetMemberUsername(String(s.username || ""))
+      );
+      return memorySessions;
+    }
+    return memorySessions;
+  } catch {
+    return memorySessions;
+  }
+}
+
+function writeSessionsLocal(sessions: MemberSession[]) {
+  memorySessions = sessions.filter((s) => s && isPresetMemberUsername(String(s.username || "")));
+  if (!ensureDataDir()) return;
+  try {
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(memorySessions, null, 2), "utf8");
+  } catch {
+    // ignore
+  }
+}
+
+function mergeSessions(a: MemberSession[], b: MemberSession[]): MemberSession[] {
+  const map = new Map<string, MemberSession>();
+  const now = Date.now();
+  for (const s of [...a, ...b]) {
+    if (!s || !isPresetMemberUsername(String(s.username || ""))) continue;
+    const key = String(s.username).toLowerCase();
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...s });
+      continue;
+    }
+    const aLocked = (existing.lockedUntil || 0) > now;
+    const bLocked = (s.lockedUntil || 0) > now;
+    if (aLocked || bLocked) {
+      const winner = (s.lockedUntil || 0) > (existing.lockedUntil || 0) ? s : existing;
+      map.set(key, {
+        ...winner,
+        lockedUntil: Math.max(existing.lockedUntil || 0, s.lockedUntil || 0),
+        lastSeen: Math.max(existing.lastSeen || 0, s.lastSeen || 0),
+      });
+    } else if ((s.lastSeen || 0) > (existing.lastSeen || 0)) {
+      map.set(key, { ...s, lockedUntil: null });
+    }
+  }
+  return Array.from(map.values());
+}
+
+async function fetchCloudSessionsOnly(): Promise<MemberSession[] | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(`${CLOUD_API_URL}?_t=${Date.now()}`, {
+      signal: controller.signal,
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", Pragma: "no-cache" },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const sessions = data?.data?.sessions;
+    if (Array.isArray(sessions)) return sessions as MemberSession[];
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function readSessionsMerged(): Promise<MemberSession[]> {
+  const local = readSessionsLocal();
+  const cloud = await fetchCloudSessionsOnly();
+  if (!cloud) return local;
+  const merged = mergeSessions(local, cloud);
+  writeSessionsLocal(merged);
+  return merged;
+}
+
+function formatLockRemaining(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) return `${minutes} phút ${seconds} giây`;
+  return `${seconds} giây`;
+}
+
+function lockError(lockedUntil: number): { locked: boolean; remainingSeconds: number; error: string } {
+  const remainingSeconds = Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+  return {
+    locked: true,
+    remainingSeconds,
+    error: `Tài khoản này đang bị khóa ${formatLockRemaining(lockedUntil - Date.now())} vì phát hiện đăng nhập từ máy khác. Vui lòng thử lại sau.`,
+  };
 }
 
 function ensureDataDir() {
@@ -305,9 +414,11 @@ function mergeUserLists(primary: ManagedUser[], secondary: ManagedUser[]): Manag
   const statusRank = (status: ManagedUser["status"]) =>
     status === "approved" ? 2 : status === "rejected" ? 1 : 0;
 
-  // Thêm danh sách ban đầu (bỏ qua user đã bị xóa)
+  // Thêm danh sách ban đầu (bỏ qua user đã bị xóa và user không
+  // thuộc whitelist admin + thành viên tạo sẵn)
   for (const u of primary) {
     if (isDeletedUsername(u.username)) continue;
+    if (!isAllowedUsername(u.username)) continue;
     map.set(u.username.toLowerCase(), { ...u });
   }
 
@@ -315,6 +426,7 @@ function mergeUserLists(primary: ManagedUser[], secondary: ManagedUser[]): Manag
   for (const s of secondary) {
     const key = s.username.toLowerCase();
     if (isDeletedUsername(s.username)) continue;
+    if (!isAllowedUsername(s.username)) continue;
     const existing = map.get(key);
     if (!existing) {
       map.set(key, { ...s });
@@ -356,7 +468,7 @@ function mergeUserLists(primary: ManagedUser[], secondary: ManagedUser[]): Manag
     }
   }
 
-  return Array.from(map.values());
+  return filterToAllowedUsers(Array.from(map.values()));
 }
 
 // ---------------------------------------------------------------------------
@@ -368,6 +480,7 @@ async function fetchFromCloudStore(): Promise<{
   logs?: AuditLogItem[];
   rooms?: SyncRoom[];
   deletedUsernames?: string[];
+  sessions?: MemberSession[];
 } | null> {
   // Collect BOTH sources and merge them below. Previously this returned
   // early as soon as the txlab instance answered, so users that only
@@ -375,12 +488,13 @@ async function fetchFromCloudStore(): Promise<{
   let txlabUsers: ManagedUser[] | undefined;
   let txlabRooms: SyncRoom[] | undefined;
   let txlabDevices: LockedDevice[] | undefined;
+  let txlabSessions: MemberSession[] | undefined;
 
   // 1. Thử kéo dữ liệu trực tiếp từ máy chủ online txlab.io.vn (Nguồn chính xác nhất)
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500);
-    const [uRes, rRes, dRes] = await Promise.all([
+    const [uRes, rRes, dRes, sRes] = await Promise.all([
       fetch("https://txlab.io.vn/api/auth?_t=" + Date.now(), {
         signal: controller.signal,
         cache: "no-store",
@@ -392,6 +506,11 @@ async function fetchFromCloudStore(): Promise<{
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
       }).catch(() => null),
       fetch("https://txlab.io.vn/api/auth?type=devices&_t=" + Date.now(), {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      }).catch(() => null),
+      fetch("https://txlab.io.vn/api/auth?type=sessions&_t=" + Date.now(), {
         signal: controller.signal,
         cache: "no-store",
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
@@ -411,6 +530,10 @@ async function fetchFromCloudStore(): Promise<{
       const dData = await dRes.json().catch(() => null);
       if (dData?.devices && Array.isArray(dData.devices)) txlabDevices = dData.devices;
     }
+    if (sRes && sRes.ok) {
+      const sData = await sRes.json().catch(() => null);
+      if (sData?.sessions && Array.isArray(sData.sessions)) txlabSessions = sData.sessions;
+    }
   } catch {
     // fall through to the cloud object store below
   }
@@ -423,6 +546,7 @@ async function fetchFromCloudStore(): Promise<{
     logs?: AuditLogItem[];
     rooms?: SyncRoom[];
     deletedUsernames?: string[];
+    sessions?: MemberSession[];
   } | null = null;
   try {
     const controller = new AbortController();
@@ -448,19 +572,24 @@ async function fetchFromCloudStore(): Promise<{
     txlabUsers && cloudData?.users
       ? mergeUserLists(txlabUsers, cloudData.users)
       : txlabUsers || cloudData?.users;
+  const mergedSessions = mergeSessions(
+    txlabSessions || [],
+    cloudData?.sessions || []
+  );
   const deletedUsernames = Array.from(
     new Set([
       ...(cloudData?.deletedUsernames || []).map((v) => String(v).toLowerCase()),
     ])
   );
 
-  if (mergedUsers || txlabRooms || cloudData?.rooms || txlabDevices || cloudData?.devices || cloudData?.logs || deletedUsernames.length > 0) {
+  if (mergedUsers || txlabRooms || cloudData?.rooms || txlabDevices || cloudData?.devices || cloudData?.logs || deletedUsernames.length > 0 || mergedSessions.length > 0) {
     return {
       users: mergedUsers,
       rooms: txlabRooms || cloudData?.rooms,
       devices: txlabDevices || cloudData?.devices,
       logs: cloudData?.logs,
       deletedUsernames: deletedUsernames.length > 0 ? deletedUsernames : undefined,
+      sessions: mergedSessions.length > 0 ? mergedSessions : undefined,
     };
   }
   return null;
@@ -498,6 +627,9 @@ async function triggerBackgroundCloudFetch() {
       if (cloudData.rooms && Array.isArray(cloudData.rooms)) {
         writeRoomsLocal(cloudData.rooms);
       }
+      if (cloudData.sessions && Array.isArray(cloudData.sessions)) {
+        writeSessionsLocal(mergeSessions(readSessionsLocal(), cloudData.sessions));
+      }
     }
   } catch {
     // ignore
@@ -512,6 +644,7 @@ async function saveToCloudStoreBackground(payload: {
   logs?: AuditLogItem[];
   rooms?: SyncRoom[];
   deletedUsernames?: string[];
+  sessions?: MemberSession[];
 }) {
   try {
     const controller = new AbortController();
@@ -521,6 +654,7 @@ async function saveToCloudStoreBackground(payload: {
     const currentDevices = payload.devices || memoryDevices;
     const currentLogs = payload.logs || memoryAuditLogs;
     const currentRooms = payload.rooms || memoryRooms;
+    const currentSessions = payload.sessions || memorySessions;
     const currentDeleted = payload.deletedUsernames || readDeletedUsernamesLocal();
 
     await fetch(CLOUD_API_URL, {
@@ -537,6 +671,7 @@ async function saveToCloudStoreBackground(payload: {
           logs: currentLogs.slice(0, 50),
           rooms: currentRooms,
           deletedUsernames: currentDeleted,
+          sessions: currentSessions,
         },
       }),
       signal: controller.signal,
@@ -605,6 +740,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, logs }, { headers: NO_CACHE_HEADERS });
     }
 
+    if (type === "sessions") {
+      triggerBackgroundCloudFetch().catch(() => {});
+      const sessions = readSessionsLocal();
+      return NextResponse.json({ success: true, sessions }, { headers: NO_CACHE_HEADERS });
+    }
+
     let users = readUsersLocal();
     try {
       const cloudData = await Promise.race([
@@ -622,6 +763,9 @@ export async function GET(request: Request) {
           users = mergeUserLists(users, cloudData.users);
           writeUsersLocal(users);
         }
+        if (cloudData.sessions && Array.isArray(cloudData.sessions)) {
+          writeSessionsLocal(mergeSessions(readSessionsLocal(), cloudData.sessions));
+        }
         // Mark the cloud as freshly fetched so the background trigger does
         // not immediately repeat the same fetch.
         lastCloudFetchTime = Date.now();
@@ -630,13 +774,15 @@ export async function GET(request: Request) {
       // Cloud merge is best-effort: local users are still returned.
     }
 
+    users = filterToAllowedUsers(users);
+    writeUsersLocal(users);
     return NextResponse.json(
       { success: true, users, deletedUsernames: readDeletedUsernamesLocal() },
       { headers: NO_CACHE_HEADERS }
     );
   } catch {
     return NextResponse.json(
-      { success: true, users: filterDeletedUsers(memoryUsers), deletedUsernames: readDeletedUsernamesLocal() },
+      { success: true, users: filterToAllowedUsers(filterDeletedUsers(memoryUsers)), deletedUsernames: readDeletedUsernamesLocal() },
       { headers: NO_CACHE_HEADERS }
     );
   }
@@ -648,93 +794,134 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
 
-    // 1. ĐĂNG KÝ TÀI KHOẢN MỚI
+    // 1. ĐĂNG KÝ TÀI KHOẢN MỚI — ĐÃ TẮT (name-only login).
+    // Chỉ các thành viên do admin tạo sẵn mới đăng nhập được; không
+    // tạo tài khoản mới từ API này nữa, kể cả khi client cũ vẫn gọi.
     if (action === "register") {
-      const { username, password, name, confirmPassword } = body;
-      const u = (username || "").trim();
-      const p = (password || "").trim();
-      const n = (name || "").trim();
-
-      const validationError = validateRegistration({
-        username: u,
-        password: p,
-        name: n,
-        confirmPassword: confirmPassword !== undefined ? confirmPassword : undefined,
-      });
-      if (validationError) {
-        return NextResponse.json(
-          { success: false, error: validationError },
-          { status: 400, headers: NO_CACHE_HEADERS }
-        );
-      }
-
-      // A re-registration with a previously deleted username is legitimate:
-      // clear its tombstone so the new record is not filtered out.
-      if (isDeletedUsername(u)) {
-        writeDeletedUsernamesLocal(
-          readDeletedUsernamesLocal().filter((d) => d !== u.toLowerCase())
-        );
-      }
-
-      let users = readUsersLocal();
-
-      // Kiểm tra trùng username
-      if (users.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
-        return NextResponse.json(
-          { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." },
-          { status: 400, headers: NO_CACHE_HEADERS }
-        );
-      }
-
-      const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}/${now.getFullYear()}`;
-
-      // Băm mật khẩu bằng bcrypt bảo vệ danh tính và dữ liệu người dùng
-      const hashedPassword = await hashPassword(p);
-
-      const newUser: ManagedUser = {
-        id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        username: u,
-        password: hashedPassword,
-        plainPassword: p,
-        name: n,
-        role: "user",
-        status: "pending",
-        allowedModules: [],
-        createdAt: dateStr,
-        coins: 50000,
-        provider: "local",
-        updatedAt: Date.now(),
-      };
-
-      const updated = [...users, newUser];
-      writeUsersLocal(updated);
-
-      const logs = readAuditLogsLocal();
-      const ts = `${dateStr} ${String(now.getHours()).padStart(2, "0")}:${String(
-        now.getMinutes()
-      ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-      const newLog: AuditLogItem = {
-        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        timestamp: ts,
-        username: u,
-        action: "User Registration Pending",
-        details: `Tài khoản mới @${u} (${n}) gửi yêu cầu, đang chờ Admin duyệt.`,
-        ip: "Client Machine",
-        status: "warning",
-      };
-      const updatedLogs = [newLog, ...logs].slice(0, 100);
-      writeAuditLogsLocal(updatedLogs);
-
-      // Lưu lên cloud trong background (không block UI phản hồi)
-      saveToCloudStoreBackground({ users: updated, logs: updatedLogs }).catch(() => {});
-
       return NextResponse.json(
-        { success: true, user: newUser, users: updated },
-        { headers: NO_CACHE_HEADERS }
+        {
+          success: false,
+          error: "Chức năng tạo tài khoản đã tắt. Chỉ tài khoản do admin tạo sẵn mới đăng nhập được.",
+        },
+        { status: 400, headers: NO_CACHE_HEADERS }
       );
+    }
+
+    // 1b. PHIÊN ĐĂNG NHẬP MỘT MÁY CHO THÀNH VIÊN TẠO SẴN.
+    // Không áp dụng cho admin. Một thành viên chỉ được đăng nhập ở
+    // một máy: máy thứ hai đăng nhập trong khi phiên cũ còn hoạt động
+    // (lastSeen trong 30 phút) sẽ khiến thành viên bị khóa 5 phút.
+    if (action === "session_login" || action === "session_heartbeat" || action === "session_logout") {
+      const username = String(body.username || "").trim().toLowerCase();
+      const machineId = String(body.machineId || "").trim();
+      if (!isPresetMemberUsername(username)) {
+        return NextResponse.json(
+          { success: false, error: "Chỉ thành viên do admin tạo sẵn mới dùng phiên đăng nhập này." },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+      if (!machineId) {
+        return NextResponse.json(
+          { success: false, error: "Thiếu mã máy. Vui lòng tải lại trang đăng nhập và thử lại." },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+      const sessions = await readSessionsMerged();
+      const existing = sessions.find((s) => s.username.toLowerCase() === username);
+      const now = Date.now();
+
+      if (action === "session_logout") {
+        if (existing && existing.machineId === machineId) {
+          if (existing.lockedUntil && existing.lockedUntil > now) {
+            // Keep the lock even though this machine logged out, so the
+            // lock cannot be bypassed by logging out and back in.
+            writeSessionsLocal(
+              sessions.map((s) =>
+                s.username.toLowerCase() === username
+                  ? { ...s, machineId: null, lockedUntil: s.lockedUntil }
+                  : s
+              )
+            );
+          } else {
+            writeSessionsLocal(sessions.filter((s) => s.username.toLowerCase() !== username));
+          }
+          saveToCloudStoreBackground({ sessions: readSessionsLocal() }).catch(() => {});
+        }
+        return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+      }
+
+      if (action === "session_heartbeat") {
+        if (!existing) {
+          return NextResponse.json(
+            { success: false, active: false, error: "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." },
+            { headers: NO_CACHE_HEADERS }
+          );
+        }
+        if (existing.lockedUntil && existing.lockedUntil > now) {
+          return NextResponse.json(
+            { success: false, ...lockError(existing.lockedUntil) },
+            { headers: NO_CACHE_HEADERS }
+          );
+        }
+        if (existing.machineId !== machineId) {
+          return NextResponse.json(
+            {
+              success: false,
+              active: false,
+              error: "Tài khoản này đã đăng nhập ở máy khác. Phiên này đã bị đăng xuất.",
+            },
+            { headers: NO_CACHE_HEADERS }
+          );
+        }
+        writeSessionsLocal(
+          sessions.map((s) =>
+            s.username.toLowerCase() === username ? { ...s, lastSeen: now, lockedUntil: null } : s
+          )
+        );
+        return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+      }
+
+      // session_login
+      if (existing && existing.lockedUntil && existing.lockedUntil > now) {
+        return NextResponse.json(
+          { success: false, ...lockError(existing.lockedUntil) },
+          { headers: NO_CACHE_HEADERS }
+        );
+      }
+      if (
+        existing &&
+        existing.machineId &&
+        existing.machineId !== machineId &&
+        now - (existing.lastSeen || 0) < 30 * 60 * 1000
+      ) {
+        const lockedUntil = now + 5 * 60 * 1000;
+        writeSessionsLocal(
+          sessions.map((s) =>
+            s.username.toLowerCase() === username
+              ? { ...s, lockedUntil, lockedMachineId: machineId }
+              : s
+          )
+        );
+        saveToCloudStoreBackground({ sessions: readSessionsLocal() }).catch(() => {});
+        return NextResponse.json(
+          { success: false, ...lockError(lockedUntil) },
+          { headers: NO_CACHE_HEADERS }
+        );
+      }
+      // Same machine, stale session (>30 phút), absent session, or an
+      // expired lock: allow and replace the session, clearing the lock.
+      const next: MemberSession = {
+        username,
+        machineId,
+        lastSeen: now,
+        lockedUntil: null,
+      };
+      writeSessionsLocal([
+        ...sessions.filter((s) => s.username.toLowerCase() !== username),
+        next,
+      ]);
+      saveToCloudStoreBackground({ sessions: readSessionsLocal() }).catch(() => {});
+      return NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
     }
 
     // 2. CẬP NHẬT PHÂN QUYỀN / DUYỆT TỪNG THÀNH VIÊN TRỰC TIẾP
