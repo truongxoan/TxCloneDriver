@@ -29,6 +29,7 @@ import {
   Wand2,
   Workflow,
   Radio,
+  LayoutGrid,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
@@ -58,6 +59,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
     category: "Tổng Quan",
     items: [
       { href: "/overview", label: "Tổng quan", icon: Home, module: "overview" },
+      { href: "/hubs", label: "Hub chức năng", icon: LayoutGrid, module: "overview" },
       { href: "/storage", label: "Google Drive", icon: HardDrive, module: "storage" },
       { href: "/share", label: "Bắn Tệp P2P", icon: Radio, module: "storage" as AppModuleId },
     ],
