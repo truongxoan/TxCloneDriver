@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem, LockedDevice } from "./types";
 import { verifyPassword } from "@/lib/password";
+import { validateRegistration } from "./registrationValidation";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -189,29 +190,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+          // Server-supplied tombstones (deleted usernames) must win over
+          // any stale local copy, otherwise a deleted user reappears here.
+          const deleted: string[] = Array.isArray(data.deletedUsernames)
+            ? data.deletedUsernames.map((v: string) => String(v).toLowerCase())
+            : [];
           setManagedUsers((prev) => {
             const map = new Map<string, ManagedUser>();
-            prev.forEach((u) => map.set(u.username.toLowerCase(), u));
+            prev.forEach((u) => {
+              if (!deleted.includes(u.username.toLowerCase())) {
+                map.set(u.username.toLowerCase(), u);
+              }
+            });
             data.users.forEach((serverUser: ManagedUser) => {
+              if (deleted.includes(serverUser.username.toLowerCase())) return;
               const localUser = map.get(serverUser.username.toLowerCase());
               if (!localUser) {
                 map.set(serverUser.username.toLowerCase(), serverUser);
               } else {
-                // Bảo toàn quyền duyệt và cấu hình mới nhất, không bao giờ hạ cấp về pending
-                if (localUser.status === "approved" && serverUser.status === "pending") {
-                  map.set(serverUser.username.toLowerCase(), {
-                    ...serverUser,
-                    status: "approved",
-                    allowedModules:
-                      localUser.allowedModules.length > 0
-                        ? localUser.allowedModules
-                        : serverUser.allowedModules,
-                  });
-                } else if ((localUser.updatedAt || 0) > (serverUser.updatedAt || 0)) {
-                  map.set(serverUser.username.toLowerCase(), localUser);
-                } else {
+                // Newest-wins (same rule as the server merge): a newer
+                // server rejection/approval wins over an older local
+                // record, and an older server pending record never
+                // downgrades a newer local approval. Tie: approved >
+                // rejected > pending.
+                const localTime = localUser.updatedAt || 0;
+                const serverTime = serverUser.updatedAt || 0;
+                if (serverTime > localTime) {
                   map.set(serverUser.username.toLowerCase(), serverUser);
+                } else if (serverTime === localTime) {
+                  const rank = (s: ManagedUser["status"]) =>
+                    s === "approved" ? 2 : s === "rejected" ? 1 : 0;
+                  if (rank(serverUser.status) > rank(localUser.status)) {
+                    map.set(serverUser.username.toLowerCase(), serverUser);
+                  }
                 }
+                // Otherwise the local (newer) record wins outright.
               }
             });
             const merged = Array.from(map.values());
@@ -568,19 +581,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (
     username: string,
     password: string,
-    name: string
+    name: string,
+    confirmPassword?: string
   ): Promise<{ success: boolean; error?: string }> => {
     const u = username.trim();
     const p = password.trim();
     const n = name.trim();
 
-    if (!u || !p || !n) {
-      return { success: false, error: "Vui lòng nhập đầy đủ thông tin đăng ký." };
+    const validationError = validateRegistration({
+      username: u,
+      password: p,
+      name: n,
+      confirmPassword,
+    });
+    if (validationError) {
+      return { success: false, error: validationError };
     }
 
+    if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
+      return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
+    }
+
+    // Send register request to server API so all clients/admin see it.
+    // A server failure is a real failure: there is deliberately NO
+    // local-only fallback here, because a local-only "success" would show
+    // the user a pending account that the admin on another device never
+    // sees, and that account would vanish on the next server refresh.
+    let res: Response;
     try {
-      // Send register request to server API so all clients/admin see it
-      const res = await fetch("/api/auth", {
+      res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -588,60 +617,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           username: u,
           password: p,
           name: n,
+          confirmPassword: confirmPassword !== undefined ? confirmPassword : undefined,
         }),
       });
-
-      const data = await res.json();
-      if (!data.success) {
-        return { success: false, error: data.error || "Không thể đăng ký tài khoản." };
-      }
-
-      if (Array.isArray(data.users)) {
-        setManagedUsers(data.users);
-        try {
-          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
-        } catch {}
-        broadcastSync({ type: "users_updated", users: data.users });
-      }
-
-      logSecurityAudit(
-        "User Registration Pending",
-        `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
-        "warning"
-      );
-
-      return { success: true };
     } catch {
-      // Fallback local if network fails
-      if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
-        return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
-      }
-
-      const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}/${now.getFullYear()}`;
-
-      const newUser: ManagedUser = {
-        id: `u-${Date.now()}`,
-        username: u,
-        password: p,
-        plainPassword: p,
-        name: n,
-        role: "user",
-        status: "pending",
-        allowedModules: [],
-        createdAt: dateStr,
-        coins: 50000,
-        provider: "local",
-        updatedAt: Date.now(),
+      return {
+        success: false,
+        error: "Không thể kết nối tới máy chủ đăng ký. Tài khoản chưa được tạo, vui lòng thử lại.",
       };
-
-      const updated = [...managedUsers, newUser];
-      saveUsersList(updated);
-
-      return { success: true };
     }
+
+    let data: { success?: boolean; error?: string; users?: ManagedUser[] };
+    try {
+      data = await res.json();
+    } catch {
+      return {
+        success: false,
+        error: "Máy chủ trả về phản hồi không hợp lệ. Tài khoản chưa được tạo, vui lòng thử lại.",
+      };
+    }
+
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || "Không thể đăng ký tài khoản. Tài khoản chưa được tạo, vui lòng thử lại.",
+      };
+    }
+
+    if (Array.isArray(data.users)) {
+      setManagedUsers(data.users);
+      try {
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
+      } catch {}
+      broadcastSync({ type: "users_updated", users: data.users });
+    }
+
+    logSecurityAudit(
+      "User Registration Pending",
+      `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
+      "warning"
+    );
+
+    return { success: true };
   };
 
   // Google login is deprecated per user requirement - keep minimal signature to avoid breaking callers
@@ -697,15 +714,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const rejectUser = (userId: string) => {
-    const updated = managedUsers.map((item) =>
-      item.id === userId ? { ...item, status: "rejected" as UserStatus } : item
-    );
-    saveUsersList(updated);
+    // Persist the rejection server-side via update_user_permission (with
+    // a fresh updatedAt), not only via sync_users: a sync_users merge must
+    // never be the only record of a rejection, or a stale client list can
+    // overwrite it. updateUserPermissions also updates the local list.
+    const target = managedUsers.find((item) => item.id === userId);
+    if (!target) return;
+    updateUserPermissions(userId, target.allowedModules || [], "rejected");
   };
 
   const deleteUser = (userId: string) => {
     const updated = managedUsers.filter((item) => item.id !== userId);
     saveUsersList(updated);
+
+    // Persist the deletion server-side (with a tombstone), so the user
+    // cannot reappear on the next server refresh or from a stale client
+    // sync. saveUsersList above already syncs the filtered list, and the
+    // server tombstone makes that sync safe in either arrival order:
+    // sync-before-delete is later removed by delete_user, and
+    // delete-before-sync is filtered out by the tombstone.
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete_user", userId }),
+    }).catch(() => {});
   };
 
   // Check if current user has permission for a specific module
