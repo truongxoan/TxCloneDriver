@@ -37,6 +37,7 @@ import { useAuth } from "@/modules/auth/authContext";
 import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
 import { useFeedback } from "@/modules/feedback/feedbackContext";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
+import { AnimatedCards } from "@/components/ui/AnimatedCards";
 import { LiveChatWidget } from "@/modules/overview/LiveChatWidget";
 import { BugReportWidget } from "@/modules/overview/BugReportWidget";
 import { LeaderboardWidget } from "@/modules/overview/LeaderboardWidget";
@@ -153,6 +154,7 @@ export default function OverviewPage() {
   return (
     <ModuleGuard moduleId="overview" moduleName="Tổng quan">
       <div className="space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300 pb-12">
+        <AnimatedCards />
         {/* ============================================================== */}
         {/* 1. TOP ROW: GREETING & PROFILE + COMPACT CALENDAR              */}
         {/* ============================================================== */}
