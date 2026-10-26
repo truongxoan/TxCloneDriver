@@ -322,11 +322,11 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-amber-400 animate-pulse" />
                   <h3 className="font-bold text-amber-300 text-sm">
-                    Yêu cầu Đăng ký Mới Đang Chờ Xét Duyệt ({pendingUsers.length})
+                    Yêu cầu Chờ Xét Duyệt ({pendingUsers.length})
                   </h3>
                 </div>
                 <p className="text-xs text-slate-300">
-                  Thành viên đã đăng ký nhưng chưa thể đăng nhập cho đến khi Admin phê duyệt và cấp quyền truy cập các phân hệ.
+                  Thành viên đang ở trạng thái chờ duyệt và chưa thể đăng nhập cho đến khi Admin phê duyệt và cấp quyền truy cập các phân hệ. Chức năng tạo tài khoản mới đã tắt — chỉ thành viên do admin tạo sẵn mới đăng nhập được.
                 </p>
 
                 <div className="space-y-3 pt-1">
@@ -342,7 +342,7 @@ export default function SettingsPage() {
                           <Badge variant="warning" size="sm">Chờ duyệt</Badge>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Ngày đăng ký: {pUser.createdAt} &bull; Mặc định cấp quyền Google Drive khi duyệt
+                          Ngày tạo: {pUser.createdAt} &bull; Mặc định cấp quyền Google Drive khi duyệt
                         </p>
                       </div>
 

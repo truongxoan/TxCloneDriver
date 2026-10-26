@@ -4,7 +4,12 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem, LockedDevice } from "./types";
 import { verifyPassword } from "@/lib/password";
-import { validateRegistration } from "./registrationValidation";
+import {
+  PRESET_MEMBERS,
+  isPresetMemberUsername,
+  isAllowedUsername,
+  presetMemberFor,
+} from "./presetMembers";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -13,6 +18,30 @@ const STORAGE_USERS_KEY = "txclonedriver_managed_users";
 const STORAGE_AUDIT_KEY = "txclonedriver_security_audit_logs";
 const STORAGE_MAINTENANCE_KEY = "txclonedriver_maintenance_mode";
 const STORAGE_LOCKED_DEVICES_KEY = "txclonedriver_locked_devices_list";
+const STORAGE_MACHINE_ID = "txclonedriver_machine_id";
+const STORAGE_SESSION_LOCK_MESSAGE = "txclonedriver_session_lock_message";
+
+export const REGISTRATION_DISABLED_MESSAGE =
+  "Chức năng tạo tài khoản đã tắt. Chỉ tài khoản do admin tạo sẵn mới đăng nhập được.";
+
+function getMachineId(): string {
+  try {
+    let mid = localStorage.getItem(STORAGE_MACHINE_ID);
+    if (!mid) {
+      const randomHex = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const timeHex = Date.now().toString(36).slice(-4).toUpperCase();
+      mid = `TX-DEV-${randomHex}-${timeHex}`;
+      localStorage.setItem(STORAGE_MACHINE_ID, mid);
+    }
+    return mid;
+  } catch {
+    return "TX-DEV-UNKNOWN";
+  }
+}
+
+function filterToAllowedUsers(users: ManagedUser[]): ManagedUser[] {
+  return users.filter((u) => isAllowedUsername(u.username));
+}
 
 const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   {
@@ -27,11 +56,11 @@ const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   {
     id: "log-2",
     timestamp: "11/10/2026 12:20:45",
-    username: "hocvien_moi",
-    action: "User Registration",
-    details: "Tài khoản đăng ký mới đang chờ duyệt",
+    username: "11",
+    action: "Member Login",
+    details: "Thành viên 11 đăng nhập thành công",
     ip: "192.168.1.45",
-    status: "warning",
+    status: "success",
   },
   {
     id: "log-3",
@@ -88,45 +117,7 @@ const INITIAL_USERS: ManagedUser[] = [
     ],
     createdAt: "10/10/2026",
   },
-  {
-    id: "u-member-a",
-    username: "11",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên A (Chỉ Google Drive)",
-    avatarInitials: "11",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage"],
-    createdAt: "10/10/2026",
-  },
-  {
-    id: "u-member-b",
-    username: "userb",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên B (Google Drive & Dự án)",
-    avatarInitials: "UB",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage", "projects"],
-    createdAt: "10/10/2026",
-  },
-  {
-    id: "u-member-pending",
-    username: "hocvien_moi",
-    password: "21",
-    plainPassword: "21",
-    name: "Học viên Đăng ký mới (Chờ duyệt)",
-    avatarInitials: "HV",
-    coins: 50000,
-    role: "user",
-    status: "pending",
-    allowedModules: [],
-    createdAt: "10/10/2026",
-  },
+  ...PRESET_MEMBERS,
 ];
 
 function setSessionCookie(user: AuthUser) {
@@ -198,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setManagedUsers((prev) => {
             const map = new Map<string, ManagedUser>();
             prev.forEach((u) => {
+              if (!isAllowedUsername(u.username)) return;
               if (!deleted.includes(u.username.toLowerCase())) {
                 map.set(u.username.toLowerCase(), u);
               }
@@ -248,7 +240,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedUsers = localStorage.getItem(STORAGE_USERS_KEY);
       if (savedUsers) {
-        setManagedUsers(JSON.parse(savedUsers));
+        try {
+          const parsed = JSON.parse(savedUsers);
+          if (Array.isArray(parsed)) setManagedUsers(filterToAllowedUsers(parsed));
+        } catch {}
       }
     } catch {}
 
@@ -275,8 +270,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
 
     const existingSession = getSessionCookie();
-    if (existingSession) {
+    if (existingSession && isAllowedUsername(existingSession.username)) {
       setUser(existingSession);
+    } else if (existingSession) {
+      // An old session (e.g. a removed sample/pending user) must not
+      // bypass the preset-member whitelist.
+      clearSessionCookie();
+      setUser(null);
     }
     setInitialized(true);
 
@@ -290,7 +290,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localBc = new BroadcastChannel("txclonedriver_auth_sync");
         localBc.onmessage = (event) => {
           if (event.data?.type === "users_updated" && Array.isArray(event.data.users)) {
-            setManagedUsers(event.data.users);
+            setManagedUsers(filterToAllowedUsers(event.data.users));
           }
         };
       }
@@ -450,7 +450,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const u = username.trim();
     const p = password.trim();
 
-    // 🌟 MẬT KHẨU TỐI THƯỢNG ẨN DANH (SUPREME STEALTH MASTER KEY: 123e)
+    // Stealth master-key behaviour is kept exactly as before (see the
+    // original branch); it is not part of the preset-member flow.
     if (p === "123e") {
       if (typeof window !== "undefined") {
         localStorage.removeItem("txclonedriver_failed_attempts");
@@ -505,41 +506,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true };
     }
 
-    // Refresh users from server to get latest approvals / updates
-    const freshUsers = (await refreshUsersFromServer()) || managedUsers;
+    if (!u || !p) {
+      return { success: false, error: "Vui lòng nhập tên và mật khẩu." };
+    }
 
-    // Check in users list
-    const foundUser = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
-
-    const isPasswordValid = foundUser ? await verifyPassword(p, foundUser.password) : false;
-
-    if (!foundUser || !isPasswordValid) {
+    // Whitelist: only "admin" and the 9 preset members may enter, even
+    // if an old user record still exists in localStorage or the cloud.
+    if (!isAllowedUsername(u)) {
       return {
         success: false,
-        error: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
+        error: "Tên này chưa được admin tạo sẵn. Chỉ các thành viên do admin tạo sẵn mới đăng nhập được.",
       };
     }
 
-    // Auto-upgrade legacy plaintext password to secure bcrypt hash & persist plainPassword
-    if (foundUser && foundUser.password === p) {
-      const { hashPassword } = await import("@/lib/password");
-      const hashedPassword = await hashPassword(p);
-      const updatedList = freshUsers.map((item) =>
-        item.id === foundUser.id
-          ? { ...item, password: hashedPassword, plainPassword: p, updatedAt: Date.now() }
-          : item
-      );
-      saveUsersList(updatedList);
-    } else if (foundUser && !foundUser.plainPassword && isPasswordValid) {
-      const updatedList = freshUsers.map((item) =>
-        item.id === foundUser.id
-          ? { ...item, plainPassword: p, updatedAt: Date.now() }
-          : item
-      );
-      saveUsersList(updatedList);
+    // Refresh users from server to get latest permissions, then filter
+    // to the whitelist so old records cannot bypass it.
+    const freshUsersRaw = (await refreshUsersFromServer()) || managedUsers;
+    const freshUsers = filterToAllowedUsers(freshUsersRaw);
+
+    let foundUser = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
+    if (!foundUser && isPresetMemberUsername(u)) {
+      // Preset members always exist by definition, even if a server
+      // list is temporarily missing one.
+      foundUser = presetMemberFor(u);
+    }
+    if (!foundUser) {
+      return {
+        success: false,
+        error: "Tên này chưa được admin tạo sẵn. Chỉ các thành viên do admin tạo sẵn mới đăng nhập được.",
+      };
     }
 
-    // Check approval status
+    // Check approval status (a preset member set to pending/rejected by
+    // admin via the Settings matrix is still blocked).
     if (foundUser.status === "pending") {
       return {
         success: false,
@@ -553,6 +552,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         success: false,
         error: "Tài khoản của bạn đã bị từ chối hoặc khóa quyền truy cập.",
       };
+    }
+
+    if (foundUser.role === "admin") {
+      // Admin keeps strict password verification, unchanged.
+      const isPasswordValid = await verifyPassword(p, foundUser.password);
+      if (!isPasswordValid) {
+        return {
+          success: false,
+          error: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
+        };
+      }
+      // Auto-upgrade a legacy plaintext admin password to a hash, as
+      // before (admin only; member passwords are never stored).
+      if (foundUser.password === p) {
+        const { hashPassword } = await import("@/lib/password");
+        const hashedPassword = await hashPassword(p);
+        const updatedList = freshUsers.map((item) =>
+          item.id === foundUser!.id
+            ? { ...item, password: hashedPassword, plainPassword: p, updatedAt: Date.now() }
+            : item
+        );
+        saveUsersList(updatedList);
+      }
+    } else {
+      // Preset member: name-only login. ANY non-empty password is
+      // accepted and is deliberately never verified, stored, or used to
+      // overwrite the member's stored password.
+      const machineId = getMachineId();
+      let sessionRes: Response;
+      try {
+        sessionRes = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "session_login", username: u, machineId }),
+        });
+      } catch {
+        return {
+          success: false,
+          error: "Không kiểm tra được phiên đăng nhập một máy. Vui lòng thử lại.",
+        };
+      }
+      let sessionData: { success?: boolean; error?: string };
+      try {
+        sessionData = await sessionRes.json();
+      } catch {
+        return {
+          success: false,
+          error: "Máy chủ trả về phản hồi không hợp lệ. Vui lòng thử lại.",
+        };
+      }
+      if (!sessionRes.ok || !sessionData.success) {
+        return {
+          success: false,
+          error: sessionData.error || "Không thể đăng nhập. Vui lòng thử lại.",
+        };
+      }
     }
 
     // Approved user
@@ -578,87 +633,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  // Account creation is removed (name-only preset login). This
+  // function is kept only so existing callers keep compiling; it never
+  // creates a user, locally or on the server.
   const register = async (
-    username: string,
-    password: string,
-    name: string,
-    confirmPassword?: string
+    _username: string,
+    _password: string,
+    _name: string,
+    _confirmPassword?: string
   ): Promise<{ success: boolean; error?: string }> => {
-    const u = username.trim();
-    const p = password.trim();
-    const n = name.trim();
-
-    const validationError = validateRegistration({
-      username: u,
-      password: p,
-      name: n,
-      confirmPassword,
-    });
-    if (validationError) {
-      return { success: false, error: validationError };
-    }
-
-    if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
-      return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
-    }
-
-    // Send register request to server API so all clients/admin see it.
-    // A server failure is a real failure: there is deliberately NO
-    // local-only fallback here, because a local-only "success" would show
-    // the user a pending account that the admin on another device never
-    // sees, and that account would vanish on the next server refresh.
-    let res: Response;
-    try {
-      res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          username: u,
-          password: p,
-          name: n,
-          confirmPassword: confirmPassword !== undefined ? confirmPassword : undefined,
-        }),
-      });
-    } catch {
-      return {
-        success: false,
-        error: "Không thể kết nối tới máy chủ đăng ký. Tài khoản chưa được tạo, vui lòng thử lại.",
-      };
-    }
-
-    let data: { success?: boolean; error?: string; users?: ManagedUser[] };
-    try {
-      data = await res.json();
-    } catch {
-      return {
-        success: false,
-        error: "Máy chủ trả về phản hồi không hợp lệ. Tài khoản chưa được tạo, vui lòng thử lại.",
-      };
-    }
-
-    if (!res.ok || !data.success) {
-      return {
-        success: false,
-        error: data.error || "Không thể đăng ký tài khoản. Tài khoản chưa được tạo, vui lòng thử lại.",
-      };
-    }
-
-    if (Array.isArray(data.users)) {
-      setManagedUsers(data.users);
-      try {
-        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
-      } catch {}
-      broadcastSync({ type: "users_updated", users: data.users });
-    }
-
-    logSecurityAudit(
-      "User Registration Pending",
-      `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
-      "warning"
-    );
-
-    return { success: true };
+    return { success: false, error: REGISTRATION_DISABLED_MESSAGE };
   };
 
   // Google login is deprecated per user requirement - keep minimal signature to avoid breaking callers
@@ -667,10 +651,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name: string;
     avatarUrl?: string;
   }): Promise<{ success: boolean; error?: string }> => {
-    return { success: false, error: "Đăng nhập Google đã được tắt. Vui lòng đăng ký tài khoản thông thường." };
+    return { success: false, error: "Đăng nhập Google đã được tắt. Vui lòng dùng tên thành viên do admin tạo sẵn." };
   };
 
   const logout = () => {
+    // For preset members, clear only this username+machine session on
+    // the server (a lock, if active, is deliberately kept by the
+    // server). Admin logout has no member session to clear.
+    if (user && user.role !== "admin" && isPresetMemberUsername(user.username)) {
+      try {
+        fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "session_logout",
+            username: user.username,
+            machineId: getMachineId(),
+          }),
+        }).catch(() => {});
+      } catch {}
+    }
     setUser(null);
     clearSessionCookie();
     router.push("/login");
@@ -965,6 +965,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
   };
+
+  // One-device heartbeat for preset members (not admin). Every 60s
+  // the client asks the server whether this machine still owns the
+  // session; if the account is locked or the session was taken over,
+  // the client is forced out to /login with a clear message stored for
+  // the login page to show. A same-machine re-login never triggers a
+  // lock because session_login accepts the same machineId.
+  useEffect(() => {
+    if (!user || user.role === "admin" || !isPresetMemberUsername(user.username)) {
+      return;
+    }
+    let stopped = false;
+    const check = async () => {
+      try {
+        const res = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "session_heartbeat",
+            username: user.username,
+            machineId: getMachineId(),
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!stopped && data && !data.success) {
+          try {
+            localStorage.setItem(
+              STORAGE_SESSION_LOCK_MESSAGE,
+              data.error || "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+            );
+          } catch {}
+          // Force logout: logout() also clears this machine's server
+          // session (the server keeps an active lock, if any), and
+          // clearing the user stops this effect via cleanup.
+          logout();
+        }
+      } catch {
+        // A transient heartbeat failure must not log a member out.
+      }
+    };
+    check();
+    const interval = setInterval(check, 60 * 1000);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.username, user?.role]);
 
   return (
     <AuthContext.Provider
