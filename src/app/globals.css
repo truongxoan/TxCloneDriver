@@ -368,7 +368,7 @@ body {
 }
 
 .tx-depth-card:hover {
-  transform: translateY(-2px) translateZ(6px);
+  transform: translateY(-2px) translateZ(var(--tx-depth, 6px));
   box-shadow:
     0 20px 45px -18px rgba(0, 0, 0, 0.75),
     0 0 24px -8px var(--primary-glow);
