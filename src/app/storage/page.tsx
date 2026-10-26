@@ -58,7 +58,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatBytes, cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
-import { useDriveEndpoints, DriveFileItem, DEFAULT_COURSE_FOLDERS } from "@/modules/storage/driveEndpointsContext";
+import { useDriveEndpoints, DriveFileItem, DEFAULT_COURSE_FOLDERS, DEFAULT_DRIVE_AUDIO_TRACKS, DEFAULT_DRIVE_VIDEO_ITEMS } from "@/modules/storage/driveEndpointsContext";
 import { MusicPlayerBar, AudioTrack } from "@/modules/storage/MusicPlayerBar";
 import CinemaVideoModal, { VideoItem } from "@/modules/storage/CinemaVideoModal";
 import { detectDuplicates } from "@/modules/storage/duplicateDetector";
@@ -106,53 +106,14 @@ const DEFAULT_DEMO_JUNK_FILES: DriveFileItem[] = [
   },
 ];
 
-// Default soothing audio tracks in Drive for testing & immediate experience
-const DEFAULT_DRIVE_AUDIO_TRACKS: DriveFileItem[] = [
-  {
-    id: "audio-demo-1",
-    name: "Lofi Chill Sunset (TxCloneDriver).mp3",
-    mimeType: "audio/mp3",
-    sizeBytes: 5242880,
-    updatedAt: "26/04/2025",
-    downloadUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-  },
-  {
-    id: "audio-demo-2",
-    name: "Night Walk Acoustic Melodies.mp3",
-    mimeType: "audio/mp3",
-    sizeBytes: 4194304,
-    updatedAt: "25/04/2025",
-    downloadUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-  },
-  {
-    id: "audio-demo-3",
-    name: "Cyberpunk Ambient Wave.mp3",
-    mimeType: "audio/mp3",
-    sizeBytes: 6291456,
-    updatedAt: "24/04/2025",
-    downloadUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-  },
-];
 
-// Default sample cinema videos for immediate theater experience
-const DEFAULT_DRIVE_VIDEO_ITEMS: DriveFileItem[] = [
-  {
-    id: "video-demo-1",
-    name: "TxCloneDriver Sci-Fi Cinematic Trailer 4K.mp4",
-    mimeType: "video/mp4",
-    sizeBytes: 157286400,
-    updatedAt: "26/04/2025",
-    downloadUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-  },
-  {
-    id: "video-demo-2",
-    name: "Nature & Aurora TimeLapse 1080p.mp4",
-    mimeType: "video/mp4",
-    sizeBytes: 94371840,
-    updatedAt: "25/04/2025",
-    downloadUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-  },
-];
+
+// Folders have no meaningful byte size (their stored sizeBytes is 0), so
+// show a dash instead of a misleading "0 Bytes" (audit fix #10).
+function formatDriveSize(item: DriveFileItem): string {
+  if (item.isFolder || item.mimeType === "application/vnd.google-apps.folder") return "—";
+  return formatBytes(item.sizeBytes);
+}
 
 export default function StoragePage() {
   const { user, isAdmin } = useAuth();
@@ -1284,7 +1245,7 @@ export default function StoragePage() {
                               )}
                             </div>
                             <span className="text-[10px] text-slate-400 font-mono">
-                              {formatBytes(item.sizeBytes)} &bull; {item.updatedAt}
+                              {formatDriveSize(item)} &bull; {item.updatedAt}
                             </span>
                           </div>
                         </div>
@@ -1491,7 +1452,7 @@ export default function StoragePage() {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-slate-200 font-mono font-semibold whitespace-nowrap">
-                          {formatBytes(item.sizeBytes)}
+                          {formatDriveSize(item)}
                         </td>
                         <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">{item.updatedAt}</td>
                         <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -1634,7 +1595,7 @@ export default function StoragePage() {
                       </p>
                     </div>
                     <p className="text-[11px] text-muted-foreground font-mono">
-                      <strong className="text-white">{formatBytes(item.sizeBytes)}</strong> &bull; {item.updatedAt}
+                      <strong className="text-white">{formatDriveSize(item)}</strong> &bull; {item.updatedAt}
                     </p>
                   </div>
 
