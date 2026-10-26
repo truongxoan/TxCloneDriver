@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
+import { DepthCard } from "@/components/ui/DepthCard";
 import { GamesProvider, useGames } from "@/modules/games/gamesContext";
 import { GameId } from "@/modules/games/types";
 import { TaiXiuGame } from "@/modules/games/components/TaiXiuGame";
@@ -82,7 +83,7 @@ function GamesContent() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* Top Banner & Coin Wallet */}
-      <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-r from-amber-600/20 via-purple-600/20 to-sky-600/20 glass-panel border border-white/10 shadow-2xl overflow-hidden">
+      <DepthCard tilt={4} className="p-6 sm:p-8 bg-gradient-to-r from-amber-600/20 via-purple-600/20 to-sky-600/20">
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
@@ -172,7 +173,7 @@ function GamesContent() {
             </button>
           </div>
         )}
-      </div>
+      </DepthCard>
 
       {/* Game Selector Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
