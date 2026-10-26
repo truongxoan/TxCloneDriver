@@ -74,6 +74,53 @@ export const DEFAULT_COURSE_FOLDERS: DriveFileItem[] = [
   },
 ];
 
+
+export const DEFAULT_DRIVE_AUDIO_TRACKS: DriveFileItem[] = [
+  {
+    id: "audio-demo-1",
+    name: "Lofi Chill Sunset (TxCloneDriver).mp3",
+    mimeType: "audio/mp3",
+    sizeBytes: 5242880,
+    updatedAt: "26/04/2025",
+    downloadUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+  },
+  {
+    id: "audio-demo-2",
+    name: "Night Walk Acoustic Melodies.mp3",
+    mimeType: "audio/mp3",
+    sizeBytes: 4194304,
+    updatedAt: "25/04/2025",
+    downloadUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+  },
+  {
+    id: "audio-demo-3",
+    name: "Cyberpunk Ambient Wave.mp3",
+    mimeType: "audio/mp3",
+    sizeBytes: 6291456,
+    updatedAt: "24/04/2025",
+    downloadUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+  },
+];
+
+export const DEFAULT_DRIVE_VIDEO_ITEMS: DriveFileItem[] = [
+  {
+    id: "video-demo-1",
+    name: "TxCloneDriver Sci-Fi Cinematic Trailer 4K.mp4",
+    mimeType: "video/mp4",
+    sizeBytes: 157286400,
+    updatedAt: "26/04/2025",
+    downloadUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  },
+  {
+    id: "video-demo-2",
+    name: "Nature & Aurora TimeLapse 1080p.mp4",
+    mimeType: "video/mp4",
+    sizeBytes: 94371840,
+    updatedAt: "25/04/2025",
+    downloadUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  },
+];
+
 interface DriveEndpointsContextType {
   endpoints: DriveEndpoint[];
   activeEndpoint: DriveEndpoint | null;
@@ -145,6 +192,23 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
 
   const activeEndpoint = endpoints.find((e) => e.isActive) || endpoints[0] || null;
 
+  // Fetch with a timeout so the refresh button can never stay stuck in
+  // "loading" forever if the endpoint hangs (audit fix #4).
+  const fetchWithTimeout = async (url: string, body: unknown) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      return await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
   // Fetch files from active endpoint
   const refreshFiles = async () => {
     if (!activeEndpoint) return;
@@ -152,11 +216,7 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
     setError(null);
 
     try {
-      const res = await fetch("/api/drive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: activeEndpoint.url }),
-      });
+      const res = await fetchWithTimeout("/api/drive", { url: activeEndpoint.url });
 
       const data = await res.json();
       if (data.success) {
@@ -199,9 +259,16 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
         }
       }
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "Lỗi kết nối tới thư mục Google Drive.";
+      const errMsg =
+        err instanceof Error && err.name === "AbortError"
+          ? "Hết thời gian chờ (15 giây) khi tải danh sách tệp từ Google Drive. Vui lòng bấm Làm mới để thử lại."
+          : err instanceof Error
+            ? err.message
+            : "Lỗi kết nối tới thư mục Google Drive.";
       setError(errMsg);
     } finally {
+      // Always reset loading, even on timeout/abort, so the refresh
+      // button is enabled again (audit fix #4).
       setLoading(false);
     }
   };
@@ -254,11 +321,7 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
     if (!target) return { success: false, error: "Không tìm thấy thư mục." };
 
     try {
-      const res = await fetch("/api/drive", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: target.url }),
-      });
+      const res = await fetchWithTimeout("/api/drive", { url: target.url });
       const data = await res.json();
       if (data.success) {
         const count = (data.files || []).length;
@@ -283,7 +346,12 @@ export function DriveEndpointsProvider({ children }: { children: React.ReactNode
         return { success: false, error: data.error };
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Lỗi kiểm tra kết nối";
+      const msg =
+        err instanceof Error && err.name === "AbortError"
+          ? "Hết thời gian chờ (15 giây) khi kiểm tra kết nối."
+          : err instanceof Error
+            ? err.message
+            : "Lỗi kiểm tra kết nối";
       return { success: false, error: msg };
     }
   };
