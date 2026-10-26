@@ -6,6 +6,9 @@ export type VaultCategory =
   | "banking"
   | "crypto"
   | "work"
+  | "game"
+  | "study"
+  | "shopping"
   | "other";
 
 export interface VaultAccount {

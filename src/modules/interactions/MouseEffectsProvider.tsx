@@ -30,6 +30,33 @@ interface Particle {
   speedX: number;
   speedY: number;
   alpha: number;
+  kind?: "dot" | "sparkle" | "bubble" | "ring";
+}
+
+export type MouseTrail = "stardust" | "sparkle" | "bubble" | "none";
+export type MouseClickFx = "burst" | "ripple" | "ring" | "none";
+export type IdleFx = "glow" | "orbs" | "drift" | "none";
+export interface MouseFxSettings {
+  trail: MouseTrail;
+  clickFx: MouseClickFx;
+  idleFx: IdleFx;
+  idleDelaySec: number;
+  trailDensity: number;
+}
+export const DEFAULT_MOUSE_FX: MouseFxSettings = {
+  trail: "stardust",
+  clickFx: "burst",
+  idleFx: "glow",
+  idleDelaySec: 30,
+  trailDensity: 0.45,
+};
+export function loadMouseFxSettings(): MouseFxSettings {
+  try {
+    const saved = JSON.parse(localStorage.getItem("txclonedriver_mouse_fx") || "{}");
+    return { ...DEFAULT_MOUSE_FX, ...saved };
+  } catch {
+    return DEFAULT_MOUSE_FX;
+  }
 }
 
 export type CursorStyle = "default" | "neon-cross" | "cyber-dot" | "heart" | "sword" | "star";
@@ -40,6 +67,10 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
 
   // Custom Cursor Style State (stored in localStorage)
   const [cursorStyle, setCursorStyle] = useState<CursorStyle>("default");
+  const [fxSettings, setFxSettings] = useState<MouseFxSettings>(DEFAULT_MOUSE_FX);
+  const fxRef = useRef<MouseFxSettings>(DEFAULT_MOUSE_FX);
+  const lastActivityRef = useRef(Date.now());
+  const [isIdle, setIsIdle] = useState(false);
   const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
   const [isClicking, setIsClicking] = useState(false);
 
@@ -57,7 +88,22 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
       }
     };
     window.addEventListener("tx_cursor_style_change", handleCursorChange);
-    return () => window.removeEventListener("tx_cursor_style_change", handleCursorChange);
+    try {
+      const saved = loadMouseFxSettings();
+      setFxSettings(saved);
+      fxRef.current = saved;
+    } catch {}
+    const handleFxChange = (e: any) => {
+      if (e.detail?.settings) {
+        setFxSettings(e.detail.settings);
+        fxRef.current = e.detail.settings;
+      }
+    };
+    window.addEventListener("tx_mouse_fx_change", handleFxChange);
+    return () => {
+      window.removeEventListener("tx_cursor_style_change", handleCursorChange);
+      window.removeEventListener("tx_mouse_fx_change", handleFxChange);
+    };
   }, []);
 
   const changeCursorStyle = (style: CursorStyle) => {
@@ -113,6 +159,33 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
+  // Gentle idle effect: after no mouse, keyboard or scroll activity for
+  // idleDelaySec, show a soft overlay until the user moves again.
+  useEffect(() => {
+    const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) return;
+    const markActive = () => {
+      lastActivityRef.current = Date.now();
+      setIsIdle(false);
+    };
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivityRef.current >= fxRef.current.idleDelaySec * 1000 && fxRef.current.idleFx !== "none") {
+        setIsIdle(true);
+      }
+    }, 1000);
+    window.addEventListener("mousemove", markActive);
+    window.addEventListener("keydown", markActive);
+    window.addEventListener("scroll", markActive, true);
+    window.addEventListener("pointerdown", markActive);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("mousemove", markActive);
+      window.removeEventListener("keydown", markActive);
+      window.removeEventListener("scroll", markActive, true);
+      window.removeEventListener("pointerdown", markActive);
+    };
+  }, []);
+
   // Stardust Particle Effect
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -136,17 +209,20 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
     const handleMouseMove = (e: MouseEvent) => {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
       setMousePos({ x: e.clientX, y: e.clientY });
-
-      // Spawn 1-2 stardust particles on move
-      if (Math.random() < 0.45) {
+      const fx = fxRef.current;
+      if (fx.trail === "none") return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (Math.random() < fx.trailDensity) {
+        const kind = fx.trail === "sparkle" ? "sparkle" : fx.trail === "bubble" ? "bubble" : "dot";
         particlesRef.current.push({
           x: e.clientX,
           y: e.clientY,
           size: Math.random() * 2.5 + 1.2,
           color: colors[Math.floor(Math.random() * colors.length)],
           speedX: (Math.random() - 0.5) * 1.5,
-          speedY: (Math.random() - 0.5) * 1.5,
+          speedY: kind === "bubble" ? -Math.random() * 0.8 - 0.2 : (Math.random() - 0.5) * 1.5,
           alpha: 1,
+          kind,
         });
       }
     };
@@ -155,7 +231,13 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
     const handleMouseUp = () => setIsClicking(false);
 
     const handleClick = (e: MouseEvent) => {
-      // Spawn ripple particle shockwave on click
+      const fx = fxRef.current;
+      if (fx.clickFx === "none") return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (fx.clickFx === "ripple" || fx.clickFx === "ring") {
+        particlesRef.current.push({ x: e.clientX, y: e.clientY, size: 6, color: colors[Math.floor(Math.random() * colors.length)], speedX: 0, speedY: 0, alpha: 1, kind: "ring" });
+        return;
+      }
       for (let i = 0; i < 14; i++) {
         const angle = Math.random() * Math.PI * 2;
         const speed = Math.random() * 3 + 1.5;
@@ -167,6 +249,7 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
           speedX: Math.cos(angle) * speed,
           speedY: Math.sin(angle) * speed,
           alpha: 1,
+          kind: "dot",
         });
       }
     };
@@ -179,28 +262,58 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
     const render = () => {
       ctx.clearRect(0, 0, width, height);
 
+      // Idle drift: slow particles float up while the page rests.
+      if (fxRef.current.idleFx === "drift" && Date.now() - lastActivityRef.current >= fxRef.current.idleDelaySec * 1000 && Math.random() < 0.08) {
+        particlesRef.current.push({ x: Math.random() * width, y: height + 10, size: Math.random() * 2 + 1, color: colors[Math.floor(Math.random() * colors.length)], speedX: (Math.random() - 0.5) * 0.3, speedY: -0.4, alpha: 0.7, kind: "dot" });
+      }
       // Update & draw particles
       const particles = particlesRef.current;
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.speedX;
         p.y += p.speedY;
-        p.alpha -= 0.025;
-        p.size *= 0.97;
-
-        if (p.alpha <= 0 || p.size <= 0.3) {
+        if (p.kind === "ring") {
+          p.size += 2.5;
+          p.alpha -= 0.04;
+        } else {
+          p.alpha -= 0.025;
+          p.size *= 0.97;
+        }
+        if (p.alpha <= 0 || p.size <= 0.3 || p.size > 90) {
           particles.splice(i, 1);
           continue;
         }
-
         ctx.save();
         ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        if (p.kind === "ring") {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 2;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (p.kind === "sparkle") {
+          ctx.translate(p.x, p.y);
+          ctx.rotate(Math.PI / 4);
+          ctx.fillStyle = p.color;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = p.color;
+          ctx.fillRect(-p.size, -p.size, p.size * 2, p.size * 2);
+        } else if (p.kind === "bubble") {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = p.color;
+          ctx.shadowBlur = 8;
+          ctx.shadowColor = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
       }
 
@@ -295,6 +408,20 @@ export function MouseEffectsProvider({ children }: { children: React.ReactNode }
               ⭐
             </div>
           )}
+        </div>
+      )}
+
+      {/* Gentle idle overlay: only after the user has rested, never while working */}
+      {isIdle && fxSettings.idleFx === "glow" && (
+        <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden" aria-hidden>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.14),transparent_65%)] animate-pulse" />
+        </div>
+      )}
+      {isIdle && fxSettings.idleFx === "orbs" && (
+        <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden" aria-hidden>
+          <div className="absolute left-[15%] top-[20%] w-40 h-40 rounded-full bg-violet-500/20 blur-3xl animate-bounce" style={{ animationDuration: "6s" }} />
+          <div className="absolute right-[20%] top-[55%] w-52 h-52 rounded-full bg-sky-500/15 blur-3xl animate-bounce" style={{ animationDuration: "8s", animationDelay: "1s" }} />
+          <div className="absolute left-[45%] bottom-[15%] w-32 h-32 rounded-full bg-pink-500/15 blur-3xl animate-bounce" style={{ animationDuration: "7s", animationDelay: "0.5s" }} />
         </div>
       )}
 

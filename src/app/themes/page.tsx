@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { ThemeStudio } from "@/components/ui/ThemeStudio";
+import MouseFxStudio from "@/components/ui/MouseFxStudio";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
@@ -267,6 +268,7 @@ export default function ThemesPage() {
 
       {/* Theme Studio — tự tạo theme */}
       <ThemeStudio />
+      <MouseFxStudio />
 
       {/* Seasonal Control Panel */}
       <Card className="p-5 glass-card">
