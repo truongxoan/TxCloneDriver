@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { ThemeStudio } from "@/components/ui/ThemeStudio";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
@@ -263,6 +264,9 @@ export default function ThemesPage() {
           </Badge>
         </div>
       </div>
+
+      {/* Theme Studio — tự tạo theme */}
+      <ThemeStudio />
 
       {/* Seasonal Control Panel */}
       <Card className="p-5 glass-card">
