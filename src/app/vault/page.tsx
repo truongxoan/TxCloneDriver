@@ -29,6 +29,9 @@ import {
   CheckCircle2,
   Layers,
   Sliders,
+  Gamepad2,
+  GraduationCap,
+  ShoppingBag,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -47,9 +50,12 @@ export default function VaultPage() {
   const { user } = useAuth();
   const {
     isUnlocked,
+    hasVault,
+    setupVault,
     unlockVault,
+    verifyMasterPassword,
     lockVault,
-    changeMasterPin,
+    changeMasterPassword,
     accounts,
     addAccount,
     updateAccount,
@@ -60,6 +66,11 @@ export default function VaultPage() {
   // Unlock PIN form state
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
+  const [setupConfirm, setSetupConfirm] = useState("");
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [verifyInput, setVerifyInput] = useState("");
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [pendingSensitive, setPendingSensitive] = useState<{ id: string; action: "show" | "copy"; password: string } | null>(null);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -140,14 +151,30 @@ export default function VaultPage() {
   };
 
   // Handle Unlock submission
-  const handleUnlockSubmit = (e: React.FormEvent) => {
+  const handleUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError(null);
-    const res = unlockVault(pinInput);
+    const res = await unlockVault(pinInput);
     if (res.success) {
       setPinInput("");
     } else {
-      setPinError(res.error || "Mã PIN không đúng.");
+      setPinError(res.error || "Mật khẩu khoá không đúng.");
+    }
+  };
+
+  const handleSetupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
+    if (pinInput !== setupConfirm) {
+      setPinError("Mật khẩu khoá nhập lại chưa khớp.");
+      return;
+    }
+    const res = await setupVault(pinInput);
+    if (res.success) {
+      setPinInput("");
+      setSetupConfirm("");
+    } else {
+      setPinError(res.error || "Không thể tạo két sắt.");
     }
   };
 
@@ -223,10 +250,10 @@ export default function VaultPage() {
   };
 
   // Submit Change PIN
-  const handleChangePinSubmit = (e: React.FormEvent) => {
+  const handleChangePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinModalError(null);
-    const res = changeMasterPin(oldPin, newPin);
+    const res = await changeMasterPassword(oldPin, newPin);
     if (res.success) {
       triggerToast("Đã đổi mã PIN mở két sắt thành công!");
       setOldPin("");
@@ -237,9 +264,36 @@ export default function VaultPage() {
     }
   };
 
-  // Toggle show password
-  const toggleShowPassword = (id: string) => {
-    setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
+  // A password is only shown or copied after re-entering the vault password.
+  const requestSensitiveAction = (acc: VaultAccount, action: "show" | "copy") => {
+    if (visiblePasswords[acc.id] && action === "show") {
+      setVisiblePasswords((prev) => ({ ...prev, [acc.id]: false }));
+      return;
+    }
+    setPendingSensitive({ id: acc.id, action, password: acc.password });
+    setVerifyInput("");
+    setVerifyError(null);
+    setShowVerifyModal(true);
+  };
+
+  const handleVerifySensitive = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingSensitive) return;
+    const ok = await verifyMasterPassword(verifyInput);
+    if (!ok) {
+      setVerifyError("Mật khẩu khoá không đúng, không thể hiện hoặc sao chép mật khẩu này.");
+      return;
+    }
+    if (pendingSensitive.action === "show") {
+      setVisiblePasswords((prev) => ({ ...prev, [pendingSensitive.id]: true }));
+      setTimeout(() => setVisiblePasswords((prev) => ({ ...prev, [pendingSensitive.id]: false })), 15000);
+    } else {
+      navigator.clipboard.writeText(pendingSensitive.password);
+      triggerToast("Đã sao chép Mật khẩu vào Clipboard!");
+    }
+    setShowVerifyModal(false);
+    setPendingSensitive(null);
+    setVerifyInput("");
   };
 
   // Copy with security feedback
@@ -273,6 +327,12 @@ export default function VaultPage() {
         return <Coins className="h-4 w-4 text-yellow-400" />;
       case "work":
         return <Briefcase className="h-4 w-4 text-indigo-400" />;
+      case "game":
+        return <Gamepad2 className="h-4 w-4 text-fuchsia-400" />;
+      case "study":
+        return <GraduationCap className="h-4 w-4 text-teal-400" />;
+      case "shopping":
+        return <ShoppingBag className="h-4 w-4 text-orange-400" />;
       default:
         return <KeyRound className="h-4 w-4 text-slate-400" />;
     }
@@ -311,7 +371,7 @@ export default function VaultPage() {
                   Két Sắt Mật Khẩu & Mã 2FA
                 </h2>
                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  Dữ liệu được lưu trữ riêng biệt theo tài khoản <strong className="text-white">@{user?.username}</strong>. Vui lòng nhập mã PIN để mở khóa két sắt.
+                  Vault mới, sạch và trống. Dữ liệu chỉ được giải mã khi bạn nhập đúng mật khẩu khoá, và sẽ tự khóa lại sau 5 phút không dùng. Tài khoản của @{user?.username} không có tài khoản mẫu.
                 </p>
               </div>
 
@@ -323,8 +383,8 @@ export default function VaultPage() {
                 </div>
               )}
 
-              {/* Master PIN Input Form */}
-              <form onSubmit={handleUnlockSubmit} className="space-y-4">
+              {/* Setup (first time) or Unlock */}
+              <form onSubmit={hasVault ? handleUnlockSubmit : handleSetupSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <input
                     type="password"
@@ -332,13 +392,23 @@ export default function VaultPage() {
                     maxLength={10}
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
-                    placeholder="Nhập mã PIN mở khóa..."
-                    className="w-full text-center tracking-[0.4em] text-lg font-bold py-3 rounded-2xl glass-input text-white font-mono placeholder:text-slate-600 placeholder:tracking-normal placeholder:text-xs"
+                    placeholder={hasVault ? "Nhập mật khẩu khoá..." : "Tạo mật khẩu khoá (ít nhất 8 ký tự)..."}
+                    className="w-full text-center text-lg font-bold py-3 rounded-2xl glass-input text-white font-mono placeholder:text-slate-600 placeholder:text-xs"
                     autoFocus
                     required
                   />
+                  {!hasVault && (
+                    <input
+                      type="password"
+                      value={setupConfirm}
+                      onChange={(e) => setSetupConfirm(e.target.value)}
+                      placeholder="Nhập lại mật khẩu khoá..."
+                      className="w-full text-center text-lg font-bold py-3 rounded-2xl glass-input text-white font-mono placeholder:text-slate-600 placeholder:text-xs"
+                      required
+                    />
+                  )}
                   <p className="text-[11px] text-slate-400">
-                    💡 Mã PIN mặc định ban đầu: <strong className="text-sky-300 font-mono">080497</strong> (có thể đổi sau khi mở khóa).
+                    {hasVault ? "Nhập đúng mật khẩu khoá mới xem được mục tài khoản." : "Đây là Vault mới sạch, chưa có tài khoản mẫu. Mật khẩu khoá này chỉ bạn biết, quên là không khôi phục được."}
                   </p>
                 </div>
 
@@ -382,7 +452,7 @@ export default function VaultPage() {
                   className="w-full py-3 text-xs font-bold gap-2 bg-gradient-to-r from-blue-600 to-indigo-600"
                 >
                   <Unlock className="h-4 w-4" />
-                  <span>Mở Khóa Két Sắt Ngay</span>
+                  <span>{hasVault ? "Mở Khóa Két Sắt Ngay" : "Tạo Két Sắt Mới"}</span>
                 </Button>
               </form>
             </div>
@@ -432,7 +502,7 @@ export default function VaultPage() {
                   className="h-8 text-xs gap-1.5"
                 >
                   <KeyRound className="h-3.5 w-3.5" />
-                  <span>Đổi mã PIN</span>
+                  <span>Đổi mật khẩu khoá</span>
                 </Button>
 
                 <Button
@@ -530,6 +600,10 @@ export default function VaultPage() {
                   { id: "banking", label: "Ngân hàng", icon: Building2 },
                   { id: "crypto", label: "Crypto & Web3", icon: Coins },
                   { id: "work", label: "Công việc", icon: Briefcase },
+                  { id: "game", label: "Game", icon: Gamepad2 },
+                  { id: "study", label: "Học tập", icon: GraduationCap },
+                  { id: "shopping", label: "Mua sắm", icon: ShoppingBag },
+                  { id: "other", label: "Khác", icon: KeyRound },
                 ].map((cat) => {
                   const Icon = cat.icon;
                   const isActive = selectedCategory === cat.id;
@@ -645,14 +719,14 @@ export default function VaultPage() {
                             </span>
                             <div className="flex items-center gap-1 shrink-0">
                               <button
-                                onClick={() => toggleShowPassword(acc.id)}
+                                onClick={() => requestSensitiveAction(acc, "show")}
                                 className="text-slate-400 hover:text-white p-1"
                                 title={isPassVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                               >
                                 {isPassVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                               </button>
                               <button
-                                onClick={() => handleCopyText(acc.password, "Mật khẩu")}
+                                onClick={() => requestSensitiveAction(acc, "copy")}
                                 className="text-slate-400 hover:text-white p-1"
                                 title="Sao chép mật khẩu"
                               >
@@ -825,6 +899,9 @@ export default function VaultPage() {
                       <option value="banking">Ngân hàng</option>
                       <option value="crypto">Crypto & Web3</option>
                       <option value="work">Công việc</option>
+                      <option value="game">Game</option>
+                      <option value="study">Học tập</option>
+                      <option value="shopping">Mua sắm</option>
                       <option value="other">Khác</option>
                     </select>
                   </div>
@@ -1047,6 +1124,32 @@ export default function VaultPage() {
 
         {/* ============================================================== */}
         {/* MODAL 3: CHANGE MASTER PIN */}
+        {/* Re-enter vault password to show or copy one password */}
+        {showVerifyModal && pendingSensitive && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+            <div className="w-full max-w-sm rounded-3xl glass-panel p-6 border border-white/20 bg-slate-950/95 shadow-2xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <KeyRound className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Nhập lại mật khẩu khoá</h3>
+                  <p className="text-[11px] text-slate-400">Chỉ khi nhập đúng, mật khẩu này mới được {pendingSensitive.action === "show" ? "hiện ra" : "sao chép"} và sẽ tự ẩn sau 15 giây.</p>
+                </div>
+              </div>
+              {verifyError && (
+                <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">{verifyError}</div>
+              )}
+              <form onSubmit={handleVerifySensitive} className="space-y-3">
+                <input type="password" value={verifyInput} onChange={(e) => setVerifyInput(e.target.value)} placeholder="Mật khẩu khoá..." className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white" required autoFocus />
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                  <Button variant="secondary" size="sm" onClick={() => { setShowVerifyModal(false); setPendingSensitive(null); }}>Hủy</Button>
+                  <Button type="submit" variant="primary" size="sm">Xác nhận</Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
         {/* ============================================================== */}
         {showPinModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -1056,7 +1159,7 @@ export default function VaultPage() {
                   <KeyRound className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm">Đổi Mã PIN Mở Két Sắt</h3>
+                  <h3 className="font-bold text-white text-sm">Đổi Mật Khẩu Khoá</h3>
                   <p className="text-[11px] text-slate-400">Thay đổi mã mở khóa cho tài khoản @{user?.username}</p>
                 </div>
               </div>
@@ -1069,24 +1172,24 @@ export default function VaultPage() {
 
               <form onSubmit={handleChangePinSubmit} className="space-y-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">Mã PIN hiện tại</label>
+                  <label className="text-xs font-semibold text-slate-200 block">Mật khẩu khoá hiện tại</label>
                   <input
                     type="password"
                     value={oldPin}
                     onChange={(e) => setOldPin(e.target.value)}
-                    placeholder="Mã PIN cũ (mặc định 080497)..."
+                    placeholder="Mật khẩu khoá hiện tại..."
                     className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                     required
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-200 block">Mã PIN mới</label>
+                  <label className="text-xs font-semibold text-slate-200 block">Mật khẩu khoá mới</label>
                   <input
                     type="password"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
-                    placeholder="Mã PIN mới (ít nhất 4 số)..."
+                    placeholder="Mật khẩu khoá mới (ít nhất 8 ký tự)..."
                     className="w-full px-3 py-2 rounded-xl glass-input text-xs text-white"
                     required
                   />
@@ -1097,7 +1200,7 @@ export default function VaultPage() {
                     Hủy
                   </Button>
                   <Button type="submit" variant="primary" size="sm">
-                    Lưu mã PIN mới
+                    Lưu mật khẩu khoá mới
                   </Button>
                 </div>
               </form>
