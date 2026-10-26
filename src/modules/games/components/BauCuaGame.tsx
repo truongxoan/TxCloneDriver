@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useGames } from "../gamesContext";
 import { useAuth } from "@/modules/auth/authContext";
+import { logAdminRiggedOutcome } from "@/modules/games/adminAudit";
 import { Sparkles, RotateCcw, Crown } from "lucide-react";
 
 type AnimalId = "nai" | "bau" | "ga" | "ca" | "cua" | "tom";
@@ -196,7 +197,7 @@ export function BauCuaGame() {
               🎲 Tự Nhiên
             </button>
             <button
-              onClick={() => setBauCuaRiggedAnimals(["bau", "bau", "bau"])}
+              onClick={() => { setBauCuaRiggedAnimals(["bau", "bau", "bau"]); logAdminRiggedOutcome("BauCua", "bau-bau-bau"); }}
               className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                 bauCuaRiggedAnimals?.[0] === "bau" && bauCuaRiggedAnimals?.[1] === "bau"
                   ? "bg-amber-500 text-slate-950 shadow font-black"
@@ -206,7 +207,7 @@ export function BauCuaGame() {
               🎃 3 BẦU (x3)
             </button>
             <button
-              onClick={() => setBauCuaRiggedAnimals(["cua", "cua", "cua"])}
+              onClick={() => { setBauCuaRiggedAnimals(["cua", "cua", "cua"]); logAdminRiggedOutcome("BauCua", "cua-cua-cua"); }}
               className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                 bauCuaRiggedAnimals?.[0] === "cua" && bauCuaRiggedAnimals?.[1] === "cua"
                   ? "bg-amber-500 text-slate-950 shadow font-black"
@@ -216,7 +217,7 @@ export function BauCuaGame() {
               🦀 3 CUA (x3)
             </button>
             <button
-              onClick={() => setBauCuaRiggedAnimals(["tom", "tom", "tom"])}
+              onClick={() => { setBauCuaRiggedAnimals(["tom", "tom", "tom"]); logAdminRiggedOutcome("BauCua", "tom-tom-tom"); }}
               className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                 bauCuaRiggedAnimals?.[0] === "tom" && bauCuaRiggedAnimals?.[1] === "tom"
                   ? "bg-amber-500 text-slate-950 shadow font-black"
@@ -226,7 +227,7 @@ export function BauCuaGame() {
               🦐 3 TÔM (x3)
             </button>
             <button
-              onClick={() => setBauCuaRiggedAnimals(["bau", "cua", "tom"])}
+              onClick={() => { setBauCuaRiggedAnimals(["bau", "cua", "tom"]); logAdminRiggedOutcome("BauCua", "bau-cua-tom"); }}
               className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                 bauCuaRiggedAnimals?.[0] === "bau" && bauCuaRiggedAnimals?.[1] === "cua"
                   ? "bg-amber-500 text-slate-950 shadow font-black"
