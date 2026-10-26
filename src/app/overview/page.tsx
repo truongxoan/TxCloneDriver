@@ -11,7 +11,6 @@ import {
   MoreVertical,
   Laptop,
   Smartphone,
-  Server,
   Bookmark,
   Upload,
   Link2,
@@ -34,7 +33,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/modules/auth/authContext";
-import { useDriveEndpoints } from "@/modules/storage/driveEndpointsContext";
+import {
+  useDriveEndpoints,
+  DEFAULT_COURSE_FOLDERS,
+  DEFAULT_DRIVE_AUDIO_TRACKS,
+  DEFAULT_DRIVE_VIDEO_ITEMS,
+} from "@/modules/storage/driveEndpointsContext";
+import { scanJunkFiles } from "@/modules/storage/junkFilter";
+import { INITIAL_ALL_NOTES } from "@/modules/notes/notesData";
+import { DEFAULT_PROJECTS, PROJECT_STATUS_LABELS } from "@/modules/projects/projectsData";
+import { ProjectItem } from "@/types/notesAndProjects";
 import { useFeedback } from "@/modules/feedback/feedbackContext";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { AnimatedCards } from "@/components/ui/AnimatedCards";
@@ -59,11 +67,16 @@ export default function OverviewPage() {
 
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [notesCount, setNotesCount] = useState<number>(3);
-  const [projectsCount, setProjectsCount] = useState<number>(4);
+  // Audit fix #1: defaults come from the same sources as /notes and
+  // /projects, so the first paint already matches those pages instead of
+  // showing placeholder 3 notes / 4 "in progress" projects.
+  const [notesCount, setNotesCount] = useState<number>(INITIAL_ALL_NOTES.length);
+  const [projects, setProjects] = useState<ProjectItem[]>(DEFAULT_PROJECTS);
+  const projectsCount = projects.filter((proj) => proj.status === "in_progress").length;
   const [totalMonthExpense, setTotalMonthExpense] = useState<number>(2450000);
 
-  // Load actual local notes, projects & expenses counts
+  // Load actual local notes & projects from the same keys and with the
+  // same merge rule as /notes and /projects (audit fix #1/#2).
   useEffect(() => {
     try {
       const rawNotes =
@@ -71,12 +84,20 @@ export default function OverviewPage() {
         localStorage.getItem("datavault_notes");
       if (rawNotes) {
         const parsed = JSON.parse(rawNotes);
-        if (Array.isArray(parsed)) setNotesCount(parsed.length);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map((item: any) => item.id));
+          const missingBuiltIn = INITIAL_ALL_NOTES.filter((item) => !existingIds.has(item.id));
+          setNotesCount(parsed.length + missingBuiltIn.length);
+        } else {
+          setNotesCount(INITIAL_ALL_NOTES.length);
+        }
+      } else {
+        setNotesCount(INITIAL_ALL_NOTES.length);
       }
       const rawProjects = localStorage.getItem("datavault_projects");
       if (rawProjects) {
         const parsed = JSON.parse(rawProjects);
-        if (Array.isArray(parsed)) setProjectsCount(parsed.length);
+        if (Array.isArray(parsed)) setProjects(parsed);
       }
       const rawExp = localStorage.getItem("txclonedriver_expenses");
       if (rawExp) {
@@ -93,10 +114,23 @@ export default function OverviewPage() {
     }
   }, []);
 
-  // Compute real drive usage
-  const totalDriveBytes = files.reduce((acc, f) => {
-    return acc + (f.sizeBytes && f.sizeBytes > 0 ? f.sizeBytes : 25 * 1024 * 1024);
-  }, 0);
+  // Compute real drive usage from the SAME clean display list as
+  // /storage (audit fix #1): the context files when present, otherwise
+  // the shared course-folder + audio + video defaults, with junk files
+  // excluded. Folders count as items but contribute 0 bytes — the old
+  // 25 MB fallback per file is gone, so the total can no longer inflate.
+  const cleanDriveFiles = React.useMemo(() => {
+    const baseList =
+      files.length > 0
+        ? files
+        : [
+            ...DEFAULT_COURSE_FOLDERS,
+            ...DEFAULT_DRIVE_AUDIO_TRACKS,
+            ...DEFAULT_DRIVE_VIDEO_ITEMS,
+          ];
+    return scanJunkFiles(baseList).cleanItems;
+  }, [files]);
+  const totalDriveBytes = cleanDriveFiles.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
   const driveCapacity = 100 * 1024 * 1024 * 1024; // 100 GB
   const drivePercent = Math.min(
     100,
@@ -377,7 +411,7 @@ export default function OverviewPage() {
             <div className="mt-3">
               <span className="text-[11px] text-slate-400 block font-medium">Google Drive Thực tế</span>
               <span className="text-sm font-extrabold text-white mt-0.5 block">
-                {formatBytes(totalDriveBytes)} ({files.length} tệp tin)
+                {formatBytes(totalDriveBytes)} ({cleanDriveFiles.length} tệp tin)
               </span>
 
               {/* Progress Bar */}
@@ -508,7 +542,8 @@ export default function OverviewPage() {
         {/* 4. MIDDLE ROW: DỰ ÁN, GHI CHÚ NHANH & VIỆC CẦN LÀM TODO        */}
         {/* ============================================================== */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {/* Column 1: Dự án đang làm */}
+          {/* Column 1: Dự án — rendered from the SAME shared project
+              list as /projects (audit fix #2), never hardcoded. */}
           <div className="rounded-3xl glass-card p-5 border border-white/10 shadow-glass flex flex-col justify-between space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
@@ -523,68 +558,30 @@ export default function OverviewPage() {
               </Link>
             </div>
 
-            {/* Project 1: Website TxCloneDriver */}
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-                <Laptop className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white truncate">Website TxCloneDriver Hub</span>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-semibold">
-                    Đang làm
-                  </span>
+            {projects.map((project) => (
+              <div
+                key={project.id}
+                className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3"
+              >
+                <div className="h-10 w-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <Laptop className="h-5 w-5" />
                 </div>
-                <p className="text-[11px] text-slate-300 truncate">
-                  Phát triển giao diện, phân quyền bảo mật và kho game
-                </p>
-                <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-blue-500 h-full rounded-full" style={{ width: "85%" }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Project 2: Hệ thống Game & AI Assistant */}
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
-                <Gamepad2 className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white truncate">Kho Game & Trợ Thủ AI</span>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-semibold">
-                    Hoàn tất
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 truncate">
-                  Tài xỉu, Xóc đĩa, Baccarat, Bầu cua, Cờ tướng, Cờ caro AI
-                </p>
-                <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-emerald-500 h-full rounded-full" style={{ width: "100%" }} />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white truncate">{project.title}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-semibold shrink-0">
+                      {PROJECT_STATUS_LABELS[project.status] || project.status}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 truncate">
+                    {project.description}
+                  </p>
+                  <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                    <div className="bg-blue-500 h-full rounded-full" style={{ width: `${project.progressPercent}%` }} />
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Project 3: Backup hệ thống */}
-            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-all flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
-                <Server className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white truncate">Đồng bộ Google Drive & Telegram</span>
-                  <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/30 text-[10px] font-semibold">
-                    Sắp hoàn thành
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 truncate">
-                  Tự động sao lưu và stream đa kênh
-                </p>
-                <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-purple-500 h-full rounded-full" style={{ width: "90%" }} />
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Column 2: Ghi chú & Link nhanh */}
@@ -712,7 +709,7 @@ export default function OverviewPage() {
                   Đã đồng bộ Google Drive thành công
                 </p>
                 <p className="text-[11px] text-slate-300 truncate">
-                  {files.length} tệp tin sẵn sàng phát trực tuyến
+                  {cleanDriveFiles.length} tệp tin sẵn sàng phát trực tuyến
                 </p>
               </div>
             </div>
