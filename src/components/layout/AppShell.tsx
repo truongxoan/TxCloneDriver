@@ -11,6 +11,7 @@ import { FloatingMessenger } from "@/modules/chat/FloatingMessenger";
 import { DynamicIsland } from "./DynamicIsland";
 import { MacOsDock } from "./MacOsDock";
 import { MouseEffectsProvider } from "@/modules/interactions/MouseEffectsProvider";
+import { PageTransition } from "@/components/ui/PageTransition";
 import { useTheme } from "@/modules/theme-engine/themeContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { Wrench } from "lucide-react";
@@ -105,9 +106,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onOpenSearch={() => setSearchOpen(true)}
           />
 
-          {/* Main Workspace Body */}
-          <main className="flex-1 p-3.5 sm:p-5 lg:p-6 w-full mx-auto">
-            {children}
+          {/* Main Workspace Body — Phase 1 3D shell: perspective + scene orbs + page transition */}
+          <main
+            className="relative flex-1 p-3.5 sm:p-5 lg:p-6 w-full mx-auto"
+            style={{ perspective: 1200 }}
+          >
+            <div aria-hidden="true" className="tx-scene-orbs" />
+            <div className="relative">
+              <PageTransition>{children}</PageTransition>
+            </div>
           </main>
         </div>
       </div>
