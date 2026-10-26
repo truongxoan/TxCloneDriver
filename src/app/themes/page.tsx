@@ -460,11 +460,11 @@ export default function ThemesPage() {
         </div>
       </Card>
 
-      {/* 17 Modern Themes Grid */}
+      {/* Themes Grid (count is dynamic from THEMES) */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-            <span>Bộ Sưu Tập 17 Giao Diện Cao Cấp &amp; Hình Nền 8K Đa Chiều</span>
+            <span>Bộ Sưu Tập {THEMES.length} Giao Diện Cao Cấp &amp; Hình Nền 8K Đa Chiều</span>
             <span className="text-xs font-normal text-muted-foreground">
               (Bấm để kích hoạt tức thì)
             </span>

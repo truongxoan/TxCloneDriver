@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useGames } from "../gamesContext";
 import { useAuth } from "@/modules/auth/authContext";
+import { logAdminRiggedOutcome } from "@/modules/games/adminAudit";
 import { Sparkles, RotateCcw, Crown } from "lucide-react";
 
 type BaccaratBet = "player" | "banker" | "tie";
@@ -259,7 +260,7 @@ export function BaccaratGame() {
             ].map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => setBaccaratRiggedOutcome(mode.id as any)}
+                onClick={() => { setBaccaratRiggedOutcome(mode.id as any); if (mode.id !== "random") logAdminRiggedOutcome("Baccarat", mode.id); }}
                 className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                   baccaratRiggedOutcome === mode.id
                     ? "bg-indigo-500 text-white shadow font-black"

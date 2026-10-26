@@ -50,6 +50,9 @@ import {
 
 const STORAGE_KEY = "datavault_notes_v2";
 
+// Module scope so the useMemo below has no missing dependency.
+const KNOWN_NOTE_CATEGORIES = ["github", "triennguyen", "windows", "cheatsheet", "terminal", "tips"];
+
 export default function NotesPage() {
   const [notes, setNotes] = useState<NoteItem[]>(INITIAL_ALL_NOTES);
   const [searchTerm, setSearchTerm] = useState("");
@@ -366,7 +369,11 @@ export default function NotesPage() {
       .sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
   }, [notes, searchTerm, selectedCategory, selectedTag]);
 
-  // Category counts
+  // Category counts. "Other" counts notes whose category is "other"
+  // OR uncategorised/missing (e.g. a hand-edited localStorage entry), so a
+  // real personal note is never silently dropped from the counts. If the
+  // count is still 0, the chip is hidden below instead of showing a
+  // misleading "0" group (audit fix #11). No personal notes are invented.
   const categoryCounts = useMemo(() => {
     return {
       all: notes.length,
@@ -378,7 +385,7 @@ export default function NotesPage() {
       cheatsheet: notes.filter((n) => n.category === "cheatsheet").length,
       terminal: notes.filter((n) => n.category === "terminal").length,
       other: notes.filter(
-        (n) => !["github", "triennguyen", "windows", "cheatsheet", "terminal", "tips"].includes(n.category)
+        (n) => !(n as { category?: string }).category || !KNOWN_NOTE_CATEGORIES.includes((n as { category?: string }).category as string)
       ).length,
     };
   }, [notes]);
@@ -710,7 +717,11 @@ export default function NotesPage() {
               { id: "windows", label: "💻 Phím Tắt Windows", count: categoryCounts.windows },
               { id: "cheatsheet", label: "⚡ Lệnh Run (Win+R)", count: categoryCounts.cheatsheet },
               { id: "terminal", label: "💻 Terminal & CLI", count: categoryCounts.terminal },
-              { id: "other", label: "📝 Cá nhân & Khác", count: categoryCounts.other },
+              // Hide the empty "personal & other" chip when there is
+              // nothing in it, instead of showing a misleading 0 group.
+              ...(categoryCounts.other > 0
+                ? [{ id: "other", label: "📝 Cá nhân & Khác", count: categoryCounts.other }]
+                : []),
             ].map((cat) => (
               <button
                 key={cat.id}

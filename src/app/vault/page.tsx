@@ -388,8 +388,6 @@ export default function VaultPage() {
                 <div className="space-y-1.5">
                   <input
                     type="password"
-                    inputMode="numeric"
-                    maxLength={10}
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
                     placeholder={hasVault ? "Nhập mật khẩu khoá..." : "Tạo mật khẩu khoá (ít nhất 8 ký tự)..."}
@@ -408,42 +406,10 @@ export default function VaultPage() {
                     />
                   )}
                   <p className="text-[11px] text-slate-400">
-                    {hasVault ? "Nhập đúng mật khẩu khoá mới xem được mục tài khoản." : "Đây là Vault mới sạch, chưa có tài khoản mẫu. Mật khẩu khoá này chỉ bạn biết, quên là không khôi phục được."}
+                    {hasVault
+                      ? "Nhập đúng mật khẩu khoá (dạng chữ, không phải mã PIN số) mới xem được mục tài khoản."
+                      : "Đây là Vault mới sạch, chưa có tài khoản mẫu. Mật khẩu khoá là mật khẩu dạng chữ, ít nhất 8 ký tự — chỉ bạn biết, quên là không khôi phục được."}
                   </p>
-                </div>
-
-                {/* Quick Keypad */}
-                <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto pt-1">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setPinInput((prev) => (prev.length < 10 ? prev + num : prev))}
-                      className="py-2.5 rounded-xl bg-slate-900/80 hover:bg-white/10 text-white font-bold text-sm border border-white/5 active:scale-95 transition-all"
-                    >
-                      {num}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setPinInput("")}
-                    className="py-2.5 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 text-rose-300 font-semibold text-xs border border-white/5 active:scale-95 transition-all"
-                  >
-                    Xóa
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPinInput((prev) => (prev.length < 10 ? prev + "0" : prev))}
-                    className="py-2.5 rounded-xl bg-slate-900/80 hover:bg-white/10 text-white font-bold text-sm border border-white/5 active:scale-95 transition-all"
-                  >
-                    0
-                  </button>
-                  <button
-                    type="submit"
-                    className="py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs border border-blue-400/40 active:scale-95 transition-all"
-                  >
-                    Mở
-                  </button>
                 </div>
 
                 <Button

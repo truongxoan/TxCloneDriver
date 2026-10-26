@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useGames } from "../gamesContext";
 import { useAuth } from "@/modules/auth/authContext";
+import { logAdminRiggedOutcome } from "@/modules/games/adminAudit";
 import { Sparkles, RotateCcw, Volume2, VolumeX, Flame, Crown } from "lucide-react";
 
 type BetZone = "tai" | "xiu" | "chan" | "le" | "bao";
@@ -195,7 +196,7 @@ export function TaiXiuGame() {
             ].map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => setTaiXiuRiggedOutcome(mode.id as any)}
+                onClick={() => { setTaiXiuRiggedOutcome(mode.id as any); if (mode.id !== "random") logAdminRiggedOutcome("TaiXiu", mode.id); }}
                 className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                   taiXiuRiggedOutcome === mode.id
                     ? "bg-amber-500 text-slate-950 shadow font-black"

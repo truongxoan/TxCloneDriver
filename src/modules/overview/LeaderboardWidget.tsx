@@ -10,10 +10,16 @@ export function LeaderboardWidget() {
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [deltaAmount, setDeltaAmount] = useState<string>("10000");
 
-  // Sort users by coins descending
-  const sortedUsers = [...managedUsers].sort(
-    (a, b) => (b.coins ?? 50000) - (a.coins ?? 50000)
-  );
+  // Audit fix #12: pending members are NOT ranked, and the 50,000
+  // default is never presented as a real score. managedUsers seeds every
+  // account (including the pending one) with coins: 50000, so a raw sort
+  // made all 4 members look tied at exactly 50,000. Only approved members
+  // are ranked, by their stored coins value; a missing coins value shows
+  // as a dash, not as the default. Pending members are listed separately,
+  // labelled "Chờ duyệt", with no score.
+  const approvedUsers = managedUsers.filter((u) => u.status !== "pending");
+  const pendingUsers = managedUsers.filter((u) => u.status === "pending");
+  const sortedUsers = [...approvedUsers].sort((a, b) => (b.coins ?? 0) - (a.coins ?? 0));
 
   const handleAdjust = (isAdd: boolean) => {
     if (!selectedUser) return;
@@ -49,7 +55,6 @@ export function LeaderboardWidget() {
       {/* Leaderboard List */}
       <div className="flex-1 overflow-y-auto py-3 space-y-2 pr-1">
         {sortedUsers.map((u, idx) => {
-          const coins = u.coins ?? 50000;
           return (
             <div
               key={u.id}
@@ -102,7 +107,7 @@ export function LeaderboardWidget() {
               {/* Coins & Admin Actions */}
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-xs font-black text-amber-400 font-mono">
-                  {coins.toLocaleString()} <span className="text-[10px] text-amber-200">đ</span>
+                  {u.coins == null ? "—" : `${u.coins.toLocaleString()} đ`}
                 </span>
 
                 {isAdmin && (
@@ -120,6 +125,40 @@ export function LeaderboardWidget() {
         })}
       </div>
 
+      {/* Pending members: listed, never ranked, and never given the
+          default 50,000 as a score (audit fix #12). */}
+      {pendingUsers.length > 0 && (
+        <div className="shrink-0 pt-2 border-t border-white/10 space-y-1.5">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+            Chờ duyệt — chưa xếp hạng
+          </p>
+          {pendingUsers.map((u) => (
+            <div
+              key={u.id}
+              className="p-2.5 rounded-2xl border border-white/5 bg-black/20 flex items-center justify-between gap-3"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden">
+                  {u.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={u.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    u.avatarInitials || u.username.slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <div className="truncate">
+                  <div className="text-xs font-bold text-white truncate">{u.name}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">@{u.username}</div>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                Chờ duyệt
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Admin Adjust Modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -128,7 +167,7 @@ export function LeaderboardWidget() {
               Điều Chỉnh Điểm Cho: <span className="text-amber-400">{selectedUser.name}</span>
             </h3>
             <p className="text-xs text-muted-foreground">
-              Hiện tại đang có: <strong>{(selectedUser.coins ?? 50000).toLocaleString()}</strong> điểm.
+              Hiện tại đang có: <strong>{selectedUser.coins == null ? "—" : selectedUser.coins.toLocaleString()}</strong> điểm.
             </p>
 
             <div>

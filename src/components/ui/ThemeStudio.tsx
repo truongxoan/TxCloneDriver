@@ -67,6 +67,12 @@ export function ThemeStudio() {
   );
   const [depth, setDepth] = useState<number>(customTheme?.depth ?? 8);
   const [saved, setSaved] = useState<boolean>(false);
+  // Backgrounds that failed to load (e.g. a missing /images/*.jpg on the
+  // deployed site) are swapped for a gradient tile instead of rendering
+  // as a dark empty tile (audit fix #3). All 15 entries in
+  // CUSTOM_BG_IMAGES were verified to exist in public/images at fix time;
+  // this is the safety net for any future missing file.
+  const [failedBgImages, setFailedBgImages] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (customTheme) {
@@ -171,8 +177,25 @@ export function ThemeStudio() {
                       : "border-white/10 hover:border-white/30"
                   )}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" aria-hidden="true" className="h-full w-full object-cover" />
+                  {failedBgImages.has(src) ? (
+                    <span className="block h-full w-full bg-gradient-to-br from-sky-500/60 via-indigo-500/40 to-slate-900" aria-hidden="true" />
+                  ) : (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={src}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full object-cover"
+                      onError={() =>
+                        setFailedBgImages((prev) => {
+                          if (prev.has(src)) return prev;
+                          const next = new Set(prev);
+                          next.add(src);
+                          return next;
+                        })
+                      }
+                    />
+                  )}
                 </button>
               ))}
             </div>

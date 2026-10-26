@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -11,6 +11,7 @@ import {
   Star,
   Plus,
   Info,
+  Trash2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -20,9 +21,67 @@ import { convertSolar2Lunar, getAuspiciousHours } from "@/modules/lunar-calendar
 
 const DAYS_OF_WEEK = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
+interface CalendarEvent {
+  id: string;
+  date: string; // yyyy-mm-dd, local date of the selected day
+  title: string;
+}
+
+const CALENDAR_EVENTS_KEY = "txclonedriver_calendar_events";
+
+function toLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Real personal events for the selected date (audit fix #5). Previously
+  // the "add event" button was a demo with no onClick and saved nothing.
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [newEventTitle, setNewEventTitle] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CALENDAR_EVENTS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setEvents(parsed);
+      }
+    } catch {
+      // ignore corrupt storage; start empty
+    }
+  }, []);
+
+  const saveEvents = (updated: CalendarEvent[]) => {
+    setEvents(updated);
+    try {
+      localStorage.setItem(CALENDAR_EVENTS_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const selectedDateKey = toLocalDateKey(selectedDate);
+  const selectedDateEvents = events.filter((event) => event.date === selectedDateKey);
+
+  const handleAddEvent = () => {
+    const title = newEventTitle.trim();
+    if (!title) return;
+    saveEvents([
+      ...events,
+      { id: `cal-${Date.now()}`, date: selectedDateKey, title },
+    ]);
+    setNewEventTitle("");
+  };
+
+  const handleDeleteEvent = (id: string) => {
+    saveEvents(events.filter((event) => event.id !== id));
+  };
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0 - 11
@@ -122,7 +181,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Calendar Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -312,10 +371,51 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <Button variant="secondary" size="sm" className="w-full gap-2">
-                <Plus className="h-4 w-4" />
-                <span>Thêm sự kiện cá nhân (Demo)</span>
-              </Button>
+              <div className="space-y-2 pt-1 border-t border-surface-border/60">
+                <span className="text-xs font-semibold text-foreground block">
+                  Sự kiện cá nhân ngày {selectedDate.getDate()}/{selectedDate.getMonth() + 1}/{selectedDate.getFullYear()}
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newEventTitle}
+                    onChange={(e) => setNewEventTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddEvent();
+                    }}
+                    placeholder="Nhập tên sự kiện..."
+                    className="flex-1 min-w-0 px-3 py-2 rounded-xl glass-input text-xs"
+                  />
+                  <Button variant="secondary" size="sm" onClick={handleAddEvent} className="gap-2 shrink-0">
+                    <Plus className="h-4 w-4" />
+                    <span>Thêm sự kiện cá nhân</span>
+                  </Button>
+                </div>
+                {selectedDateEvents.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Chưa có sự kiện nào cho ngày này.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {selectedDateEvents.map((event) => (
+                      <li
+                        key={event.id}
+                        className="flex items-center justify-between gap-2 p-2 rounded-xl bg-surface-elevated/50 border border-surface-border text-xs"
+                      >
+                        <span className="text-foreground truncate">{event.title}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-400 shrink-0"
+                          title="Xóa sự kiện"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

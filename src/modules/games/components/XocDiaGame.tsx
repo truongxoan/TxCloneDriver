@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useGames } from "../gamesContext";
 import { useAuth } from "@/modules/auth/authContext";
+import { logAdminRiggedOutcome } from "@/modules/games/adminAudit";
 import { Sparkles, RotateCcw, Crown } from "lucide-react";
 
 type XocDiaBetZone = "chan" | "le" | "tu_do" | "tu_trang" | "ba_do" | "ba_trang";
@@ -203,7 +204,7 @@ export function XocDiaGame() {
             ].map((mode) => (
               <button
                 key={mode.id}
-                onClick={() => setXocDiaRiggedOutcome(mode.id as any)}
+                onClick={() => { setXocDiaRiggedOutcome(mode.id as any); if (mode.id !== "random") logAdminRiggedOutcome("XocDia", mode.id); }}
                 className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all ${
                   xocDiaRiggedOutcome === mode.id
                     ? "bg-rose-500 text-white shadow font-black"

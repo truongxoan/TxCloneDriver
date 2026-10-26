@@ -301,7 +301,7 @@ export function DynamicIsland() {
             <div className="flex items-center justify-between w-full text-[11px] select-none gap-1.5">
               {/* Left: Music / Cinema Media Indicator */}
               {cinemaData.isOpen && cinemaData.video ? (
-                <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                <div className="hidden lg:flex items-center gap-1.5 min-w-0 pr-1">
                   <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-rose-500 to-pink-600 flex items-center justify-center shrink-0 shadow-sm shadow-rose-500/40">
                     <Film className="w-2 h-2 text-white" />
                   </div>
@@ -314,7 +314,7 @@ export function DynamicIsland() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                <div className="hidden lg:flex items-center gap-1.5 min-w-0 pr-1">
                   <div
                     className={cn(
                       "w-4 h-4 rounded-full flex items-center justify-center shrink-0 transition-all",

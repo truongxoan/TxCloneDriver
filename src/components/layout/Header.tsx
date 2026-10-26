@@ -212,12 +212,13 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
 
       {/* Header Info & Controls (aligned right, matching reference) */}
       <div className="flex items-center gap-3 sm:gap-4 overflow-x-auto no-scrollbar">
-        {/* Clock & Solar Date */}
-        <div className="text-right shrink-0">
-          <div className="text-sm font-extrabold text-white tracking-tight font-mono leading-tight">
+        {/* Clock & Solar Date — min-w-0 + truncate so the centered
+            Dynamic Island pill can never cover or cut off the date (fix #9). */}
+        <div className="text-right shrink-0 min-w-0">
+          <div className="text-sm font-extrabold text-white tracking-tight font-mono leading-tight truncate">
             {hoursStr}:{minStr}:{secStr}
           </div>
-          <div className="text-[11px] text-slate-300 font-medium">
+          <div className="text-[11px] text-slate-300 font-medium truncate max-w-[180px] sm:max-w-none">
             {weekday}, {solarDateStr}
           </div>
         </div>
