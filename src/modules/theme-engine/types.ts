@@ -19,7 +19,8 @@ export type ThemeId =
   | "synthwave-80s"
   | "matrix-rain"
   | "aurora-borealis"
-  | "sunset-glow";
+  | "sunset-glow"
+  | "custom";
 
 export type EffectType =
   | "blossom"
@@ -54,4 +55,6 @@ export interface ThemeDefinition {
   previewGradient: string;
   bgImage?: string;
   cssVars: Record<string, string>;
+  /** Độ sâu 3D cho Card (translateZ khi hover), chỉ Theme Studio dùng. */
+  depth?: number;
 }

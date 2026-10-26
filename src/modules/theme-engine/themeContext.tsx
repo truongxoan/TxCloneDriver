@@ -3,6 +3,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { ThemeId, ThemeDefinition, EffectType } from "./types";
 import { THEMES } from "./themesData";
+import {
+  loadCustomTheme,
+  removeCustomTheme,
+  saveCustomTheme,
+} from "./customTheme";
 
 interface ThemeContextType {
   currentTheme: ThemeDefinition;
@@ -16,6 +21,9 @@ interface ThemeContextType {
   setIntensity: (intensity: "low" | "medium" | "high") => void;
   customEffectType: EffectType | "theme-default";
   setCustomEffectType: (effect: EffectType | "theme-default") => void;
+  customTheme: ThemeDefinition | null;
+  setCustomTheme: (theme: ThemeDefinition) => void;
+  clearCustomTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -34,6 +42,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isAutoSeason, setIsAutoSeasonState] = useState<boolean>(false);
   const [intensity, setIntensityState] = useState<"low" | "medium" | "high">("medium");
   const [customEffectType, setCustomEffectTypeState] = useState<EffectType | "theme-default">("theme-default");
+  const [customTheme, setCustomThemeState] = useState<ThemeDefinition | null>(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -44,9 +53,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const savedIntensity = localStorage.getItem("datavault_intensity") as "low" | "medium" | "high";
       const savedCustomEffect = localStorage.getItem("datavault_custom_effect") as EffectType | "theme-default";
 
+      const savedCustom = loadCustomTheme();
+      if (savedCustom) setCustomThemeState(savedCustom);
+
       if (savedAuto === "true") {
         setIsAutoSeasonState(true);
         setThemeIdState(getSeasonTheme());
+      } else if (savedTheme === "custom" && savedCustom) {
+        setThemeIdState("custom");
       } else if (savedTheme && THEMES.some((t) => t.id === savedTheme)) {
         setThemeIdState(savedTheme);
       }
@@ -129,7 +143,39 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const currentTheme = THEMES.find((t) => t.id === themeId) || THEMES[0];
+  const setCustomTheme = (theme: ThemeDefinition) => {
+    setCustomThemeState(theme);
+    saveCustomTheme(theme);
+    setThemeIdState("custom");
+    setIsAutoSeasonState(false);
+    setCustomEffectTypeState("theme-default");
+    try {
+      localStorage.setItem("datavault_theme", "custom");
+      localStorage.setItem("datavault_auto_season", "false");
+      localStorage.setItem("datavault_custom_effect", "theme-default");
+    } catch {
+      // ignore
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("tx_theme_changed", { detail: { id: "custom" } }));
+    }
+  };
+
+  const clearCustomTheme = () => {
+    setCustomThemeState(null);
+    removeCustomTheme();
+    setThemeIdState("autumn-leaves");
+    try {
+      localStorage.setItem("datavault_theme", "autumn-leaves");
+    } catch {
+      // ignore
+    }
+  };
+
+  const currentTheme =
+    themeId === "custom" && customTheme
+      ? customTheme
+      : THEMES.find((t) => t.id === themeId) || THEMES[0];
 
   // Apply CSS variables to root
   useEffect(() => {
@@ -140,6 +186,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     Object.entries(currentTheme.cssVars).forEach(([key, value]) => {
       root.style.setProperty(key, value);
     });
+    if (typeof currentTheme.depth === "number") {
+      root.style.setProperty("--tx-depth", `${currentTheme.depth}px`);
+    } else {
+      root.style.removeProperty("--tx-depth");
+    }
   }, [currentTheme]);
 
   return (
@@ -156,6 +207,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         setIntensity,
         customEffectType,
         setCustomEffectType,
+        customTheme,
+        setCustomTheme,
+        clearCustomTheme,
       }}
     >
       {children}
