@@ -25,77 +25,9 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils";
 import { ProjectItem, ProjectStatus } from "@/types/notesAndProjects";
+import { DEFAULT_PROJECTS, isProjectOverdue } from "@/modules/projects/projectsData";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 
-const DEFAULT_PROJECTS: ProjectItem[] = [
-  {
-    id: "proj-1",
-    title: "Website TxCloneDriver Cloud Hub",
-    description: "Phát triển giao diện web SaaS quản lý dữ liệu cá nhân cao cấp, tích hợp Google Drive và Telegram Bot.",
-    status: "in_progress",
-    progressPercent: 75,
-    priority: "high",
-    dueDate: "30/05/2025",
-    updatedAt: "26/04/2025",
-    githubUrl: "https://github.com/txclonedriver/hub",
-    branch: "main",
-    tasks: [
-      { id: "t1", title: "Thiết kế Glassmorphism SaaS 3D", completed: true },
-      { id: "t2", title: "Tích hợp Google Apps Script Drive", completed: true },
-      { id: "t3", title: "Xây dựng Music Player cho Google Drive", completed: true },
-      { id: "t4", title: "Tối ưu hóa Lighthouse 90+", completed: false },
-    ],
-  },
-  {
-    id: "proj-2",
-    title: "Ứng dụng Di động TxCloneDriver Mobile",
-    description: "Phiên bản di động React Native hỗ trợ đồng bộ tệp ngoại tuyến và xác thực vân tay/FaceID.",
-    status: "not_started",
-    progressPercent: 40,
-    priority: "medium",
-    dueDate: "15/07/2025",
-    updatedAt: "20/04/2025",
-    githubUrl: "https://github.com/txclonedriver/mobile",
-    branch: "dev",
-    tasks: [
-      { id: "t5", title: "Phác thảo Wireframe & UX", completed: true },
-      { id: "t6", title: "Cấu hình Expo / React Native", completed: false },
-      { id: "t7", title: "Đồng bộ offline SQLite", completed: false },
-    ],
-  },
-  {
-    id: "proj-3",
-    title: "Backup Hệ thống & Multi-Endpoint Hub",
-    description: "Cơ chế tự động hóa sao lưu và failover sang các tài khoản Drive dự phòng khi gặp sự cố.",
-    status: "almost_done",
-    progressPercent: 90,
-    priority: "high",
-    dueDate: "10/05/2025",
-    updatedAt: "24/04/2025",
-    githubUrl: "https://github.com/txclonedriver/backup-engine",
-    branch: "feature/failover",
-    tasks: [
-      { id: "t8", title: "Thiết kế Route Handler Proxy", completed: true },
-      { id: "t9", title: "Quản lý đa endpoint dự phòng", completed: true },
-      { id: "t10", title: "Kiểm thử mã hóa AES-256", completed: false },
-    ],
-  },
-  {
-    id: "proj-4",
-    title: "Telegram AI Bot Trợ lý",
-    description: "Bot Telegram thông minh gửi thông báo thời tiết, sự kiện và tra cứu tệp qua chat lệnh.",
-    status: "idea",
-    progressPercent: 25,
-    priority: "low",
-    dueDate: "01/08/2025",
-    updatedAt: "18/04/2025",
-    tasks: [
-      { id: "t11", title: "Đăng ký BotFather Token", completed: true },
-      { id: "t12", title: "Viết lệnh /recent và /backup", completed: false },
-      { id: "t13", title: "Tích hợp Gemini AI tóm tắt", completed: false },
-    ],
-  },
-];
 
 const STATUS_COLUMNS: { id: ProjectStatus; label: string; color: string }[] = [
   { id: "idea", label: "Ý tưởng", color: "border-purple-500/40 text-purple-300" },
@@ -428,7 +360,14 @@ export default function ProjectsPage() {
 
                       {/* Card Bottom Meta */}
                       <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
-                        <span>Hạn: {p.dueDate}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span>Hạn: {p.dueDate}</span>
+                          {isProjectOverdue(p) && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">
+                              Quá hạn
+                            </span>
+                          )}
+                        </span>
                         {p.githubUrl && (
                           <a
                             href={p.githubUrl}
@@ -481,7 +420,14 @@ export default function ProjectsPage() {
                     </td>
                     <td className="py-3 px-4">{getPriorityBadge(p.priority)}</td>
                     <td className="py-3 px-4 text-slate-300 font-mono text-[11px]">
-                      {p.dueDate}
+                      <span className="flex items-center gap-1.5">
+                        <span>{p.dueDate}</span>
+                        {isProjectOverdue(p) && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">
+                            Quá hạn
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
