@@ -1,4 +1,5 @@
 export type ThemeId =
+  | "stark-jarvis"
   | "spring-blossom"
   | "summer-nature"
   | "autumn-leaves"

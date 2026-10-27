@@ -39,8 +39,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <MouseEffectsProvider>
       <div className="relative min-h-screen text-foreground flex overflow-hidden">
-      {/* Layer 0: Scenic Fullscreen Deep Wallpaper */}
-      {currentTheme.bgImage ? (
+      {/* Layer 0: STARK HUD backdrop (grid + vong reactor xoay + duong quet) */}
+      {currentTheme.id === "stark-jarvis" ? (
+        <div className="fixed inset-0 z-0 overflow-hidden bg-[#02070f]">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_75%_55%_at_50%_-5%,rgba(0,217,255,0.16),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_55%_40%_at_95%_110%,rgba(255,179,0,0.08),transparent_60%)]" />
+          <svg className="absolute -right-40 -top-40 w-[560px] h-[560px] opacity-[0.13] animate-spin-slower" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+            <circle cx="50" cy="50" r="48" stroke="#00d9ff" strokeWidth="0.5" strokeDasharray="4 3" />
+            <circle cx="50" cy="50" r="38" stroke="#00d9ff" strokeWidth="0.8" strokeDasharray="10 5" />
+            <circle cx="50" cy="50" r="26" stroke="#ffb300" strokeWidth="0.5" strokeDasharray="2 4" />
+          </svg>
+          <svg className="absolute -left-52 bottom-[-180px] w-[520px] h-[520px] opacity-[0.09] animate-spin-rev" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+            <circle cx="50" cy="50" r="48" stroke="#00d9ff" strokeWidth="0.5" strokeDasharray="3 5" />
+            <circle cx="50" cy="50" r="34" stroke="#00d9ff" strokeWidth="0.8" strokeDasharray="12 6" />
+          </svg>
+          <div className="hud-sweep-line" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,rgba(1,4,10,0.75)_100%)]" />
+        </div>
+      ) : currentTheme.bgImage ? (
         <div
           className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat transition-all duration-700 ease-out transform scale-100"
           style={{ backgroundImage: `url('${currentTheme.bgImage}')` }}

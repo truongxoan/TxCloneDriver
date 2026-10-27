@@ -142,34 +142,22 @@ export function Sidebar({
               href="/overview"
               className="flex items-center gap-3 overflow-hidden group"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform p-1.5 relative overflow-hidden">
-                {/* Embedded High-Resolution Mystic Cyber Daoist Icon */}
-                <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow">
-                  <defs>
-                    <linearGradient id="yinGradSide" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#38bdf8" />
-                      <stop offset="100%" stopColor="#c084fc" />
-                    </linearGradient>
-                  </defs>
-                  {/* Outer Mystic Bagua Circle */}
-                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" strokeWidth="2" strokeOpacity="0.6" strokeDasharray="6 4" />
-                  {/* Yin Yang Symbol */}
-                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradSide)" strokeWidth="2.5" />
-                  <path d="M 50 12 A 38 38 0 0 1 50 88 A 19 19 0 0 1 50 50 A 19 19 0 0 0 50 12 Z" fill="url(#yinGradSide)" />
-                  {/* Dots */}
-                  <circle cx="50" cy="31" r="5" fill="#090d16" />
-                  <circle cx="50" cy="31" r="2.5" fill="#fde047" />
-                  <circle cx="50" cy="69" r="5" fill="#ffffff" />
-                  <circle cx="50" cy="69" r="2.5" fill="#6366f1" />
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center group-hover:scale-105 transition-transform" aria-hidden="true">
+                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full animate-spin-slow">
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#00d9ff" strokeWidth="3" strokeOpacity="0.7" strokeDasharray="8 6" />
                 </svg>
+                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full animate-spin-rev">
+                  <circle cx="50" cy="50" r="34" fill="none" stroke="#00d9ff" strokeWidth="4" strokeOpacity="0.9" strokeDasharray="14 7" />
+                </svg>
+                <div className="arc-core h-3.5 w-3.5 rounded-full bg-cyan-200 shadow-[0_0_14px_4px_rgba(0,217,255,0.85)]" />
               </div>
               {!collapsed && (
                 <div className="flex flex-col truncate">
-                  <span className="text-base font-black tracking-tight text-white leading-none">
-                    MêÂmĐạoSỹ
+                  <span className="font-display text-[15px] font-bold tracking-[0.14em] text-white leading-none">
+                    TXCLONE
                   </span>
-                  <span className="text-[11px] font-semibold text-sky-400/90 tracking-wide mt-0.5">
-                    Cloud Hub
+                  <span className="hud-label text-[9px] text-cyan-300/90 mt-1">
+                    Stark OS · Cloud HUD
                   </span>
                 </div>
               )}
@@ -210,7 +198,7 @@ export function Sidebar({
               <div key={group.category} className="space-y-1">
                 {/* Category Header or Divider */}
                 {!collapsed ? (
-                  <div className={cn("px-3.5 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400 select-none", gIdx > 0 && "pt-2 border-t border-white/5")}>
+                  <div className={cn("px-3.5 pb-1 hud-label text-[10px] text-cyan-200/50 select-none", gIdx > 0 && "pt-2 border-t border-white/5")}>
                     {group.category}
                   </div>
                 ) : (
@@ -235,7 +223,7 @@ export function Sidebar({
                       className={cn(
                         "flex items-center justify-between px-3 py-2 rounded-2xl text-xs font-semibold transition-all group",
                         isActive
-                          ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 font-bold"
+                          ? "relative bg-gradient-to-r from-cyan-500/25 via-cyan-400/10 to-transparent text-white font-bold border border-cyan-300/40 shadow-[0_0_18px_-4px_rgba(0,217,255,0.8),inset_0_0_14px_-8px_rgba(0,217,255,0.9)] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-[3px] before:rounded-full before:bg-amber-400 before:shadow-[0_0_8px_2px_rgba(255,179,0,0.7)]"
                           : isAllowed
                           ? "text-slate-300 hover:text-white hover:bg-white/10"
                           : "text-slate-500 hover:text-slate-300 hover:bg-white/5 opacity-75"
@@ -281,11 +269,11 @@ export function Sidebar({
         {/* Bottom Brand Quote matching user's reference image */}
         {!collapsed && (
           <div className="relative mt-auto pt-4 px-2 pb-2 border-t border-white/10">
-            <p className="text-xs italic text-slate-300 font-serif leading-relaxed opacity-90">
-              &ldquo;Dữ liệu của bạn là tài sản quý giá nhất&rdquo;
+            <p className="hud-label text-[10px] text-cyan-200/70 leading-relaxed">
+              J.A.R.V.I.S — mọi hệ thống đã sẵn sàng, thưa sếp.
             </p>
-            <p className="text-[10px] text-sky-400 font-medium mt-1">
-              — TxCloneDriver Cloud Hub
+            <p className="text-[10px] text-amber-400/90 font-semibold mt-1 tracking-wide">
+              — TxCloneDriver · Stark OS
             </p>
           </div>
         )}

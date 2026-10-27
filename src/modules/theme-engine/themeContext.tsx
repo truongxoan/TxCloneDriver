@@ -37,7 +37,7 @@ function getSeasonTheme(): ThemeId {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId, setThemeIdState] = useState<ThemeId>("autumn-leaves"); // Defaulting to current season (Oct)
+  const [themeId, setThemeIdState] = useState<ThemeId>("stark-jarvis"); // Mặc định mới: giao diện STARK // JARVIS HUD
   const [effectsEnabled, setEffectsEnabledState] = useState<boolean>(true);
   const [isAutoSeason, setIsAutoSeasonState] = useState<boolean>(false);
   const [intensity, setIntensityState] = useState<"low" | "medium" | "high">("medium");
@@ -56,7 +56,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const savedCustom = loadCustomTheme();
       if (savedCustom) setCustomThemeState(savedCustom);
 
-      if (savedAuto === "true") {
+      // Migration 1 lần: toàn bộ máy chuyển sang giao diện Stark HUD mới.
+      const hudMigrated = localStorage.getItem("tx_hud_stark_v1");
+      if (!hudMigrated) {
+        localStorage.setItem("tx_hud_stark_v1", "1");
+        localStorage.setItem("datavault_theme", "stark-jarvis");
+        localStorage.setItem("datavault_auto_season", "false");
+        setThemeIdState("stark-jarvis");
+        setIsAutoSeasonState(false);
+      } else if (savedAuto === "true") {
         setIsAutoSeasonState(true);
         setThemeIdState(getSeasonTheme());
       } else if (savedTheme === "custom" && savedCustom) {

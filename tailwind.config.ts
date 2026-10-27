@@ -10,6 +10,11 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Rajdhani", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Orbitron", "Rajdhani", "ui-sans-serif", "sans-serif"],
+        mono: ["'Share Tech Mono'", "ui-monospace", "monospace"],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
