@@ -14,7 +14,7 @@ export function LiveChatWidget() {
 
   // Encryption mode state
   const [isEncryptMode, setIsEncryptMode] = useState(false);
-  const [encryptPassword, setEncryptPassword] = useState("080497");
+  const [encryptPassword, setEncryptPassword] = useState("");
 
   // Decryption popup/state map: { [msgId]: { guessKey: string, decryptedText?: string, isError?: boolean } }
   const [activeDecryptMsgId, setActiveDecryptMsgId] = useState<string | null>(null);
@@ -273,7 +273,7 @@ export function LiveChatWidget() {
             type="text"
             value={encryptPassword}
             onChange={(e) => setEncryptPassword(e.target.value)}
-            placeholder="Mật mã bí mật (VD: 080497)..."
+            placeholder="Mật mã bí mật của bạn..."
             className="flex-1 px-2 py-0.5 rounded-lg bg-black/40 border border-amber-500/30 text-[11px] text-amber-200 font-mono"
           />
         </div>

@@ -200,7 +200,7 @@ export default function QRCodePage() {
                     { label: "🌐 txlab.io.vn", val: "https://txlab.io.vn" },
                     { label: "📁 Google Drive", val: "https://txlab.io.vn/storage" },
                     { label: "🎮 Kho Game Hub", val: "https://txlab.io.vn/games" },
-                    { label: "💬 TxCloneDriver Secret", val: "TxCloneDriver:080497" },
+                    { label: "💬 TxCloneDriver Secret", val: "TxCloneDriver Hub" },
                   ].map((preset, i) => (
                     <button
                       key={i}

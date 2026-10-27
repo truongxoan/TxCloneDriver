@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { ChatMessage } from "@/modules/chat/types";
+import { getSessionFromRequest } from "@/lib/sessionToken";
 
 const IS_VERCEL = !!process.env.VERCEL;
 const DATA_DIR = IS_VERCEL
@@ -42,6 +43,10 @@ function writeMessages(messages: ChatMessage[]) {
 }
 
 export async function GET(request: Request) {
+  const __session = await getSessionFromRequest(request);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const since = parseInt(searchParams.get("since") || "0", 10);
@@ -77,6 +82,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const __session = await getSessionFromRequest(request);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { message } = body;
@@ -118,6 +127,10 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const __session = await getSessionFromRequest(request);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { id, readAt } = body;
@@ -144,6 +157,10 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const __session = await getSessionFromRequest(request);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");

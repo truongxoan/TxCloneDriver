@@ -26,8 +26,8 @@ import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/modules/auth/authContext";
 import { cn } from "@/lib/utils";
+import { hasLocalPin, setLocalPin, verifyLocalPin } from "@/lib/localPin";
 
-const MASTER_PIN = "080497";
 
 interface MemoryItem {
   id: string;
@@ -167,14 +167,25 @@ export default function MemoriesPage() {
     }, 1800);
   };
 
-  // PIN unlock action
+  // PIN unlock: dùng PIN cục bộ do người dùng tự đặt trên thiết bị này.
+  // Chưa đặt PIN thì lần nhập đầu tiên (từ 4 ký tự) sẽ thành PIN của bạn.
   const handlePinUnlock = () => {
-    if (pinInput === "123e" || pinInput === MASTER_PIN) {
+    if (!hasLocalPin()) {
+      if (setLocalPin(pinInput)) {
+        setIsUnlocked(true);
+        setPinInput("");
+        setPinError(null);
+      } else {
+        setPinError("Hãy đặt PIN ít nhất 4 ký tự cho thiết bị này.");
+      }
+      return;
+    }
+    if (verifyLocalPin(pinInput)) {
       setIsUnlocked(true);
       setPinInput("");
       setPinError(null);
     } else {
-      setPinError("Mã PIN không đúng! (Mặc định: 080497 hoặc 123e)");
+      setPinError("Mã PIN không đúng. Nhập PIN bạn đã tự đặt trên thiết bị này.");
     }
   };
 
@@ -256,7 +267,7 @@ export default function MemoriesPage() {
                 Kho Ảnh & Video Kỷ Niệm 3D
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-2 leading-relaxed">
-                Cuốn album 3D lật trang độc bản lưu giữ những khoảnh khắc quý giá nhất trong cuộc đời. Bảo vệ bằng <strong>FaceID nhận diện khuôn mặt</strong>, <strong>TouchID vân tay</strong> và mã PIN độc lập (<strong>080497</strong>).
+                Cuốn album 3D lật trang độc bản lưu giữ những khoảnh khắc quý giá nhất trong cuộc đời. Bảo vệ bằng <strong>FaceID nhận diện khuôn mặt</strong>, <strong>TouchID vân tay</strong> và mã PIN độc lập do bạn tự đặt trên thiết bị.
               </p>
             </div>
 
@@ -335,7 +346,7 @@ export default function MemoriesPage() {
             {/* Fallback PIN input */}
             <div className="w-full pt-4 border-t border-white/10 space-y-2 max-w-xs">
               <span className="text-[11px] font-semibold text-muted-foreground">
-                Hoặc nhập mã PIN két sắt (080497):
+                Hoặc nhập mã PIN bạn đã tự đặt (lần đầu nhập sẽ thành PIN của bạn):
               </span>
               <div className="flex items-center gap-2">
                 <input

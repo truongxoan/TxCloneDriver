@@ -1,13 +1,24 @@
 import { NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/sessionToken";
+import { isUrlAllowed } from "@/lib/ssrf";
 
 export async function POST(request: Request) {
   try {
+    const __session = await getSessionFromRequest(request);
+    if (!__session) {
+      return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+    }
     const { url } = await request.json();
     if (!url || typeof url !== "string") {
       return NextResponse.json({ success: false, error: "Vui lòng cung cấp link video" }, { status: 400 });
     }
 
     const trimmedUrl = url.trim();
+
+    // Chỉ tải từ các nền tảng được hỗ trợ — chặn dùng API làm proxy tự do.
+    if (!isUrlAllowed(trimmedUrl, ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "tiktok.com", "www.tiktok.com", "vt.tiktok.com", "vm.tiktok.com", "facebook.com", "www.facebook.com", "fb.watch", "instagram.com", "www.instagram.com"])) {
+      return NextResponse.json({ success: false, error: "Link không thuộc nền tảng được hỗ trợ (YouTube, TikTok, Facebook, Instagram)." }, { status: 400 });
+    }
 
     // 1. YouTube Detection
     const ytMatch = trimmedUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{11})/);

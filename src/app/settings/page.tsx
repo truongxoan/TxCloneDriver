@@ -207,11 +207,10 @@ export default function SettingsPage() {
   const approvedUsers = managedUsers.filter((u) => u.status === "approved");
 
   const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
+  // Mật khẩu thật chỉ server giữ, không còn gửi xuống trình duyệt.
   const getUserPlainPass = (u: ManagedUser) => {
-    if (u.plainPassword) return u.plainPassword;
-    if (u.password && !u.password.startsWith("$2")) return u.password;
-    if (u.username.toLowerCase() === "admin") return "kdkctrkn@123";
-    return "21";
+    if (u.username.toLowerCase() === "admin") return "•••••• (chỉ server giữ)";
+    return "Mật khẩu bất kỳ (chỉ cần tài khoản)";
   };
 
   return (
@@ -505,7 +504,7 @@ export default function SettingsPage() {
                                 </div>
 
                                 <span className="text-[10px] px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-mono">
-                                  Master Bypass: <strong className="text-white">123e</strong> (Vào ẩn danh)
+                                  Đăng nhập do <strong className="text-white">server</strong> xác thực (cookie ký)
                                 </span>
                               </div>
                             )}

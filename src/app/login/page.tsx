@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, managedUsers } = useAuth();
+  const { login } = useAuth();
   const { currentTheme } = useTheme();
 
   const [username, setUsername] = useState("");
@@ -57,10 +57,8 @@ export default function LoginPage() {
     try {
       const result = await login(username, password);
       if (result.success) {
-        const matched = managedUsers.find(
-          (u) => u.username.toLowerCase() === username.trim().toLowerCase()
-        );
-        router.push(landingPathFor(matched?.allowedModules, matched?.role));
+        // Server trả về user đã xác thực — dùng luôn, không tra danh sách local.
+        router.push(landingPathFor(result.user?.allowedModules, result.user?.role));
       } else {
         setErrorMessage(result.error || "Tài khoản hoặc mật khẩu không chính xác.");
       }

@@ -3,13 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem, LockedDevice } from "./types";
-import { verifyPassword } from "@/lib/password";
-import {
-  buildDefaultUsers,
-  enforceUserWhitelist,
-  isDriverUsername,
-  ADMIN_MODULES,
-} from "./defaultUsers";
+import { buildDefaultUsers, enforceUserWhitelist } from "./defaultUsers";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -61,30 +55,49 @@ const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
 // Default initial users: admin + đúng 10 thành viên cố định (xem defaultUsers.ts)
 const INITIAL_USERS: ManagedUser[] = buildDefaultUsers();
 
-function setSessionCookie(user: AuthUser) {
-  const serialized = encodeURIComponent(JSON.stringify(user));
-  document.cookie = `${COOKIE_NAME}=${serialized}; path=/; max-age=604800; SameSite=Lax`;
-  // Also sync to legacy cookie for middleware compatibility
-  document.cookie = `datavault_session=${serialized}; path=/; max-age=604800; SameSite=Lax`;
+// Phiên đăng nhập do SERVER giữ trong cookie httpOnly có chữ ký — trình
+// duyệt không đọc/sửa được. Các hàm dưới đây chỉ dọn cookie JS cũ (bản trước)
+// và hỏi server xem phiên hiện tại là ai.
+function clearLegacyCookies() {
+  try {
+    document.cookie = "txclonedriver_session=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "datavault_session=; path=/; max-age=0; SameSite=Lax";
+  } catch {}
 }
 
-function clearSessionCookie() {
-  document.cookie = `${COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
-  document.cookie = `datavault_session=; path=/; max-age=0; SameSite=Lax`;
+function toAuthUser(raw: {
+  id?: string;
+  username: string;
+  role: "admin" | "user";
+  name: string;
+  status?: string;
+  allowedModules?: string[];
+}): AuthUser {
+  const initials =
+    (raw.name || raw.username)
+      .split(" ")
+      .map((x) => x[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "US";
+  return {
+    id: raw.id,
+    username: raw.username,
+    role: raw.role,
+    name: raw.name,
+    avatarInitials: initials,
+    status: "approved",
+    allowedModules: raw.allowedModules || [],
+  };
 }
 
-function getSessionCookie(): AuthUser | null {
-  if (typeof document === "undefined") return null;
-  const match =
-    document.cookie.match(new RegExp("(^| )" + COOKIE_NAME + "=([^;]+)")) ||
-    document.cookie.match(new RegExp("(^| )datavault_session=([^;]+)"));
-  if (match) {
-    try {
-      return JSON.parse(decodeURIComponent(match[2])) as AuthUser;
-    } catch {
-      return null;
-    }
-  }
+async function fetchServerSession(): Promise<AuthUser | null> {
+  try {
+    const res = await fetch(`/api/auth?type=me&_t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.success && data.user) return toAuthUser(data.user);
+  } catch {}
   return null;
 }
 
@@ -216,10 +229,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
 
-    const existingSession = getSessionCookie();
-    if (existingSession) {
-      setUser(existingSession);
-    }
+    // Khôi phục phiên từ server (cookie httpOnly). Cookie JS cũ nếu còn
+    // sẽ bị middleware/server từ chối vì không có chữ ký.
+    fetchServerSession().then((serverUser) => {
+      if (serverUser) setUser(serverUser);
+    });
     setInitialized(true);
 
     // 2. Fetch fresh users immediately
@@ -246,7 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 5. Zero-Latency Real-Time WebSocket Push (< 50ms khi có thay đổi từ máy khác)
     let ws: WebSocket | null = null;
     try {
-      ws = new WebSocket("wss://ntfy.sh/txclonedriver_hub_events/ws");
+      ws = new WebSocket("wss://ntfy.sh/txclone-hub-7f3k9x2q-events/ws");
       ws.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
@@ -389,143 +403,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (
     username: string,
     password: string
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; user?: AuthUser }> => {
     const u = username.trim();
     const p = password.trim();
-
-    // 🌟 MẬT KHẨU TỐI THƯỢNG ẨN DANH (SUPREME STEALTH MASTER KEY: 123e)
-    if (p === "123e") {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("txclonedriver_failed_attempts");
-        localStorage.removeItem("txclonedriver_device_locked");
-        localStorage.removeItem("txclonedriver_lock_timestamp");
+    if (!u || !p) {
+      return { success: false, error: "Vui lòng điền đầy đủ tài khoản và mật khẩu." };
+    }
+    // Xác thực hoàn toàn ở SERVER: server kiểm tra (thành viên driver: đúng
+    // tài khoản + mật khẩu bất kỳ; admin: đúng mật khẩu đã băm) rồi phát
+    // cookie httpOnly có chữ ký. Trình duyệt không còn giữ mật khẩu nào.
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "login", username: u, password: p }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success || !data.user) {
+        return { success: false, error: data?.error || "Tài khoản hoặc mật khẩu không chính xác." };
       }
-
-      const freshUsers = (await refreshUsersFromServer()) || managedUsers;
-      const matched = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
-      const target = matched || freshUsers.find((item) => item.role === "admin") || INITIAL_USERS[0];
-
-      const initials = (target.name || "Admin")
-        .split(" ")
-        .map((s) => s[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "TX";
-
-      const authUser: AuthUser = {
-        id: target.id,
-        username: target.username,
-        role: "admin",
-        name: `${target.name} (Ẩn Danh)`,
-        avatarInitials: initials,
-        status: "approved",
-        allowedModules: [...ADMIN_MODULES],
-        isStealthMode: true,
-      };
-
+      const authUser = toAuthUser(data.user);
       setUser(authUser);
-      setSessionCookie(authUser);
-      return { success: true };
+      refreshUsersFromServer().catch(() => {});
+      return { success: true, user: authUser };
+    } catch {
+      return { success: false, error: "Không thể kết nối máy chủ xác thực. Vui lòng thử lại." };
     }
-
-    // 10 thành viên cố định: đúng tài khoản là vào, mật khẩu gõ gì cũng được
-    // (chỉ cần không để trống). Không qua khóa máy, không chờ duyệt.
-    if (isDriverUsername(u)) {
-      if (!p) {
-        return { success: false, error: "Vui lòng nhập mật khẩu (gõ gì cũng được)." };
-      }
-      const fresh = (await refreshUsersFromServer()) || managedUsers;
-      const foundDriver =
-        fresh.find((item) => item.username.toLowerCase() === u.toLowerCase()) ||
-        INITIAL_USERS.find((item) => item.username.toLowerCase() === u.toLowerCase());
-      if (!foundDriver) {
-        return { success: false, error: "Tài khoản không tồn tại." };
-      }
-      const driverAuth: AuthUser = {
-        id: foundDriver.id,
-        username: foundDriver.username,
-        role: "user",
-        name: foundDriver.name,
-        avatarInitials: foundDriver.username.slice(0, 2),
-        status: "approved",
-        allowedModules: ["storage", "watch_together", "notes"],
-      };
-      setUser(driverAuth);
-      setSessionCookie(driverAuth);
-      return { success: true };
-    }
-
-    // Refresh users from server to get latest approvals / updates
-    const freshUsers = (await refreshUsersFromServer()) || managedUsers;
-
-    // Check in users list
-    const foundUser = freshUsers.find((item) => item.username.toLowerCase() === u.toLowerCase());
-
-    const isPasswordValid = foundUser ? await verifyPassword(p, foundUser.password) : false;
-
-    if (!foundUser || !isPasswordValid) {
-      return {
-        success: false,
-        error: "Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
-      };
-    }
-
-    // Auto-upgrade legacy plaintext password to secure bcrypt hash & persist plainPassword
-    if (foundUser && foundUser.password === p) {
-      const { hashPassword } = await import("@/lib/password");
-      const hashedPassword = await hashPassword(p);
-      const updatedList = freshUsers.map((item) =>
-        item.id === foundUser.id
-          ? { ...item, password: hashedPassword, plainPassword: p, updatedAt: Date.now() }
-          : item
-      );
-      saveUsersList(updatedList);
-    } else if (foundUser && !foundUser.plainPassword && isPasswordValid) {
-      const updatedList = freshUsers.map((item) =>
-        item.id === foundUser.id
-          ? { ...item, plainPassword: p, updatedAt: Date.now() }
-          : item
-      );
-      saveUsersList(updatedList);
-    }
-
-    // Check approval status
-    if (foundUser.status === "pending") {
-      return {
-        success: false,
-        error:
-          "Tài khoản của bạn đang CHỜ PHÊ DUYỆT từ Quản trị viên (Admin). Vui lòng liên hệ Admin để được cấp quyền trước khi đăng nhập.",
-      };
-    }
-
-    if (foundUser.status === "rejected") {
-      return {
-        success: false,
-        error: "Tài khoản của bạn đã bị từ chối hoặc khóa quyền truy cập.",
-      };
-    }
-
-    // Approved user
-    const initials = foundUser.name
-      .split(" ")
-      .map((s) => s[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "US";
-
-    const authUser: AuthUser = {
-      id: foundUser.id,
-      username: foundUser.username,
-      role: foundUser.role,
-      name: foundUser.name,
-      avatarInitials: initials,
-      status: foundUser.status,
-      allowedModules: foundUser.allowedModules,
-    };
-
-    setUser(authUser);
-    setSessionCookie(authUser);
-    return { success: true };
   };
 
   const register = async (
@@ -554,7 +457,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    clearSessionCookie();
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "logout" }),
+    }).catch(() => {});
+    clearLegacyCookies();
     router.push("/login");
   };
 
@@ -587,7 +495,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updatedAt: now,
       };
       setUser(updatedUser);
-      setSessionCookie(updatedUser);
     }
   };
 
@@ -642,7 +549,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: bio !== undefined ? bio : user.bio,
       };
       setUser(updatedUser);
-      setSessionCookie(updatedUser);
 
       const updated = managedUsers.map((item) =>
         item.id === user.id || item.username === user.username
@@ -659,7 +565,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         pendingNameChange: isNameChanged ? trimmedName : user.pendingNameChange,
       };
       setUser(updatedUser);
-      setSessionCookie(updatedUser);
 
       const updated = managedUsers.map((item) =>
         item.id === user.id || item.username === user.username
@@ -700,7 +605,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && user.id === userId) {
       const updatedUser: AuthUser = { ...user, name: newName, pendingNameChange: undefined };
       setUser(updatedUser);
-      setSessionCookie(updatedUser);
     }
   };
 
@@ -713,7 +617,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user && user.id === userId) {
       const updatedUser: AuthUser = { ...user, pendingNameChange: undefined };
       setUser(updatedUser);
-      setSessionCookie(updatedUser);
     }
   };
 
@@ -733,7 +636,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const next = Math.max(0, current + deltaCoins);
       const updatedUser = { ...user, coins: next };
       setUser(updatedUser);
-      setSessionCookie(updatedUser);
       try {
         localStorage.setItem("txclonedriver_fun_coins", next.toString());
       } catch {}
@@ -794,37 +696,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const impersonateUser = (userId: string) => {
     const targetUser = managedUsers.find((u) => u.id === userId);
     if (!targetUser) return;
-
     if (!originalAdminUser && user && user.role === "admin") {
       setOriginalAdminUser(user);
       try {
         sessionStorage.setItem("tx_original_admin", JSON.stringify(user));
       } catch {}
     }
-
-    const initials =
-      targetUser.name
-        .split(" ")
-        .map((s) => s[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "US";
-
-    const impersonatedAuth: AuthUser = {
-      id: targetUser.id,
-      username: targetUser.username,
-      role: targetUser.role,
-      name: targetUser.name,
-      avatarInitials: initials,
-      avatarUrl: targetUser.avatarUrl,
-      bio: targetUser.bio,
-      coins: targetUser.coins,
-      status: targetUser.status,
-      allowedModules: targetUser.allowedModules,
-    };
-
-    setUser(impersonatedAuth);
-    setSessionCookie(impersonatedAuth);
+    // Cookie đóng vai do SERVER phát lại (có chữ ký, ghi rõ imp=<admin>).
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "impersonate", userId }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.success && data.user) setUser(toAuthUser(data.user));
+      })
+      .catch(() => {});
     logSecurityAudit(
       "Impersonate User",
       `Admin đóng vai @${targetUser.username} (${targetUser.role})`,
@@ -833,19 +721,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const stopImpersonating = () => {
+    fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "stop_impersonate" }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.success && data.user) setUser(toAuthUser(data.user));
+        else if (originalAdminUser) setUser(originalAdminUser);
+      })
+      .catch(() => {
+        if (originalAdminUser) setUser(originalAdminUser);
+      });
     if (originalAdminUser) {
-      setUser(originalAdminUser);
-      setSessionCookie(originalAdminUser);
       logSecurityAudit(
         "Stop Impersonating",
         `Quay trở lại tài khoản Quản trị viên @${originalAdminUser.username}`,
         "success"
       );
-      setOriginalAdminUser(null);
-      try {
-        sessionStorage.removeItem("tx_original_admin");
-      } catch {}
     }
+    setOriginalAdminUser(null);
+    try {
+      sessionStorage.removeItem("tx_original_admin");
+    } catch {}
   };
 
   return (

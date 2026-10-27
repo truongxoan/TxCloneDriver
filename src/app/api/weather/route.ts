@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/sessionToken";
 
 /**
  * Server-side Weather API Proxy with Dual Real-time Providers & Robust Caching
@@ -328,6 +329,10 @@ async function fetchFromOpenWeather(apiKey: string, lat?: string | null, lon?: s
 
 // ─── Main Route Handler ──────────────────────────────────────
 export async function GET(request: Request) {
+  const __session = await getSessionFromRequest(request);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
   const { searchParams } = new URL(request.url);
   const latParam = searchParams.get("lat");
   const lonParam = searchParams.get("lon");

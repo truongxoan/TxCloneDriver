@@ -8,7 +8,49 @@ import {
   buildDefaultUsers,
   enforceUserWhitelist,
   isAllowedUsername,
+  isDriverUsername,
+  DRIVER_MODULES,
 } from "@/modules/auth/defaultUsers";
+import { verifyPassword } from "@/lib/password";
+import {
+  SESSION_COOKIE,
+  SESSION_COOKIE_OPTIONS,
+  createSessionToken,
+  getSessionFromRequest,
+} from "@/lib/sessionToken";
+
+// Mật khẩu CHỈ phía server, lưu dạng băm bcrypt (không có mật khẩu thô ở đây,
+// và tuyệt đối không gửi xuống trình duyệt / cloud nữa).
+const SERVER_PASSWORD_HASHES: Record<string, string> = {
+  admin: "$2b$10$xgCGGuyAlU/X.SAZonCE5Owjt5JI.fwq0fKpkfTDag.sVbyOVKoKG",
+  "11": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "22": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "33": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "44": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "55": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "66": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "77": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "88": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "99": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+  "100": "$2b$10$sPHDjGI2wO5CTu06JnQd6ecVVBB4.G.w4yizinGaU3v3WFluP0oTu",
+};
+
+function withServerSecrets(users: ManagedUser[]): ManagedUser[] {
+  return users.map((u) => ({
+    ...u,
+    password: u.password || SERVER_PASSWORD_HASHES[u.username.toLowerCase()],
+  }));
+}
+
+/** Bản user an toàn để trả cho trình duyệt: không mật khẩu dưới bất kỳ dạng nào. */
+function sanitizeUser(u: ManagedUser): ManagedUser {
+  const { password: _pw, plainPassword: _pp, ...rest } = u;
+  void _pw; void _pp;
+  return rest as ManagedUser;
+}
+function sanitizeUsers(users: ManagedUser[]): ManagedUser[] {
+  return users.map(sanitizeUser);
+}
 
 // Hỗ trợ cả môi trường serverless Vercel (/tmp) và máy chủ cục bộ / VPS (thư mục ./data)
 const IS_VERCEL = !!process.env.VERCEL;
@@ -26,7 +68,7 @@ const ROOMS_FILE = path.join(DATA_DIR, "rooms.json");
 const CLOUD_STORE_ID = "ff808181a09d98f701a135d01243556c";
 const CLOUD_API_URL = `https://api.restful-api.dev/objects/${CLOUD_STORE_ID}`;
 
-const INITIAL_USERS: ManagedUser[] = buildDefaultUsers();
+const INITIAL_USERS: ManagedUser[] = withServerSecrets(buildDefaultUsers());
 
 // In-Memory Master Cache (Ultra-fast 0ms response)
 let memoryUsers: ManagedUser[] = [...INITIAL_USERS];
@@ -121,7 +163,7 @@ function readUsersLocal(): ManagedUser[] {
 
 function writeUsersLocal(users: ManagedUser[]) {
   // Never persist a tombstoned user, even if a stale sync carried it in.
-  users = filterDeletedUsers(users);
+  users = withServerSecrets(filterDeletedUsers(users));
   memoryUsers = users;
   if (!ensureDataDir()) return;
   try {
@@ -443,7 +485,8 @@ async function saveToCloudStoreBackground(payload: {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
 
-    const currentUsers = payload.users || memoryUsers;
+    // TUYỆT ĐỐI không đẩy mật khẩu lên cloud công khai nữa.
+    const currentUsers = sanitizeUsers(payload.users || memoryUsers);
     const currentDevices = payload.devices || memoryDevices;
     const currentLogs = payload.logs || memoryAuditLogs;
     const currentRooms = payload.rooms || memoryRooms;
@@ -482,13 +525,13 @@ async function saveToCloudStoreBackground(payload: {
         fetch("https://txlab.io.vn/api/auth", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "sync_users", users: payload.users }),
+          body: JSON.stringify({ action: "sync_users", users: sanitizeUsers(payload.users) }),
         }).catch(() => {});
       }
     }
 
     // Kích hoạt WebSocket Broadcast tức thì
-    fetch("https://ntfy.sh/txclonedriver_hub_events", {
+    fetch("https://ntfy.sh/txclone-hub-7f3k9x2q-events", {
       method: "POST",
       body: JSON.stringify({ event: "sync_update", timestamp: Date.now() }),
     }).catch(() => {});
@@ -512,6 +555,39 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
+    const session = await getSessionFromRequest(request);
+
+    // Phiên hiện tại (dùng để khôi phục đăng nhập sau F5 — cookie httpOnly
+    // nên trình duyệt không tự đọc được, phải hỏi server).
+    if (type === "me") {
+      if (!session) {
+        return NextResponse.json({ success: false, user: null }, { headers: NO_CACHE_HEADERS });
+      }
+      return NextResponse.json(
+        {
+          success: true,
+          user: {
+            id: session.id,
+            username: session.username,
+            role: session.role,
+            name: session.name,
+            status: "approved",
+            allowedModules: session.allowedModules,
+            ...(session.imp ? { impersonatedBy: session.imp } : {}),
+          },
+        },
+        { headers: NO_CACHE_HEADERS }
+      );
+    }
+
+    // Từ đây trở đi: BẮT BUỘC đã đăng nhập. Trước đây ai cũng gọi được và
+    // nhận cả mật khẩu — đó là lỗ hổng nghiêm trọng nhất của hệ thống cũ.
+    if (!session) {
+      return NextResponse.json(
+        { success: false, error: "Chưa đăng nhập." },
+        { status: 401, headers: NO_CACHE_HEADERS }
+      );
+    }
 
     if (type === "rooms") {
       triggerBackgroundCloudFetch().catch(() => {});
@@ -520,12 +596,18 @@ export async function GET(request: Request) {
     }
 
     if (type === "devices") {
+      if (session.role !== "admin") {
+        return NextResponse.json({ success: false, error: "Chỉ admin." }, { status: 403, headers: NO_CACHE_HEADERS });
+      }
       triggerBackgroundCloudFetch().catch(() => {});
       const devices = readDevicesLocal();
       return NextResponse.json({ success: true, devices }, { headers: NO_CACHE_HEADERS });
     }
 
     if (type === "audit") {
+      if (session.role !== "admin") {
+        return NextResponse.json({ success: false, error: "Chỉ admin." }, { status: 403, headers: NO_CACHE_HEADERS });
+      }
       triggerBackgroundCloudFetch().catch(() => {});
       const logs = readAuditLogsLocal();
       return NextResponse.json({ success: true, logs }, { headers: NO_CACHE_HEADERS });
@@ -548,8 +630,6 @@ export async function GET(request: Request) {
           users = mergeUserLists(users, cloudData.users);
           writeUsersLocal(users);
         }
-        // Mark the cloud as freshly fetched so the background trigger does
-        // not immediately repeat the same fetch.
         lastCloudFetchTime = Date.now();
       }
     } catch {
@@ -557,13 +637,13 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(
-      { success: true, users, deletedUsernames: readDeletedUsernamesLocal() },
+      { success: true, users: sanitizeUsers(users), deletedUsernames: readDeletedUsernamesLocal() },
       { headers: NO_CACHE_HEADERS }
     );
   } catch {
     return NextResponse.json(
-      { success: true, users: filterDeletedUsers(memoryUsers), deletedUsernames: readDeletedUsernamesLocal() },
-      { headers: NO_CACHE_HEADERS }
+      { success: false, error: "Lỗi máy chủ." },
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
@@ -573,6 +653,128 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action } = body;
+    const session = await getSessionFromRequest(request);
+    const requireAdmin = () =>
+      session?.role === "admin"
+        ? null
+        : NextResponse.json(
+            { success: false, error: "Chỉ quản trị viên mới thực hiện được thao tác này." },
+            { status: 403, headers: NO_CACHE_HEADERS }
+          );
+    const requireSession = () =>
+      session
+        ? null
+        : NextResponse.json(
+            { success: false, error: "Chưa đăng nhập." },
+            { status: 401, headers: NO_CACHE_HEADERS }
+          );
+
+    // 0. ĐĂNG NHẬP — server xác thực, phát cookie httpOnly có chữ ký.
+    if (action === "login") {
+      const u = String(body.username || "").trim();
+      const pw = String(body.password || "");
+      if (!u || !pw) {
+        return NextResponse.json(
+          { success: false, error: "Vui lòng điền đầy đủ tài khoản và mật khẩu." },
+          { status: 400, headers: NO_CACHE_HEADERS }
+        );
+      }
+      const users = readUsersLocal();
+      const found = users.find((x) => x.username.toLowerCase() === u.toLowerCase());
+      if (!found) {
+        return NextResponse.json(
+          { success: false, error: "Tài khoản hoặc mật khẩu không chính xác." },
+          { status: 401, headers: NO_CACHE_HEADERS }
+        );
+      }
+      if (isDriverUsername(found.username)) {
+        // 10 thành viên cố định: mật khẩu bất kỳ (đã kiểm tra không trống ở trên).
+      } else if (found.role === "admin") {
+        const stored = found.password || SERVER_PASSWORD_HASHES[found.username.toLowerCase()];
+        const ok = await verifyPassword(pw.trim(), stored);
+        if (!ok) {
+          return NextResponse.json(
+            { success: false, error: "Tài khoản hoặc mật khẩu không chính xác." },
+            { status: 401, headers: NO_CACHE_HEADERS }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { success: false, error: "Tài khoản không hợp lệ." },
+          { status: 401, headers: NO_CACHE_HEADERS }
+        );
+      }
+      if (found.status !== "approved") {
+        return NextResponse.json(
+          { success: false, error: "Tài khoản chưa được kích hoạt." },
+          { status: 403, headers: NO_CACHE_HEADERS }
+        );
+      }
+      const token = await createSessionToken({
+        id: found.id,
+        username: found.username,
+        role: found.role,
+        name: found.name,
+        allowedModules: found.role === "admin" ? found.allowedModules : [...DRIVER_MODULES],
+      });
+      const res = NextResponse.json(
+        { success: true, user: sanitizeUser(found) },
+        { headers: NO_CACHE_HEADERS }
+      );
+      res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+      res.cookies.set("datavault_session", token, SESSION_COOKIE_OPTIONS);
+      return res;
+    }
+
+    // 0b. ĐĂNG XUẤT
+    if (action === "logout") {
+      const res = NextResponse.json({ success: true }, { headers: NO_CACHE_HEADERS });
+      res.cookies.set(SESSION_COOKIE, "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+      res.cookies.set("datavault_session", "", { ...SESSION_COOKIE_OPTIONS, maxAge: 0 });
+      return res;
+    }
+
+    // 0c. ADMIN ĐÓNG VAI THÀNH VIÊN / THOÁT ĐÓNG VAI (cookie do server phát lại)
+    if (action === "impersonate") {
+      const denied = requireAdmin();
+      if (denied) return denied;
+      const target = readUsersLocal().find((x) => x.id === body.userId);
+      if (!target) {
+        return NextResponse.json({ success: false, error: "Không tìm thấy thành viên." }, { status: 404, headers: NO_CACHE_HEADERS });
+      }
+      const token = await createSessionToken({
+        id: target.id,
+        username: target.username,
+        role: target.role,
+        name: target.name,
+        allowedModules: target.allowedModules,
+        imp: session!.username,
+      });
+      const res = NextResponse.json({ success: true, user: sanitizeUser(target) }, { headers: NO_CACHE_HEADERS });
+      res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+      res.cookies.set("datavault_session", token, SESSION_COOKIE_OPTIONS);
+      return res;
+    }
+    if (action === "stop_impersonate") {
+      if (!session?.imp) {
+        return NextResponse.json({ success: false, error: "Không ở chế độ đóng vai." }, { status: 400, headers: NO_CACHE_HEADERS });
+      }
+      const adminUser = readUsersLocal().find((x) => x.username.toLowerCase() === session.imp!.toLowerCase());
+      if (!adminUser) {
+        return NextResponse.json({ success: false, error: "Không tìm thấy admin." }, { status: 404, headers: NO_CACHE_HEADERS });
+      }
+      const token = await createSessionToken({
+        id: adminUser.id,
+        username: adminUser.username,
+        role: adminUser.role,
+        name: adminUser.name,
+        allowedModules: adminUser.allowedModules,
+      });
+      const res = NextResponse.json({ success: true, user: sanitizeUser(adminUser) }, { headers: NO_CACHE_HEADERS });
+      res.cookies.set(SESSION_COOKIE, token, SESSION_COOKIE_OPTIONS);
+      res.cookies.set("datavault_session", token, SESSION_COOKIE_OPTIONS);
+      return res;
+    }
 
     // 1. ĐĂNG KÝ TÀI KHOẢN MỚI — ĐÃ TẮT VĨNH VIỄN
     // Hệ thống chỉ có admin + 10 thành viên cố định (11..100). Không tạo thêm user.
@@ -588,6 +790,8 @@ export async function POST(request: Request) {
 
     // 2. CẬP NHẬT PHÂN QUYỀN / DUYỆT TỪNG THÀNH VIÊN TRỰC TIẾP
     if (action === "update_user_permission" || action === "approve_user") {
+      const denied = requireAdmin();
+      if (denied) return denied;
       const { userId, allowedModules, status } = body;
       if (!userId) {
         return NextResponse.json(
@@ -613,13 +817,15 @@ export async function POST(request: Request) {
       writeUsersLocal(updated);
       saveToCloudStoreBackground({ users: updated }).catch(() => {});
 
-      return NextResponse.json({ success: true, users: updated }, { headers: NO_CACHE_HEADERS });
+      return NextResponse.json({ success: true, users: sanitizeUsers(updated) }, { headers: NO_CACHE_HEADERS });
     }
 
     // 2b. XÓA TÀI KHOẢN (server-side, có tombstone để stale sync không
     // khôi phục lại user đã xóa). Idempotent: xóa lại user đã xóa vẫn
     // trả success với danh sách hiện tại.
     if (action === "delete_user") {
+      const denied = requireAdmin();
+      if (denied) return denied;
       const { userId, username } = body;
       if (!userId && !username) {
         return NextResponse.json(
@@ -635,7 +841,7 @@ export async function POST(request: Request) {
           (username && u.username.toLowerCase() === String(username).toLowerCase())
       );
       if (!target) {
-        return NextResponse.json({ success: true, users }, { headers: NO_CACHE_HEADERS });
+        return NextResponse.json({ success: true, users: sanitizeUsers(users) }, { headers: NO_CACHE_HEADERS });
       }
       if (target.role === "admin" || isAllowedUsername(target.username)) {
         return NextResponse.json(
@@ -658,20 +864,43 @@ export async function POST(request: Request) {
       }).catch(() => {});
 
       return NextResponse.json(
-        { success: true, users: updated, deletedUsernames: readDeletedUsernamesLocal() },
+        { success: true, users: sanitizeUsers(updated), deletedUsernames: readDeletedUsernamesLocal() },
         { headers: NO_CACHE_HEADERS }
       );
     }
 
     // 3. ĐỒNG BỘ DANH SÁCH USERS
     if (action === "sync_users") {
+      const denied = requireSession();
+      if (denied) return denied;
       const { users } = body;
       if (Array.isArray(users)) {
         const local = readUsersLocal();
+        if (session!.role !== "admin") {
+          // Thành viên thường: chỉ được cập nhật hồ sơ của CHÍNH mình
+          // (tên chờ duyệt, avatar, bio, xu). Quyền/trạng thái/vai trò và
+          // mọi tài khoản khác luôn lấy theo bản server, bỏ qua dữ liệu gửi lên.
+          const mine = (users as ManagedUser[]).find(
+            (x) => x.username.toLowerCase() === session!.username.toLowerCase()
+          );
+          const constrained = local.map((srv) => {
+            if (!mine || srv.username.toLowerCase() !== session!.username.toLowerCase()) return srv;
+            return {
+              ...srv,
+              avatarUrl: mine.avatarUrl ?? srv.avatarUrl,
+              bio: mine.bio ?? srv.bio,
+              pendingNameChange: mine.pendingNameChange,
+              coins: typeof mine.coins === "number" ? mine.coins : srv.coins,
+            };
+          });
+          writeUsersLocal(constrained);
+          saveToCloudStoreBackground({ users: constrained }).catch(() => {});
+          return NextResponse.json({ success: true, users: sanitizeUsers(constrained) }, { headers: NO_CACHE_HEADERS });
+        }
         const merged = mergeUserLists(local, users);
         writeUsersLocal(merged);
         saveToCloudStoreBackground({ users: merged }).catch(() => {});
-        return NextResponse.json({ success: true, users: merged }, { headers: NO_CACHE_HEADERS });
+        return NextResponse.json({ success: true, users: sanitizeUsers(merged) }, { headers: NO_CACHE_HEADERS });
       }
       return NextResponse.json(
         { success: false, error: "Dữ liệu users không hợp lệ" },
@@ -681,6 +910,8 @@ export async function POST(request: Request) {
 
     // 4. SYNC PHÒNG XEM & NGHE CHUNG
     if (action === "sync_rooms") {
+      const denied = requireSession();
+      if (denied) return denied;
       const { rooms } = body;
       if (Array.isArray(rooms)) {
         writeRoomsLocal(rooms);
@@ -695,6 +926,8 @@ export async function POST(request: Request) {
 
     // 5. SYNC KHÓA MÁY
     if (action === "sync_devices") {
+      const denied = requireAdmin();
+      if (denied) return denied;
       const { devices } = body;
       if (Array.isArray(devices)) {
         writeDevicesLocal(devices);
@@ -709,6 +942,8 @@ export async function POST(request: Request) {
 
     // 6. SYNC NHẬT KÝ AN NINH
     if (action === "sync_audit") {
+      const denied = requireSession();
+      if (denied) return denied;
       const { logs } = body;
       if (Array.isArray(logs)) {
         writeAuditLogsLocal(logs);

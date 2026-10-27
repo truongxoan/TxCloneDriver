@@ -25,9 +25,9 @@ export function SelfDestructNoteWidget() {
   const [mode, setMode] = useState<"create" | "read" | "destroyed">("create");
   const [noteTitle, setNoteTitle] = useState("Kế hoạch Mật Lệnh TxLab 2026");
   const [noteContent, setNoteContent] = useState(
-    "Chào bạn! Đây là bức thư bảo mật cấp cao. Mật khẩu két sắt Master PIN là: 080497. Bức thư này sẽ kích hoạt cơ chế tự hủy trong 60 giây ngay sau khi mở khóa. Đừng chia sẻ cho bất kỳ ai!"
+    "Chào bạn! Đây là bức thư bảo mật cấp cao. Bức thư này sẽ kích hoạt cơ chế tự hủy trong 60 giây ngay sau khi mở khóa. Đừng chia sẻ cho bất kỳ ai!"
   );
-  const [pinCode, setPinCode] = useState("080497");
+  const [pinCode, setPinCode] = useState("1357");
   const [inputPin, setInputPin] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [countdown, setCountdown] = useState(60);
@@ -52,7 +52,7 @@ export function SelfDestructNoteWidget() {
 
   const handleUnlock = () => {
     const clean = inputPin.trim();
-    if (clean === "123e" || clean === "080497" || clean === pinCode.trim()) {
+    if (clean.length > 0 && clean === pinCode.trim()) {
       setIsUnlocked(true);
       setPinError(false);
       setCountdown(60);
@@ -74,7 +74,7 @@ export function SelfDestructNoteWidget() {
     setIsUnlocked(false);
     setCountdown(60);
     setNoteContent(
-      "Chào bạn! Đây là bức thư bảo mật cấp cao. Mật mã két sắt Master PIN là: 080497. Bức thư này sẽ kích hoạt cơ chế tự hủy trong 60 giây ngay sau khi mở khóa!"
+      "Chào bạn! Đây là bức thư bảo mật cấp cao. Bức thư này sẽ kích hoạt cơ chế tự hủy trong 60 giây ngay sau khi mở khóa!"
     );
   };
 

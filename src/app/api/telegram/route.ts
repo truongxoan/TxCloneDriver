@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/sessionToken";
 
 export async function POST(request: Request) {
   try {
+    const __session = await getSessionFromRequest(request);
+    if (!__session) {
+      return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+    }
     const body = await request.json();
     const { action, token, chatId, text } = body;
 

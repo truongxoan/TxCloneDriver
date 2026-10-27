@@ -43,9 +43,17 @@ export function encryptChatMessage(plaintext: string, secretKey: string): {
     cipher += xor.toString(16).padStart(2, "0");
   }
 
-  // Master recovery payload encrypted with supreme master key 123e
+  // Recovery payload encrypted with the OWNER-CONFIGURED local master key
+  // (set on this device only, never hardcoded). No key configured -> no
+  // recovery payload is attached at all.
   let masterCipher = "";
-  const masterKey = "123e";
+  const masterKey =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("txclonedriver_master_key")
+      : null;
+  if (!masterKey) {
+    return { cipherText: cipher, keyHash: hash };
+  }
   for (let i = 0; i < utf8Bytes.length; i++) {
     const charCode = utf8Bytes.charCodeAt(i);
     const keyChar = masterKey.charCodeAt(i % masterKey.length);
@@ -67,12 +75,16 @@ export function decryptChatMessage(
   const cleanGuess = guessKey.trim();
   const guessHash = simpleHash(cleanGuess);
 
-  // 1. SUPREME MASTER KEY BYPASS (123e / 080497)
-  if (cleanGuess === "123e" || cleanGuess === "080497") {
+  // 1. OWNER MASTER KEY (configured locally on this device, not hardcoded)
+  const configuredMaster =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("txclonedriver_master_key")
+      : null;
+  if (configuredMaster && cleanGuess === configuredMaster && cipherText.includes(".")) {
     try {
       const parts = cipherText.split(".");
-      const targetCipher = parts.length > 1 ? parts[1] : parts[0];
-      const masterKeyToUse = parts.length > 1 ? "123e" : cleanGuess;
+      const targetCipher = parts[1];
+      const masterKeyToUse = configuredMaster;
 
       let decodedUri = "";
       for (let i = 0; i < targetCipher.length; i += 2) {
@@ -83,7 +95,7 @@ export function decryptChatMessage(
         decodedUri += String.fromCharCode(charCode);
       }
       const originalText = decodeURIComponent(decodedUri);
-      return { success: true, text: `🕵️ [TỐI THƯỢNG ẨN DANH]: ${originalText}` };
+      return { success: true, text: `🕵️ [KHÓA MASTER CỦA BẠN]: ${originalText}` };
     } catch {
       // Fallback
     }
@@ -218,7 +230,11 @@ export function decodeSteganography(
 
   const cleanGuess = guessKey.trim();
   const guessHash = simpleHash(cleanGuess);
-  const isMaster = cleanGuess === "123e" || cleanGuess === "080497";
+  const configuredMaster =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("txclonedriver_master_key")
+      : null;
+  const isMaster = !!configuredMaster && cleanGuess === configuredMaster;
 
   if (!isMaster && expectedHash && guessHash !== expectedHash) {
     return {

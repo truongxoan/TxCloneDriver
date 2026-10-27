@@ -1,13 +1,27 @@
 import { NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/sessionToken";
+import { isUrlAllowed } from "@/lib/ssrf";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { url } = body;
+  const __session = await getSessionFromRequest(request);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
         { success: false, error: "Đường dẫn Google Apps Script không hợp lệ." },
+        { status: 400 }
+      );
+    }
+
+    // SSRF guard: chỉ proxy tới Google Apps Script / Google Drive chính chủ.
+    if (!isUrlAllowed(url, ["script.google.com", ".googleusercontent.com", "docs.google.com", "drive.google.com"])) {
+      return NextResponse.json(
+        { success: false, error: "URL không thuộc danh sách Google được phép." },
         { status: 400 }
       );
     }

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/sessionToken";
+import { isUrlAllowed } from "@/lib/ssrf";
 
 const MAXCHEAPAI_BASE_URL = "https://maxcheapai.com/api";
 
 export async function POST(req: NextRequest) {
+  const __session = await getSessionFromRequest(req);
+  if (!__session) {
+    return NextResponse.json({ success: false, error: "Chưa đăng nhập." }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { action, apiKey, payload } = body;
@@ -135,10 +141,18 @@ export async function POST(req: NextRequest) {
 
 // GET handler to proxy clean image/video downloads without watermarks
 export async function GET(req: NextRequest) {
+  const __session = await getSessionFromRequest(req);
+  if (!__session) {
+    return new NextResponse("Chưa đăng nhập.", { status: 401 });
+  }
   try {
     const url = req.nextUrl.searchParams.get("url");
     if (!url) {
       return new NextResponse("Thiếu tham số url", { status: 400 });
+    }
+    // SSRF guard: trước đây fetch BẤT KỲ url nào người gọi gửi lên.
+    if (!isUrlAllowed(url, [".maxcheapai.com", "maxcheapai.com", "storage.googleapis.com", ".googleusercontent.com", "drive.google.com"])) {
+      return new NextResponse("URL không thuộc danh sách được phép.", { status: 400 });
     }
 
     const mediaRes = await fetch(url);

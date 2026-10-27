@@ -33,6 +33,7 @@ import {
 import { useChat } from "./chatContext";
 import { useAuth } from "@/modules/auth/authContext";
 import { cn } from "@/lib/utils";
+import { hasLocalPin, setLocalPin, verifyLocalPin, getLocalMasterKey } from "@/lib/localPin";
 import {
   SAMPLE_COVER_TEXTS,
   decodeSteganography,
@@ -40,7 +41,6 @@ import {
   cleanVisibleText,
 } from "./cryptoHelper";
 
-const MASTER_PIN = "080497";
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes inactivity lock
 const BLUR_TIMEOUT_MS = 20 * 1000; // 20 seconds anti-peep blur
 const UNBLUR_SESSION_MS = 60 * 1000; // 60 seconds unblur session expiry
@@ -90,12 +90,12 @@ export function FloatingMessenger() {
   const [showAdminVaultKeys, setShowAdminVaultKeys] = useState(false);
   const [copiedUser, setCopiedUser] = useState<string | null>(null);
 
-  const getUserPassword = (mUser?: { username: string; password?: string; plainPassword?: string }) => {
-    if (!mUser) return "21";
-    if (mUser.plainPassword) return mUser.plainPassword;
-    if (mUser.password && !mUser.password.startsWith("$2")) return mUser.password;
-    if (mUser.username.toLowerCase() === "admin") return "kdkctrkn@123";
-    return "21";
+  // Mật khẩu thật không còn được gửi xuống trình duyệt nữa (server giữ).
+  // Thành viên driver: đăng nhập bằng tài khoản + mật khẩu bất kỳ.
+  const getUserPassword = (mUser?: { username: string }) => {
+    if (!mUser) return "—";
+    if (mUser.username.toLowerCase() === "admin") return "•••••• (chỉ server giữ)";
+    return "Mật khẩu bất kỳ (chỉ cần tài khoản)";
   };
 
   const copyPassword = (username: string, pass: string) => {
@@ -255,10 +255,12 @@ export function FloatingMessenger() {
     }
   }, [messages, isOpen, activeTab, selectedPeer, sizeMode]);
 
-  // Master PIN check supporting supreme key 123e and 080497
+  // PIN cục bộ do người dùng tự đặt trên thiết bị này (không còn PIN cứng).
+  // Chưa đặt PIN thì lần nhập đầu tiên (từ 4 ký tự) sẽ thành PIN của bạn.
   const isMasterPin = (pin: string) => {
     const clean = pin.trim();
-    return clean === "123e" || clean === "080497" || clean === MASTER_PIN;
+    if (!hasLocalPin()) return setLocalPin(clean);
+    return verifyLocalPin(clean);
   };
 
   // Handle Lock / Unlock PIN
@@ -502,7 +504,7 @@ export function FloatingMessenger() {
                     <EyeOff className="w-2.5 h-2.5" /> Mờ 20s
                   </span>
                   <span>&bull;</span>
-                  <span className="text-emerald-300 font-mono text-[9px]">PIN: 080497</span>
+                  <span className="text-emerald-300 font-mono text-[9px]">PIN: bạn tự đặt</span>
                 </span>
               </div>
             </div>
@@ -597,7 +599,7 @@ export function FloatingMessenger() {
                   setIsContentUnblurred(false);
                 }}
                 className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/20 text-muted-foreground hover:text-rose-300 transition-colors cursor-pointer"
-                title="Khóa bảo mật ngay lập tức (Yêu cầu PIN 080497)"
+                title="Khóa bảo mật ngay lập tức (yêu cầu PIN bạn tự đặt)"
               >
                 <Lock className="w-4 h-4" />
               </button>
@@ -635,7 +637,7 @@ export function FloatingMessenger() {
                     SỔ MẬT KHẨU TẤT CẢ THÀNH VIÊN
                   </h5>
                   <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold">
-                    Master Key: 123e
+                    Khóa master: bạn tự đặt trên thiết bị
                   </span>
                 </div>
                 <button
@@ -706,7 +708,7 @@ export function FloatingMessenger() {
                   <input
                     type="password"
                     maxLength={6}
-                    placeholder="Mã PIN (Mặc định: 080497)"
+                    placeholder="Mã PIN bạn tự đặt"
                     value={enteredPin}
                     onChange={(e) => setEnteredPin(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
@@ -1179,7 +1181,7 @@ export function FloatingMessenger() {
                             className="text-[10px] text-sky-400 font-bold mt-1 cursor-pointer flex items-center gap-1 hover:underline"
                           >
                             <Lock className="w-3 h-3" /> Đã làm mờ chống nhìn trộm (Nhấn để mở bằng
-                            PIN 080497)
+                            PIN của bạn)
                           </span>
                         )}
                       </div>
@@ -1391,7 +1393,7 @@ export function FloatingMessenger() {
                 <input
                   type="password"
                   maxLength={6}
-                  placeholder="Mã PIN (080497)"
+                  placeholder="Mã PIN của bạn"
                   value={unblurPin}
                   onChange={(e) => setUnblurPin(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleConfirmUnblur()}
@@ -1446,13 +1448,13 @@ export function FloatingMessenger() {
                   }}
                   className="w-full text-center text-xs px-3 py-2 rounded-xl bg-black/60 border border-white/20 text-white focus:outline-none focus:border-amber-500 font-mono"
                 />
-                {isAdmin && (
+                {isAdmin && getLocalMasterKey() && (
                   <button
                     type="button"
-                    onClick={() => setDecryptGuess("123e")}
+                    onClick={() => setDecryptGuess(getLocalMasterKey() || "")}
                     className="text-[10px] text-amber-300 hover:text-white underline font-mono cursor-pointer"
                   >
-                    ⚡ Dùng Mật Khẩu Tối Thượng 123e
+                    ⚡ Dùng khóa master bạn đã đặt trên thiết bị này
                   </button>
                 )}
                 <div className="flex items-center gap-2 pt-1">
@@ -1505,13 +1507,13 @@ export function FloatingMessenger() {
                   }}
                   className="w-full text-center text-xs px-3 py-2 rounded-xl bg-black/60 border border-purple-400/40 text-white focus:outline-none focus:border-purple-400 font-mono"
                 />
-                {isAdmin && (
+                {isAdmin && getLocalMasterKey() && (
                   <button
                     type="button"
-                    onClick={() => setStegoGuessKey("123e")}
+                    onClick={() => setStegoGuessKey(getLocalMasterKey() || "")}
                     className="text-[10px] text-purple-300 hover:text-white underline font-mono cursor-pointer"
                   >
-                    ⚡ Dùng Mật Khẩu Tối Thượng 123e
+                    ⚡ Dùng khóa master bạn đã đặt trên thiết bị này
                   </button>
                 )}
                 {stegoError && (

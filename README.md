@@ -60,3 +60,10 @@ Hệ thống **chỉ có 11 tài khoản cố định** — **không có chức 
   - Đăng nhập: nhập đúng tài khoản, **mật khẩu gõ gì cũng được** (chỉ cần không để trống).
   - Quyền hạn (cả 10 người đều giống nhau): chỉ **Google Drive**, **Xem & Nghe Chung** và **Ghi chú & Link**.
   - Không xem được các phân hệ khác, kể cả khi gõ URL trực tiếp.
+
+## 🔐 BẢO MẬT (bản siết chặt)
+
+- Đăng nhập do **server** xác thực; phiên là cookie `httpOnly` có chữ ký HMAC — không còn mật khẩu nào được gửi xuống trình duyệt hay đẩy lên cloud công khai.
+- Đã xóa khóa master viết sẵn trong code (`123e` / PIN `080497`). PIN của Kỷ niệm / Messenger / ghi chú là **PIN bạn tự đặt trên từng thiết bị**; khóa khôi phục tin nhắn cũng do admin tự đặt trên thiết bị.
+- **Việc cần làm trên Vercel (1 phút):** vào Project → Settings → Environment Variables, thêm `TX_AUTH_SECRET` = một chuỗi dài ngẫu nhiên bất kỳ (30+ ký tự), rồi Redeploy. Đây là chìa khóa ký cookie, chỉ nằm trên Vercel. Chưa đặt thì hệ thống dùng khóa dự phòng trong code (vẫn chạy, nhưng đặt rồi mới kín hoàn toàn vì repo là public).
+- Sau khi bản này deploy, mọi phiên đăng nhập cũ đều hết hiệu lực — đăng nhập lại một lần.

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionFromRequest } from "@/lib/sessionToken";
 
 export async function GET(request: NextRequest) {
   try {
+    const __session = await getSessionFromRequest(request);
+    if (!__session) {
+      return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 

@@ -7,7 +7,7 @@ export const TRUONGXOAN_GITHUB_REPOS: NoteItem[] = [
     category: "github",
     url: "https://github.com/truongxoan/TxCloneDriver",
     content:
-      "Dự án Web App chính chủ cao cấp của @truongxoan: Quản trị và đồng bộ dữ liệu đám mây đa nguồn kết hợp Google Drive (Apps Script failover bảo mật), Telegram Bot 24/7, Két sắt bảo mật AES Master PIN 080497, Dynamic Island đồng bộ âm thanh Drive, Rạp chiếu phim xem chung (Watch Party), Lịch âm dương truyền thống Việt Nam, Đấu trường game PvP, Trung tâm học tiếng Trung HSK và Sổ quản lý chi tiêu.",
+      "Dự án Web App chính chủ cao cấp của @truongxoan: Quản trị và đồng bộ dữ liệu đám mây đa nguồn kết hợp Google Drive (Apps Script failover bảo mật), Telegram Bot 24/7, Két sắt bảo mật AES, Dynamic Island đồng bộ âm thanh Drive, Rạp chiếu phim xem chung (Watch Party), Lịch âm dương truyền thống Việt Nam, Đấu trường game PvP, Trung tâm học tiếng Trung HSK và Sổ quản lý chi tiêu.",
     tags: ["GitHub", "Owner", "TypeScript", "Next.js", "Cloud"],
     isPinned: true,
     updatedAt: "11/10/2026",

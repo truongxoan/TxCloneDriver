@@ -148,7 +148,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     // Zero-Latency Real-Time WebSocket Push (< 50ms)
     let ws: WebSocket | null = null;
     try {
-      ws = new WebSocket("wss://ntfy.sh/txclonedriver_hub_events/ws");
+      ws = new WebSocket("wss://ntfy.sh/txclone-hub-7f3k9x2q-events/ws");
       ws.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
@@ -205,7 +205,7 @@ export function WatchPartyProvider({ children }: { children: React.ReactNode }) 
     }).catch(() => {});
 
     // Broadcast instant update signal to all connected clients
-    fetch("https://ntfy.sh/txclonedriver_hub_events", {
+    fetch("https://ntfy.sh/txclone-hub-7f3k9x2q-events", {
       method: "POST",
       body: JSON.stringify({ event: "sync_update", timestamp: Date.now() }),
     }).catch(() => {});

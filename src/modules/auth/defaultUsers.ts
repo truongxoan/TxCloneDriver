@@ -119,11 +119,11 @@ export function landingPathFor(modules: string[] | undefined, role?: string): st
 }
 
 export function buildDefaultUsers(): ManagedUser[] {
+  // KHÔNG để mật khẩu thật ở đây: file này được import cả phía trình duyệt
+  // (bundle public). Mật khẩu thật chỉ nằm phía server (api/auth/route.ts).
   const admin: ManagedUser = {
     id: "u-admin",
     username: "admin",
-    password: "kdkctrkn@123",
-    plainPassword: "kdkctrkn@123",
     name: "Quản trị viên Tối cao",
     avatarInitials: "TX",
     coins: 50000,
@@ -137,10 +137,8 @@ export function buildDefaultUsers(): ManagedUser[] {
   const drivers: ManagedUser[] = DRIVER_USERNAMES.map((username, i) => ({
     id: `u-driver-${username}`,
     username,
-    // Mật khẩu lưu chỉ để tương thích dữ liệu cũ; đăng nhập của 10 thành viên
-    // chấp nhận bất kỳ mật khẩu không trống nào (xem authContext.login).
-    password: "21",
-    plainPassword: "21",
+    // Không có trường password: đăng nhập của 10 thành viên do server xác
+    // thực (đúng tài khoản + mật khẩu bất kỳ), không cần mật khẩu lưu ở đây.
     name: `Thành viên ${username}`,
     avatarInitials: username.slice(0, 2),
     coins: 50000,

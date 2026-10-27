@@ -86,7 +86,7 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   managedUsers: ManagedUser[];
-  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string; user?: AuthUser }>;
   loginWithGoogle: (googleProfile: { email: string; name: string; avatarUrl?: string }) => Promise<{ success: boolean; error?: string }>;
   register: (username: string, password: string, name: string, confirmPassword?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
