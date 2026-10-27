@@ -311,7 +311,7 @@ export default function P2PSharePage() {
   };
 
   return (
-    <ModuleGuard moduleId="overview" moduleName="P2P Direct Share">
+    <ModuleGuard moduleId="storage" moduleName="P2P Direct Share">
       <div className="space-y-6 pb-20 max-w-4xl mx-auto">
         {/* Header Banner */}
         <div className="p-6 rounded-3xl glass-panel border border-white/15 bg-gradient-to-r from-emerald-950/70 via-teal-950/50 to-slate-950/90 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">

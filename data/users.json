@@ -3,6 +3,7 @@
     "id": "u-admin",
     "username": "admin",
     "password": "kdkctrkn@123",
+    "plainPassword": "kdkctrkn@123",
     "name": "Quản trị viên Tối cao",
     "avatarInitials": "TX",
     "coins": 50000,
@@ -31,53 +32,186 @@
     ],
     "createdAt": "10/10/2026",
     "provider": "local",
-    "updatedAt": 1792276584167
+    "updatedAt": 1728500000000
   },
   {
-    "id": "u-member-a",
+    "id": "u-driver-11",
     "username": "11",
     "password": "21",
-    "name": "Thành viên A (Chỉ Google Drive)",
+    "name": "Thành viên 11",
     "avatarInitials": "11",
     "coins": 50000,
     "role": "user",
     "status": "approved",
     "allowedModules": [
-      "storage"
+      "storage",
+      "watch_together",
+      "notes"
     ],
     "createdAt": "10/10/2026",
     "provider": "local",
     "updatedAt": 1728500000000
   },
   {
-    "id": "u-member-b",
-    "username": "userb",
+    "id": "u-driver-22",
+    "username": "22",
     "password": "21",
-    "name": "Thành viên B (Google Drive & Dự án)",
-    "avatarInitials": "UB",
+    "name": "Thành viên 22",
+    "avatarInitials": "22",
     "coins": 50000,
     "role": "user",
     "status": "approved",
     "allowedModules": [
       "storage",
-      "projects"
+      "watch_together",
+      "notes"
     ],
     "createdAt": "10/10/2026",
     "provider": "local",
-    "updatedAt": 1728500000000
+    "updatedAt": 1728500000001
   },
   {
-    "id": "u-member-pending",
-    "username": "hocvien_moi",
+    "id": "u-driver-33",
+    "username": "33",
     "password": "21",
-    "name": "Học viên Đăng ký mới (Chờ duyệt)",
-    "avatarInitials": "HV",
+    "name": "Thành viên 33",
+    "avatarInitials": "33",
     "coins": 50000,
     "role": "user",
-    "status": "pending",
-    "allowedModules": [],
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
     "createdAt": "10/10/2026",
     "provider": "local",
-    "updatedAt": 1728500000000
+    "updatedAt": 1728500000002
+  },
+  {
+    "id": "u-driver-44",
+    "username": "44",
+    "password": "21",
+    "name": "Thành viên 44",
+    "avatarInitials": "44",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000003
+  },
+  {
+    "id": "u-driver-55",
+    "username": "55",
+    "password": "21",
+    "name": "Thành viên 55",
+    "avatarInitials": "55",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000004
+  },
+  {
+    "id": "u-driver-66",
+    "username": "66",
+    "password": "21",
+    "name": "Thành viên 66",
+    "avatarInitials": "66",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000005
+  },
+  {
+    "id": "u-driver-77",
+    "username": "77",
+    "password": "21",
+    "name": "Thành viên 77",
+    "avatarInitials": "77",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000006
+  },
+  {
+    "id": "u-driver-88",
+    "username": "88",
+    "password": "21",
+    "name": "Thành viên 88",
+    "avatarInitials": "88",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000007
+  },
+  {
+    "id": "u-driver-99",
+    "username": "99",
+    "password": "21",
+    "name": "Thành viên 99",
+    "avatarInitials": "99",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000008
+  },
+  {
+    "id": "u-driver-100",
+    "username": "100",
+    "password": "21",
+    "name": "Thành viên 100",
+    "avatarInitials": "10",
+    "coins": 50000,
+    "role": "user",
+    "status": "approved",
+    "allowedModules": [
+      "storage",
+      "watch_together",
+      "notes"
+    ],
+    "createdAt": "10/10/2026",
+    "provider": "local",
+    "updatedAt": 1728500000009
   }
 ]

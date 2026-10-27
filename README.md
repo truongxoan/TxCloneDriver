@@ -50,16 +50,13 @@ Nhấp đúp chuột vào file **`start-server.bat`** trong thư mục dự án:
 
 ## 🚀 TÀI KHOẢN MẶC ĐỊNH HỆ THỐNG
 
+Hệ thống **chỉ có 11 tài khoản cố định** — **không có chức năng đăng ký thành viên**:
+
 - **Quản trị viên Tối cao (Admin)**:
   - Tài khoản: `admin`
   - Mật khẩu: `kdkctrkn@123`
-  - Quyền hạn: Toàn quyền tất cả các phân hệ, duyệt thành viên, phân quyền.
-- **Thành viên A**:
-  - Tài khoản: `11`
-  - Mật khẩu: `21`
-  - Quyền hạn: Chỉ được mở Google Drive.
-- **Thành viên B**:
-  - Tài khoản: `userb`
-  - Mật khẩu: `21`
-  - Quyền hạn: Chỉ được mở Google Drive và Dự án.
-- **Mã PIN mở Két Sắt Mật Khẩu**: `123456`
+  - Quyền hạn: Toàn quyền tất cả các phân hệ.
+- **10 thành viên**: `11`, `22`, `33`, `44`, `55`, `66`, `77`, `88`, `99`, `100`
+  - Đăng nhập: nhập đúng tài khoản, **mật khẩu gõ gì cũng được** (chỉ cần không để trống).
+  - Quyền hạn (cả 10 người đều giống nhau): chỉ **Google Drive**, **Xem & Nghe Chung** và **Ghi chú & Link**.
+  - Không xem được các phân hệ khác, kể cả khi gõ URL trực tiếp.

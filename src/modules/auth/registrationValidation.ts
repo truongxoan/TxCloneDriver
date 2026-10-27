@@ -1,35 +1,6 @@
-// Shared registration validation, used by the login form, authContext and
-// the /api/auth register endpoint so all three enforce the same rules.
-// Messages are in Vietnamese and are shown to the user as-is.
-export function validateRegistration(input: {
-  username: string;
-  password: string;
-  name: string;
-  confirmPassword?: string;
-}): string | null {
-  const name = (input.name || "").trim();
-  if (!name) {
-    return "Vui lòng nhập họ và tên.";
-  }
-
-  const username = (input.username || "").trim();
-  if (!username) {
-    return "Vui lòng nhập tên tài khoản.";
-  }
-  if (username.length < 3 || /\s/.test(username)) {
-    return "Tên tài khoản phải có ít nhất 3 ký tự và không chứa khoảng trắng.";
-  }
-
-  const password = (input.password || "").trim();
-  if (password.length < 6) {
-    return "Mật khẩu phải có ít nhất 6 ký tự.";
-  }
-
-  if (input.confirmPassword !== undefined) {
-    if ((input.confirmPassword || "").trim() !== password) {
-      return "Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.";
-    }
-  }
-
-  return null;
+// Đăng ký thành viên đã bị TẮT vĩnh viễn (hệ thống chỉ có admin + 10 thành
+// viên cố định trong defaultUsers.ts). File này được giữ lại dưới dạng stub
+// để các import cũ không vỡ, nhưng không còn logic đăng ký nào nữa.
+export function registrationDisabledMessage(): string {
+  return "Chức năng đăng ký đã bị tắt. Hệ thống chỉ có các tài khoản được cấp sẵn.";
 }

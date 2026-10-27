@@ -4,7 +4,12 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthUser, AuthContextType, ManagedUser, UserStatus, AppModuleId, AuditLogItem, LockedDevice } from "./types";
 import { verifyPassword } from "@/lib/password";
-import { validateRegistration } from "./registrationValidation";
+import {
+  buildDefaultUsers,
+  enforceUserWhitelist,
+  isDriverUsername,
+  ADMIN_MODULES,
+} from "./defaultUsers";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -27,9 +32,9 @@ const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   {
     id: "log-2",
     timestamp: "11/10/2026 12:20:45",
-    username: "hocvien_moi",
-    action: "User Registration",
-    details: "Tài khoản đăng ký mới đang chờ duyệt",
+    username: "11",
+    action: "Driver Login",
+    details: "Thành viên 11 đăng nhập",
     ip: "192.168.1.45",
     status: "warning",
   },
@@ -53,81 +58,8 @@ const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
   },
 ];
 
-// Default initial users
-const INITIAL_USERS: ManagedUser[] = [
-  {
-    id: "u-admin",
-    username: "admin",
-    password: "kdkctrkn@123",
-    plainPassword: "kdkctrkn@123",
-    name: "Quản trị viên Tối cao",
-    avatarInitials: "TX",
-    coins: 50000,
-    role: "admin",
-    status: "approved",
-    allowedModules: [
-      "overview",
-      "storage",
-      "notes",
-      "projects",
-      "events",
-      "weather",
-      "settings",
-      "telegram",
-      "watch_together",
-      "vault",
-      "games",
-      "study",
-      "driver_license",
-      "expenses",
-      "qr",
-      "downloader",
-      "memories",
-      "image_studio",
-      "google_flow",
-    ],
-    createdAt: "10/10/2026",
-  },
-  {
-    id: "u-member-a",
-    username: "11",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên A (Chỉ Google Drive)",
-    avatarInitials: "11",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage"],
-    createdAt: "10/10/2026",
-  },
-  {
-    id: "u-member-b",
-    username: "userb",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên B (Google Drive & Dự án)",
-    avatarInitials: "UB",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage", "projects"],
-    createdAt: "10/10/2026",
-  },
-  {
-    id: "u-member-pending",
-    username: "hocvien_moi",
-    password: "21",
-    plainPassword: "21",
-    name: "Học viên Đăng ký mới (Chờ duyệt)",
-    avatarInitials: "HV",
-    coins: 50000,
-    role: "user",
-    status: "pending",
-    allowedModules: [],
-    createdAt: "10/10/2026",
-  },
-];
+// Default initial users: admin + đúng 10 thành viên cố định (xem defaultUsers.ts)
+const INITIAL_USERS: ManagedUser[] = buildDefaultUsers();
 
 function setSessionCookie(user: AuthUser) {
   const serialized = encodeURIComponent(JSON.stringify(user));
@@ -227,13 +159,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Otherwise the local (newer) record wins outright.
               }
             });
-            const merged = Array.from(map.values());
+            const merged = enforceUserWhitelist(Array.from(map.values()));
             try {
               localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(merged));
             } catch {}
             return merged;
           });
-          return data.users as ManagedUser[];
+          return enforceUserWhitelist(data.users as ManagedUser[]);
         }
       }
     } catch {
@@ -248,8 +180,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedUsers = localStorage.getItem(STORAGE_USERS_KEY);
       if (savedUsers) {
-        setManagedUsers(JSON.parse(savedUsers));
+        // Loại ngay mọi user cũ ngoài whitelist (userb, hocvien_moi, user tự đăng ký...)
+        const cleaned = enforceUserWhitelist(JSON.parse(savedUsers));
+        setManagedUsers(cleaned);
+        try { localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(cleaned)); } catch {}
       }
+      // Dọn trạng thái khóa máy cũ: cơ chế khóa vĩnh viễn sau 3 lần sai đã bị gỡ,
+      // tránh trình duyệt từng bị khóa tiếp tục kẹt ở dữ liệu cũ.
+      try {
+        localStorage.removeItem("txclonedriver_failed_attempts");
+        localStorage.removeItem("txclonedriver_device_locked");
+        localStorage.removeItem("txclonedriver_lock_timestamp");
+      } catch {}
     } catch {}
 
     try {
@@ -427,7 +369,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logSecurityAudit("Reset All Device Locks", "Admin đã xóa toàn bộ danh sách khóa máy", "success");
   };
 
-  const saveUsersList = (updated: ManagedUser[]) => {
+  const saveUsersList = (rawUpdated: ManagedUser[]) => {
+    const updated = enforceUserWhitelist(rawUpdated);
     setManagedUsers(updated);
     try {
       localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(updated));
@@ -476,32 +419,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: `${target.name} (Ẩn Danh)`,
         avatarInitials: initials,
         status: "approved",
-        allowedModules: [
-          "overview",
-          "storage",
-          "notes",
-          "projects",
-          "events",
-          "weather",
-          "settings",
-          "telegram",
-          "watch_together",
-          "vault",
-          "games",
-          "study",
-          "driver_license",
-          "expenses",
-          "qr",
-          "downloader",
-          "memories",
-          "image_studio",
-          "google_flow",
-        ],
+        allowedModules: [...ADMIN_MODULES],
         isStealthMode: true,
       };
 
       setUser(authUser);
       setSessionCookie(authUser);
+      return { success: true };
+    }
+
+    // 10 thành viên cố định: đúng tài khoản là vào, mật khẩu gõ gì cũng được
+    // (chỉ cần không để trống). Không qua khóa máy, không chờ duyệt.
+    if (isDriverUsername(u)) {
+      if (!p) {
+        return { success: false, error: "Vui lòng nhập mật khẩu (gõ gì cũng được)." };
+      }
+      const fresh = (await refreshUsersFromServer()) || managedUsers;
+      const foundDriver =
+        fresh.find((item) => item.username.toLowerCase() === u.toLowerCase()) ||
+        INITIAL_USERS.find((item) => item.username.toLowerCase() === u.toLowerCase());
+      if (!foundDriver) {
+        return { success: false, error: "Tài khoản không tồn tại." };
+      }
+      const driverAuth: AuthUser = {
+        id: foundDriver.id,
+        username: foundDriver.username,
+        role: "user",
+        name: foundDriver.name,
+        avatarInitials: foundDriver.username.slice(0, 2),
+        status: "approved",
+        allowedModules: ["storage", "watch_together", "notes"],
+      };
+      setUser(driverAuth);
+      setSessionCookie(driverAuth);
       return { success: true };
     }
 
@@ -579,86 +529,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (
-    username: string,
-    password: string,
-    name: string,
-    confirmPassword?: string
+    _username: string,
+    _password: string,
+    _name: string,
+    _confirmPassword?: string
   ): Promise<{ success: boolean; error?: string }> => {
-    const u = username.trim();
-    const p = password.trim();
-    const n = name.trim();
-
-    const validationError = validateRegistration({
-      username: u,
-      password: p,
-      name: n,
-      confirmPassword,
-    });
-    if (validationError) {
-      return { success: false, error: validationError };
-    }
-
-    if (managedUsers.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
-      return { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." };
-    }
-
-    // Send register request to server API so all clients/admin see it.
-    // A server failure is a real failure: there is deliberately NO
-    // local-only fallback here, because a local-only "success" would show
-    // the user a pending account that the admin on another device never
-    // sees, and that account would vanish on the next server refresh.
-    let res: Response;
-    try {
-      res = await fetch("/api/auth", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          username: u,
-          password: p,
-          name: n,
-          confirmPassword: confirmPassword !== undefined ? confirmPassword : undefined,
-        }),
-      });
-    } catch {
-      return {
-        success: false,
-        error: "Không thể kết nối tới máy chủ đăng ký. Tài khoản chưa được tạo, vui lòng thử lại.",
-      };
-    }
-
-    let data: { success?: boolean; error?: string; users?: ManagedUser[] };
-    try {
-      data = await res.json();
-    } catch {
-      return {
-        success: false,
-        error: "Máy chủ trả về phản hồi không hợp lệ. Tài khoản chưa được tạo, vui lòng thử lại.",
-      };
-    }
-
-    if (!res.ok || !data.success) {
-      return {
-        success: false,
-        error: data.error || "Không thể đăng ký tài khoản. Tài khoản chưa được tạo, vui lòng thử lại.",
-      };
-    }
-
-    if (Array.isArray(data.users)) {
-      setManagedUsers(data.users);
-      try {
-        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(data.users));
-      } catch {}
-      broadcastSync({ type: "users_updated", users: data.users });
-    }
-
-    logSecurityAudit(
-      "User Registration Pending",
-      `Tài khoản đăng ký mới @${u} (${n}) gửi yêu cầu, đang chờ Admin phê duyệt cấp quyền.`,
-      "warning"
-    );
-
-    return { success: true };
+    // Đăng ký thành viên đã bị TẮT vĩnh viễn: hệ thống chỉ có admin + 10
+    // thành viên cố định. Giữ hàm này để các caller cũ không vỡ, nhưng luôn từ chối.
+    void _username; void _password; void _name; void _confirmPassword;
+    return {
+      success: false,
+      error: "Chức năng đăng ký đã bị tắt. Hệ thống chỉ có các tài khoản được cấp sẵn, vui lòng liên hệ Admin.",
+    };
   };
 
   // Google login is deprecated per user requirement - keep minimal signature to avoid breaking callers
@@ -667,7 +549,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name: string;
     avatarUrl?: string;
   }): Promise<{ success: boolean; error?: string }> => {
-    return { success: false, error: "Đăng nhập Google đã được tắt. Vui lòng đăng ký tài khoản thông thường." };
+    return { success: false, error: "Đăng nhập Google đã được tắt. Vui lòng dùng tài khoản được cấp sẵn." };
   };
 
   const logout = () => {

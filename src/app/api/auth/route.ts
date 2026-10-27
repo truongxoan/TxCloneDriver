@@ -4,8 +4,11 @@ import path from "path";
 import os from "os";
 import { ManagedUser, LockedDevice, AuditLogItem } from "@/modules/auth/types";
 import { SyncRoom } from "@/modules/watch-party/types";
-import { hashPassword } from "@/lib/password";
-import { validateRegistration } from "@/modules/auth/registrationValidation";
+import {
+  buildDefaultUsers,
+  enforceUserWhitelist,
+  isAllowedUsername,
+} from "@/modules/auth/defaultUsers";
 
 // Hỗ trợ cả môi trường serverless Vercel (/tmp) và máy chủ cục bộ / VPS (thư mục ./data)
 const IS_VERCEL = !!process.env.VERCEL;
@@ -23,88 +26,7 @@ const ROOMS_FILE = path.join(DATA_DIR, "rooms.json");
 const CLOUD_STORE_ID = "ff808181a09d98f701a135d01243556c";
 const CLOUD_API_URL = `https://api.restful-api.dev/objects/${CLOUD_STORE_ID}`;
 
-const INITIAL_USERS: ManagedUser[] = [
-  {
-    id: "u-admin",
-    username: "admin",
-    password: "kdkctrkn@123",
-    plainPassword: "kdkctrkn@123",
-    name: "Quản trị viên Tối cao",
-    avatarInitials: "TX",
-    coins: 50000,
-    role: "admin",
-    status: "approved",
-    allowedModules: [
-      "overview",
-      "storage",
-      "notes",
-      "projects",
-      "events",
-      "weather",
-      "settings",
-      "telegram",
-      "watch_together",
-      "vault",
-      "games",
-      "study",
-      "driver_license",
-      "expenses",
-      "qr",
-      "downloader",
-      "memories",
-      "image_studio",
-      "google_flow",
-    ],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
-  {
-    id: "u-member-a",
-    username: "11",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên A (Chỉ Google Drive)",
-    avatarInitials: "11",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage"],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
-  {
-    id: "u-member-b",
-    username: "userb",
-    password: "21",
-    plainPassword: "21",
-    name: "Thành viên B (Google Drive & Dự án)",
-    avatarInitials: "UB",
-    coins: 50000,
-    role: "user",
-    status: "approved",
-    allowedModules: ["storage", "projects"],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
-  {
-    id: "u-member-pending",
-    username: "hocvien_moi",
-    password: "21",
-    plainPassword: "21",
-    name: "Học viên Đăng ký mới (Chờ duyệt)",
-    avatarInitials: "HV",
-    coins: 50000,
-    role: "user",
-    status: "pending",
-    allowedModules: [],
-    createdAt: "10/10/2026",
-    provider: "local",
-    updatedAt: 1728500000000,
-  },
-];
+const INITIAL_USERS: ManagedUser[] = buildDefaultUsers();
 
 // In-Memory Master Cache (Ultra-fast 0ms response)
 let memoryUsers: ManagedUser[] = [...INITIAL_USERS];
@@ -154,9 +76,13 @@ function isDeletedUsername(username: string): boolean {
 }
 
 function filterDeletedUsers(users: ManagedUser[]): ManagedUser[] {
+  // Whitelist cứng: chỉ admin + 10 thành viên cố định mới được tồn tại.
+  // Mọi user cũ (userb, hocvien_moi...) hoặc user tự đăng ký đều bị loại ở đây,
+  // kể cả khi dữ liệu cloud/local cũ cố merge chúng trở lại.
+  const whitelisted = enforceUserWhitelist(users || []);
   const deleted = readDeletedUsernamesLocal();
-  if (deleted.length === 0) return users;
-  return users.filter((u) => !deleted.includes(u.username.toLowerCase()));
+  if (deleted.length === 0) return whitelisted;
+  return whitelisted.filter((u) => !deleted.includes(u.username.toLowerCase()));
 }
 
 function ensureDataDir() {
@@ -356,7 +282,7 @@ function mergeUserLists(primary: ManagedUser[], secondary: ManagedUser[]): Manag
     }
   }
 
-  return Array.from(map.values());
+  return enforceUserWhitelist(Array.from(map.values()));
 }
 
 // ---------------------------------------------------------------------------
@@ -648,92 +574,15 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
 
-    // 1. ĐĂNG KÝ TÀI KHOẢN MỚI
+    // 1. ĐĂNG KÝ TÀI KHOẢN MỚI — ĐÃ TẮT VĨNH VIỄN
+    // Hệ thống chỉ có admin + 10 thành viên cố định (11..100). Không tạo thêm user.
     if (action === "register") {
-      const { username, password, name, confirmPassword } = body;
-      const u = (username || "").trim();
-      const p = (password || "").trim();
-      const n = (name || "").trim();
-
-      const validationError = validateRegistration({
-        username: u,
-        password: p,
-        name: n,
-        confirmPassword: confirmPassword !== undefined ? confirmPassword : undefined,
-      });
-      if (validationError) {
-        return NextResponse.json(
-          { success: false, error: validationError },
-          { status: 400, headers: NO_CACHE_HEADERS }
-        );
-      }
-
-      // A re-registration with a previously deleted username is legitimate:
-      // clear its tombstone so the new record is not filtered out.
-      if (isDeletedUsername(u)) {
-        writeDeletedUsernamesLocal(
-          readDeletedUsernamesLocal().filter((d) => d !== u.toLowerCase())
-        );
-      }
-
-      let users = readUsersLocal();
-
-      // Kiểm tra trùng username
-      if (users.some((item) => item.username.toLowerCase() === u.toLowerCase())) {
-        return NextResponse.json(
-          { success: false, error: "Tên tài khoản này đã tồn tại trên hệ thống. Vui lòng chọn tên khác." },
-          { status: 400, headers: NO_CACHE_HEADERS }
-        );
-      }
-
-      const now = new Date();
-      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
-        now.getMonth() + 1
-      ).padStart(2, "0")}/${now.getFullYear()}`;
-
-      // Băm mật khẩu bằng bcrypt bảo vệ danh tính và dữ liệu người dùng
-      const hashedPassword = await hashPassword(p);
-
-      const newUser: ManagedUser = {
-        id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        username: u,
-        password: hashedPassword,
-        plainPassword: p,
-        name: n,
-        role: "user",
-        status: "pending",
-        allowedModules: [],
-        createdAt: dateStr,
-        coins: 50000,
-        provider: "local",
-        updatedAt: Date.now(),
-      };
-
-      const updated = [...users, newUser];
-      writeUsersLocal(updated);
-
-      const logs = readAuditLogsLocal();
-      const ts = `${dateStr} ${String(now.getHours()).padStart(2, "0")}:${String(
-        now.getMinutes()
-      ).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-      const newLog: AuditLogItem = {
-        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-        timestamp: ts,
-        username: u,
-        action: "User Registration Pending",
-        details: `Tài khoản mới @${u} (${n}) gửi yêu cầu, đang chờ Admin duyệt.`,
-        ip: "Client Machine",
-        status: "warning",
-      };
-      const updatedLogs = [newLog, ...logs].slice(0, 100);
-      writeAuditLogsLocal(updatedLogs);
-
-      // Lưu lên cloud trong background (không block UI phản hồi)
-      saveToCloudStoreBackground({ users: updated, logs: updatedLogs }).catch(() => {});
-
       return NextResponse.json(
-        { success: true, user: newUser, users: updated },
-        { headers: NO_CACHE_HEADERS }
+        {
+          success: false,
+          error: "Chức năng đăng ký đã bị tắt. Hệ thống chỉ có các tài khoản được cấp sẵn.",
+        },
+        { status: 403, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -788,9 +637,9 @@ export async function POST(request: Request) {
       if (!target) {
         return NextResponse.json({ success: true, users }, { headers: NO_CACHE_HEADERS });
       }
-      if (target.role === "admin") {
+      if (target.role === "admin" || isAllowedUsername(target.username)) {
         return NextResponse.json(
-          { success: false, error: "Không thể xóa tài khoản quản trị viên." },
+          { success: false, error: "Không thể xóa tài khoản cố định của hệ thống (admin + 10 thành viên)." },
           { status: 400, headers: NO_CACHE_HEADERS }
         );
       }

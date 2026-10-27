@@ -147,14 +147,14 @@ export function Sidebar({
                 <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow">
                   <defs>
                     <linearGradient id="yinGradSide" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="#38bdf8" />
-                      <stop offset="100%" stop-color="#c084fc" />
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#c084fc" />
                     </linearGradient>
                   </defs>
                   {/* Outer Mystic Bagua Circle */}
-                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" stroke-width="2" stroke-opacity="0.6" stroke-dasharray="6 4" />
+                  <circle cx="50" cy="50" r="46" fill="none" stroke="#38bdf8" strokeWidth="2" strokeOpacity="0.6" strokeDasharray="6 4" />
                   {/* Yin Yang Symbol */}
-                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradSide)" stroke-width="2.5" />
+                  <circle cx="50" cy="50" r="38" fill="#090d16" stroke="url(#yinGradSide)" strokeWidth="2.5" />
                   <path d="M 50 12 A 38 38 0 0 1 50 88 A 19 19 0 0 1 50 50 A 19 19 0 0 0 50 12 Z" fill="url(#yinGradSide)" />
                   {/* Dots */}
                   <circle cx="50" cy="31" r="5" fill="#090d16" />
@@ -199,7 +199,14 @@ export function Sidebar({
 
           {/* Navigation Items */}
           <nav className="space-y-3 overflow-y-auto max-h-[calc(100vh-270px)] pr-1 no-scrollbar">
-            {SIDEBAR_GROUPS.map((group, gIdx) => (
+            {SIDEBAR_GROUPS.map((group) => ({
+              ...group,
+              // Thành viên thường chỉ thấy đúng module được cấp (Drive / Xem chung / Ghi chú).
+              // Admin thấy tất cả. Module chưa có quyền được ẩn hẳn thay vì hiện khóa gây rối mắt.
+              items: group.items.filter((it) => isAdmin || hasModuleAccess(it.module)),
+            }))
+              .filter((group) => group.items.length > 0)
+              .map((group, gIdx) => (
               <div key={group.category} className="space-y-1">
                 {/* Category Header or Divider */}
                 {!collapsed ? (
